@@ -39,7 +39,8 @@ import {
   MicOff,
   Volume2,
   VolumeX,
-  Plus
+  Plus,
+  User
 } from 'lucide-react';
 import {
   Chart as ChartJS,
