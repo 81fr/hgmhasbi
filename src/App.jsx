@@ -40,7 +40,7 @@ import {
   Volume2,
   VolumeX,
   Plus,
-  User
+  UserCircle
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -533,7 +533,7 @@ const App = () => {
                   <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>{asset.category} <span style={{margin:'0 0.3rem', opacity:0.5}}>|</span> {DEPRECIATION_METHODS[asset.method]}</div>
                 </td>
                 <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{fontWeight:600, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.3rem'}}><User size={12} color="#64748b" /> {asset.custody}</div>
+                  <div style={{fontWeight:600, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.3rem'}}><UserCircle size={12} color="#64748b" /> {asset.custody}</div>
                   <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>المورد: {asset.source}</div>
                 </td>
                 <td style={{padding:'1.2rem 1rem', fontWeight:700}}>{(asset.cost + (asset.vat || 0)).toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></td>
