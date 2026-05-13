@@ -584,58 +584,95 @@ const App = () => {
     
     return (
       <div className="view-anim">
-        <div style={{background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding:'1.5rem', borderRadius:'16px', color:'white', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.5)', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1rem'}}>
+        <div style={{background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding:'2rem', borderRadius:'16px', color:'white', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.5)', display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem'}}>
           <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>إجمالي المدين</div>
-            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#ef4444'}}>{totalDebit.toLocaleString()} ر.س</div>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>إجمالي المدين (DR)</div>
+            <div style={{fontSize:'1.75rem', fontWeight:800, color:'#fb7185'}}>{totalDebit.toLocaleString()} <span style={{fontSize:'0.9rem', fontWeight:400, opacity:0.7}}>ر.س</span></div>
           </div>
           <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>إجمالي الدائن</div>
-            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#10b981'}}>{totalCredit.toLocaleString()} ر.س</div>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>إجمالي الدائن (CR)</div>
+            <div style={{fontSize:'1.75rem', fontWeight:800, color:'#34d399'}}>{totalCredit.toLocaleString()} <span style={{fontSize:'0.9rem', fontWeight:400, opacity:0.7}}>ر.س</span></div>
+          </div>
+          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>قيود غير مرحلة</div>
+            <div style={{fontSize:'1.75rem', fontWeight:800, color:'#fbbf24'}}>{draftCount} <span style={{fontSize:'0.9rem', fontWeight:400, opacity:0.7}}>قيد</span></div>
           </div>
           <div>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>قيود معلقة (مسودة)</div>
-            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#f59e0b'}}>{draftCount} قيود</div>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>توازن الدفاتر</div>
+            <div style={{fontSize:'1.25rem', fontWeight:700, color: totalDebit === totalCredit ? '#10b981' : '#ef4444'}}>
+              {totalDebit === totalCredit ? '✓ متوازنة' : '⚠ غير متوازنة'}
+            </div>
+            <div style={{fontSize:'0.75rem', opacity:0.6}}>نظام المطابقة الآلي نشط</div>
           </div>
         </div>
 
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-          <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><FileText size={24} color="var(--accent)" /> قيود اليومية التلقائية</h2>
-          <div style={{display:'flex', gap:'0.5rem'}}>
-            <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)'}} onClick={() => { showToast('تم فك الترحيل وإعادة القيود لحالة المسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> فك / إلغاء الترحيل</button>
-            <button className="btn btn-primary" onClick={() => { showToast('تم ترحيل القيود المعلقة بنجاح'); setJournals(journals.map(j => ({...j, status: 'مرحل'}))); }}><FileText size={18} /> ترحيل القيود</button>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 3fr', gap:'1.5rem', marginBottom:'2rem'}}>
+          <div className="card">
+             <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>نشاط التدوين الأسبوعي</h3>
+             <div style={{height:'220px'}}>
+                <Line data={{
+                  labels: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
+                  datasets: [{
+                    label: 'عدد القيود',
+                    data: [12, 19, 15, 28, 22],
+                    borderColor: 'var(--accent)',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'var(--accent)'
+                  }]
+                }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
+             </div>
+             <div style={{marginTop:'1.5rem', padding:'1rem', background:'#f0f9ff', borderRadius:'8px', fontSize:'0.8rem', color:'#0369a1', border:'1px solid #bae6fd'}}>
+                <Sparkles size={14} style={{marginLeft:'0.4rem'}} />
+                <strong>تحليل النمط الزمني:</strong> يلاحظ كثافة في توليد القيود يوم الأربعاء نتيجة إغلاق عهد الموظفين؛ نوصي بجدولة الترحيل النهائي صباح الخميس لضمان دقة التقارير.
+             </div>
           </div>
-        </div>
-        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
-          <table style={{width:'100%', borderCollapse:'collapse'}}>
-            <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
-              <tr>
-                <th style={{padding:'1rem', textAlign:'right'}}>رقم القيد</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>البيان</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>مدين</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>دائن</th>
-                <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
-              </tr>
-            </thead>
-            <tbody>
-              {journals.map((j, idx) => (
-                <tr key={idx} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
-                  <td style={{padding:'1rem', fontWeight:700, color:'#0f172a'}}>{j.id}</td>
-                  <td style={{padding:'1rem'}}>{j.date}</td>
-                  <td style={{padding:'1rem', fontWeight:600}}>{j.desc}</td>
-                  <td style={{padding:'1rem', color:'var(--danger)', fontWeight:700}}>{j.debit ? j.debit.toLocaleString() : '-'}</td>
-                  <td style={{padding:'1rem', color:'var(--success)', fontWeight:700}}>{j.credit ? j.credit.toLocaleString() : '-'}</td>
-                  <td style={{padding:'1rem', textAlign:'center'}}>
-                    {j.status === 'مرحل' ? 
-                      <span className="badge b-active" style={{padding:'0.4rem 1rem'}}>مرحل</span> : 
-                      <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem'}}>مسودة</span>
-                    }
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+
+          <div>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+              <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><FileText size={24} color="var(--accent)" /> سجل قيود اليومية المركزية</h2>
+              <div style={{display:'flex', gap:'0.5rem'}}>
+                <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)', padding:'0.6rem 1.2rem'}} onClick={() => { showToast('تم فك ترحيل جميع القيود وإعادتها كمسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> إلغاء الترحيل الجماعي</button>
+                <button className="btn btn-primary" style={{padding:'0.6rem 1.2rem'}} onClick={() => { showToast('تم ترحيل كافة القيود المعلقة للسجلات المالية'); setJournals(journals.map(j => ({...j, status: 'مرحل'}))); }}><FileText size={18} /> ترحيل كافة القيود</button>
+              </div>
+            </div>
+            <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
+              <table style={{width:'100%', borderCollapse:'collapse'}}>
+                <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
+                  <tr>
+                    <th style={{padding:'1rem', textAlign:'right'}}>الرقم المرجعي</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>البيان المحاسبي</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>المدين (DR)</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>الدائن (CR)</th>
+                    <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {journals.map((j, idx) => (
+                    <tr key={j.id} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                      <td style={{padding:'1rem', fontWeight:700, color:'#0f172a'}}>{j.id}</td>
+                      <td style={{padding:'1rem', fontSize:'0.85rem'}}>{j.date}</td>
+                      <td style={{padding:'1rem'}}>
+                         <div style={{fontWeight:600}}>{j.desc}</div>
+                         <div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>المصدر: نظام الأصول الثابتة الآلي</div>
+                      </td>
+                      <td style={{padding:'1rem', color:'#e11d48', fontWeight:700}}>{j.debit ? j.debit.toLocaleString() : '-'}</td>
+                      <td style={{padding:'1rem', color:'#10b981', fontWeight:700}}>{j.credit ? j.credit.toLocaleString() : '-'}</td>
+                      <td style={{padding:'1rem', textAlign:'center'}}>
+                        {j.status === 'مرحل' ? 
+                          <span className="badge b-active" style={{padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><CheckCircle size={12}/> مرحل</span> : 
+                          <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><Activity size={12}/> مسودة</span>
+                        }
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       </div>
     );
