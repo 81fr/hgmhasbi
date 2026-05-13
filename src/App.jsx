@@ -471,7 +471,7 @@ const App = () => {
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
         <h2 style={{fontSize:'1.25rem'}}>تقارير الجرد الميداني</h2>
-        <button className="btn btn-primary"><CheckCircle size={18} /> بدء جرد جديد</button>
+        <button className="btn btn-primary" onClick={() => setView('new-inventory')}><CheckCircle size={18} /> بدء جرد جديد</button>
       </div>
       <div style={{display: 'grid', gap: '1rem'}}>
         <div className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.5rem'}}>
@@ -482,6 +482,44 @@ const App = () => {
           <div><div style={{fontWeight:600, fontSize:'1.1rem'}}>جرد الربع الثاني 2024</div><div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>الفرع الرئيسي فقط</div></div>
           <div><span className="badge" style={{background:'#fef3c7', color:'#92400e', fontSize:'0.9rem'}}>قيد التنفيذ 45%</span></div>
         </div>
+      </div>
+    </div>
+  );
+
+  const renderNewInventory = () => (
+    <div className="view-anim">
+      <div style={{marginBottom:'2rem'}}>
+        <h2 style={{fontSize:'1.25rem'}}>بدء جرد ميداني جديد</h2>
+        <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>قم بتحديد نطاق الجرد وتعيين لجان الجرد للبدء</p>
+      </div>
+      <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
+        <form onSubmit={(e) => { e.preventDefault(); alert('تم إطلاق حملة الجرد بنجاح وإرسال الإشعارات لأعضاء اللجنة الميدانية.'); setView('inventory'); }} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+            <label style={{fontSize: '0.85rem', fontWeight: 600}}>اسم حملة الجرد</label>
+            <input type="text" required placeholder="مثال: جرد الربع الثالث 2024" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+          </div>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+            <label style={{fontSize: '0.85rem', fontWeight: 600}}>تاريخ الإغلاق المتوقع</label>
+            <input type="date" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', colorScheme: 'dark'}} />
+          </div>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
+            <label style={{fontSize: '0.85rem', fontWeight: 600}}>نطاق الجرد (الأقسام / الفروع)</label>
+            <select required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+              <option value="all">شامل لجميع الفروع والأقسام</option>
+              <option value="main">الفرع الرئيسي فقط</option>
+              <option value="it">قسم تقنية المعلومات فقط</option>
+              <option value="waqf">أصول الأوقاف فقط</option>
+            </select>
+          </div>
+          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
+            <label style={{fontSize: '0.85rem', fontWeight: 600}}>رئيس لجنة الجرد الميداني</label>
+            <input type="text" required placeholder="اسم رئيس اللجنة المعتمد" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+          </div>
+          <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
+            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>إطلاق الحملة</button>
+            <button type="button" className="btn btn-ghost" onClick={() => setView('inventory')} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -578,6 +616,7 @@ const App = () => {
           {view === 'new-transfer' && renderNewTransfer()}
           {view === 'budget' && renderBudget()}
           {view === 'inventory' && renderInventory()}
+          {view === 'new-inventory' && renderNewInventory()}
           {view === 'settings' && renderSettings()}
         </div>
       </main>
