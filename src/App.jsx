@@ -85,23 +85,47 @@ const App = () => {
   };
 
   const [assets, setAssets] = useState([
-    { id: 'ORG-AST-001', code: 'IT-001', name: 'خوادم البيانات المركزية', category: 'أصول تقنية', cost: 120000, vat: 18000, salvage: 10000, life: 5, date: '2023-01-01', method: 'SL', status: 'يعمل', custody: 'أحمد سالم', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-002', code: 'VH-021', name: 'أسطول سيارات التوزيع', category: 'مركبات', cost: 450000, vat: 67500, salvage: 50000, life: 7, date: '2022-06-15', method: 'DB', status: 'يعمل', custody: 'محمد العبدالله', source: 'البلاد' },
-    { id: 'ORG-AST-003', code: 'LD-001', name: 'أرض المقر الرئيسي', category: 'أراضي', cost: 1500000, vat: 0, salvage: 1500000, life: 99, date: '2015-01-01', method: 'SL', status: 'يعمل', custody: '-', source: 'تبرعات عينية' },
-    { id: 'ORG-AST-004', code: 'WAQ-001', name: 'مبنى الوقف السكني', category: 'أصول أوقاف', cost: 3000000, vat: 0, salvage: 500000, life: 40, date: '2018-05-10', method: 'SL', status: 'يعمل', custody: 'إدارة الأوقاف', source: 'تبرعات عينية' },
-    { id: 'ORG-AST-005', code: 'OF-015', name: 'طابعة مكتبية صغيرة', category: 'أثاث', cost: 1500, vat: 225, salvage: 0, life: 3, date: '2024-01-10', method: 'SL', status: 'يعمل', custody: 'سعد فهد', source: 'موردين', isExpense: true },
+    { id: 'ORG-AST-001', code: 'IT-001', name: 'خوادم البيانات المركزية (Mainframe)', category: 'أصول تقنية', cost: 1200000, vat: 180000, salvage: 100000, life: 5, date: '2023-01-01', method: 'SL', status: 'يعمل', custody: 'أحمد سالم', source: 'بنك الراجحي' },
+    { id: 'ORG-AST-002', code: 'VH-021', name: 'أسطول سيارات التوزيع الدفعة الأولى', category: 'مركبات', cost: 450000, vat: 67500, salvage: 50000, life: 7, date: '2022-06-15', method: 'DB', status: 'يعمل', custody: 'محمد العبدالله', source: 'البلاد' },
+    { id: 'ORG-AST-003', code: 'LD-001', name: 'أرض المقر الرئيسي (حي الصحافة)', category: 'أراضي', cost: 15000000, vat: 0, salvage: 15000000, life: 99, date: '2015-01-01', method: 'SL', status: 'يعمل', custody: '-', source: 'تبرعات عينية' },
+    { id: 'ORG-AST-004', code: 'WAQ-001', name: 'مبنى الوقف السكني التجاري', category: 'أصول أوقاف', cost: 8500000, vat: 0, salvage: 1500000, life: 40, date: '2018-05-10', method: 'SL', status: 'يعمل', custody: 'إدارة الأوقاف', source: 'تبرعات عينية' },
+    { id: 'ORG-AST-005', code: 'OF-015', name: 'طابعة مكتبية ليزرية', category: 'أثاث ومعدات', cost: 1500, vat: 225, salvage: 0, life: 3, date: '2024-01-10', method: 'SL', status: 'يعمل', custody: 'سعد فهد', source: 'موردين', isExpense: true },
+    { id: 'ORG-AST-006', code: 'IT-002', name: 'أجهزة حاسب آلي (لاب توب) للإدارة', category: 'أصول تقنية', cost: 350000, vat: 52500, salvage: 20000, life: 4, date: '2022-11-20', method: 'SYD', status: 'يعمل', custody: 'قسم تقنية المعلومات', source: 'موردين' },
+    { id: 'ORG-AST-007', code: 'VH-022', name: 'سيارة نقل ثقيل مرسيدس', category: 'مركبات', cost: 380000, vat: 57000, salvage: 60000, life: 10, date: '2020-03-05', method: 'DB', status: 'بالمستودع', custody: 'صالح اليامي', source: 'بنك الراجحي' },
+    { id: 'ORG-AST-008', code: 'OF-016', name: 'أثاث مكتبي صالة الاستقبال', category: 'أثاث ومعدات', cost: 45000, vat: 6750, salvage: 5000, life: 5, date: '2023-08-12', method: 'SL', status: 'يعمل', custody: 'إدارة المرافق', source: 'بنك البلاد' },
+    { id: 'ORG-AST-009', code: 'IT-003', name: 'تجهيزات شبكة سيسكو', category: 'أصول تقنية', cost: 180000, vat: 27000, salvage: 15000, life: 5, date: '2021-02-18', method: 'SL', status: 'يعمل', custody: 'أحمد سالم', source: 'موردين' },
+    { id: 'ORG-AST-010', code: 'BD-001', name: 'مبنى المستودعات اللوجستية', category: 'مباني', cost: 3200000, vat: 480000, salvage: 400000, life: 33, date: '2019-09-30', method: 'SL', status: 'يعمل', custody: 'الإدارة الهندسية', source: 'بنك الراجحي' },
+    { id: 'ORG-AST-011', code: 'VH-023', name: 'باص نقل موظفين 30 راكب', category: 'مركبات', cost: 220000, vat: 33000, salvage: 30000, life: 8, date: '2021-07-25', method: 'DB', status: 'تالف', custody: 'قسم النقل', source: 'البلاد' },
+    { id: 'ORG-AST-012', code: 'IT-004', name: 'شاشات عرض تفاعلية للتدريب', category: 'أصول تقنية', cost: 55000, vat: 8250, salvage: 5000, life: 4, date: '2023-10-10', method: 'SYD', status: 'يعمل', custody: 'مركز التدريب', source: 'موردين' },
+    { id: 'ORG-AST-013', code: 'OF-017', name: 'مكيفات مركزية للمبنى الإداري', category: 'أثاث ومعدات', cost: 280000, vat: 42000, salvage: 25000, life: 10, date: '2019-05-15', method: 'SL', status: 'يعمل', custody: 'إدارة المرافق', source: 'بنك الراجحي' },
+    { id: 'ORG-AST-014', code: 'WAQ-002', name: 'مزرعة وقفية بالقصيم', category: 'أصول أوقاف', cost: 5500000, vat: 0, salvage: 2000000, life: 25, date: '2017-12-01', method: 'SL', status: 'يعمل', custody: 'إدارة الأوقاف', source: 'تبرعات عينية' },
+    { id: 'ORG-AST-015', code: 'LD-002', name: 'أرض فضاء للاستثمار', category: 'أراضي', cost: 8000000, vat: 0, salvage: 8000000, life: 99, date: '2020-01-20', method: 'SL', status: 'بالمستودع', custody: '-', source: 'بنك البلاد' },
+    { id: 'ORG-AST-016', code: 'IT-005', name: 'رخص برمجيات أوراكل (CAPEX)', category: 'أصول تقنية', cost: 750000, vat: 112500, salvage: 0, life: 5, date: '2022-04-01', method: 'SL', status: 'يعمل', custody: 'قسم تقنية المعلومات', source: 'موردين' },
+    { id: 'ORG-AST-017', code: 'OF-018', name: 'آلة تصوير مستندات ضخمة', category: 'أثاث ومعدات', cost: 35000, vat: 5250, salvage: 2000, life: 5, date: '2024-02-05', method: 'SL', status: 'يعمل', custody: 'إدارة الشؤون الإدارية', source: 'البلاد' },
+    { id: 'ORG-AST-018', code: 'VH-024', name: 'رافعة شوكية للمستودع', category: 'مركبات', cost: 120000, vat: 18000, salvage: 15000, life: 10, date: '2021-08-11', method: 'DB', status: 'يعمل', custody: 'محمد العبدالله', source: 'بنك الراجحي' },
+    { id: 'ORG-AST-019', code: 'BD-002', name: 'مبنى فرع جدة', category: 'مباني', cost: 4500000, vat: 675000, salvage: 600000, life: 40, date: '2016-11-30', method: 'SL', status: 'يعمل', custody: 'الإدارة الهندسية', source: 'بنك الراجحي' },
+    { id: 'ORG-AST-020', code: 'IT-006', name: 'نظام الحماية من الاختراقات (Firewalls)', category: 'أصول تقنية', cost: 210000, vat: 31500, salvage: 10000, life: 4, date: '2023-06-20', method: 'SYD', status: 'يعمل', custody: 'أحمد سالم', source: 'موردين' },
   ]);
 
   const [journals, setJournals] = useState([
-    { id: 'JV-2024-001', date: '2024-03-01', desc: 'إثبات إهلاك شهر مارس', debit: 15200, credit: null, status: 'مرحل' },
-    { id: 'JV-2024-001', date: '2024-03-01', desc: 'مجمع إهلاك الأصول', debit: null, credit: 15200, status: 'مرحل' },
-    { id: 'JV-2024-002', date: '2024-04-01', desc: 'إثبات إهلاك شهر أبريل', debit: 15200, credit: null, status: 'مسودة' },
-    { id: 'JV-2024-002', date: '2024-04-01', desc: 'مجمع إهلاك الأصول', debit: null, credit: 15200, status: 'مسودة' },
+    { id: 'JV-2024-001', date: '2024-01-31', desc: 'إثبات إهلاك شهر يناير', debit: 45200, credit: null, status: 'مرحل' },
+    { id: 'JV-2024-001', date: '2024-01-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45200, status: 'مرحل' },
+    { id: 'JV-2024-015', date: '2024-02-28', desc: 'إثبات إهلاك شهر فبراير', debit: 45850, credit: null, status: 'مرحل' },
+    { id: 'JV-2024-015', date: '2024-02-28', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45850, status: 'مرحل' },
+    { id: 'JV-2024-032', date: '2024-03-31', desc: 'إثبات إهلاك شهر مارس', debit: 46100, credit: null, status: 'مرحل' },
+    { id: 'JV-2024-032', date: '2024-03-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 46100, status: 'مرحل' },
+    { id: 'JV-2024-048', date: '2024-04-30', desc: 'إثبات إهلاك شهر أبريل', debit: 46100, credit: null, status: 'مسودة' },
+    { id: 'JV-2024-048', date: '2024-04-30', desc: 'مجمع إهلاك الأصول', debit: null, credit: 46100, status: 'مسودة' },
+    { id: 'JV-2024-051', date: '2024-05-05', desc: 'تسوية بيع خردة (سيارة تالفة)', debit: 15000, credit: null, status: 'مسودة' },
+    { id: 'JV-2024-051', date: '2024-05-05', desc: 'أرباح بيع أصول ثابتة', debit: null, credit: 15000, status: 'مسودة' },
   ]);
 
   const [transfers, setTransfers] = useState([
     { id: 'TR-092', asset: 'تجهيزات المكتب الرئيسي', from: 'الإدارة', to: 'الموارد البشرية', date: '2024-01-15', status: 'مكتمل' },
     { id: 'TR-093', asset: 'آلة تغليف صناعية', from: 'المستودع', to: 'الإنتاج', date: '2024-02-20', status: 'قيد المراجعة' },
+    { id: 'TR-094', asset: 'باص نقل موظفين 30 راكب', from: 'الإنتاج', to: 'المستودع', date: '2024-03-05', status: 'مرفوض' },
+    { id: 'TR-095', asset: 'أجهزة حاسب آلي للإدارة', from: 'قسم تقنية المعلومات', to: 'الموارد البشرية', date: '2024-04-12', status: 'مكتمل' },
+    { id: 'TR-096', asset: 'طابعة مكتبية ليزرية', from: 'الإدارة', to: 'المبيعات', date: '2024-05-02', status: 'قيد المراجعة' },
   ]);
 
   const accountingEngine = useMemo(() => {
