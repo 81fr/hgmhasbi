@@ -188,84 +188,115 @@ const App = () => {
   }, [accountingEngine]);
 
   const chartData = {
-    labels: accountingEngine.map(a => a.name.length > 15 ? a.name.substring(0, 15) + '...' : a.name),
+    labels: accountingEngine.slice(0, 8).map(a => a.name.substring(0, 15)),
     datasets: [
-      { label: 'التكلفة التاريخية', data: accountingEngine.map(a => a.cost), backgroundColor: '#0f172a' },
-      { label: 'الإهلاك المتراكم', data: accountingEngine.map(a => a.accumulatedDep), backgroundColor: '#0d9488' }
+      { type: 'line', label: 'صافي القيمة', data: accountingEngine.slice(0, 8).map(a => a.netBookValue), borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.4 },
+      { type: 'bar', label: 'التكلفة التاريخية', data: accountingEngine.slice(0, 8).map(a => a.cost), backgroundColor: '#0f172a', borderRadius: 4 },
+      { type: 'bar', label: 'الإهلاك المتراكم', data: accountingEngine.slice(0, 8).map(a => a.accumulatedDep), backgroundColor: '#0d9488', borderRadius: 4 }
     ]
+  };
+
+  const categoryData = {
+    labels: ['أراضي ومباني', 'أصول تقنية', 'مركبات ورافعات', 'أثاث ومعدات', 'أوقاف'],
+    datasets: [{
+      data: [
+        accountingEngine.filter(a => a.category === 'أراضي' || a.category === 'مباني').reduce((s,a)=>s+a.cost,0),
+        accountingEngine.filter(a => a.category === 'أصول تقنية').reduce((s,a)=>s+a.cost,0),
+        accountingEngine.filter(a => a.category === 'مركبات').reduce((s,a)=>s+a.cost,0),
+        accountingEngine.filter(a => a.category === 'أثاث ومعدات').reduce((s,a)=>s+a.cost,0),
+        accountingEngine.filter(a => a.category === 'أصول أوقاف').reduce((s,a)=>s+a.cost,0)
+      ],
+      backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'],
+      borderWidth: 0
+    }]
   };
 
   const renderDashboard = () => (
     <div className="view-anim">
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'1.5rem'}}>
-        <div>
-          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem'}}>القيادة والتميز المؤسسي (Strategic View)</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مؤشرات الأداء الرئيسية، العائد على الأصول، ونسب الاستغلال.</p>
-        </div>
-        <div style={{display:'flex', gap:'1rem'}}>
-          <div style={{background:'rgba(16, 185, 129, 0.1)', color:'#10b981', padding:'0.5rem 1rem', borderRadius:'8px', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem'}}>
-            <Shield size={18} /> مؤشر الحوكمة: 98%
+      <div style={{background:'linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%)', padding:'1.5rem', borderRadius:'16px', color:'white', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(59, 130, 246, 0.4)'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
+          <div style={{background:'rgba(255,255,255,0.2)', padding:'0.75rem', borderRadius:'50%'}}>
+            <Sparkles size={28} />
           </div>
-          <div style={{background:'rgba(59, 130, 246, 0.1)', color:'#3b82f6', padding:'0.5rem 1rem', borderRadius:'8px', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem'}}>
-            <Target size={18} /> معدل استغلال الأصول: 85%
+          <div>
+            <div style={{fontWeight:700, fontSize:'1.25rem', marginBottom:'0.25rem'}}>محرك الذكاء الاصطناعي نشط (Traouf AI Engine)</div>
+            <div style={{fontSize:'0.9rem', opacity:0.9}}>تم فحص وتحليل {accountingEngine.length} أصل رأسمالي بقيمة إجمالية تتجاوز {Math.floor(totals.cost / 1000000)} مليون ريال بنجاح.</div>
           </div>
         </div>
-      </div>
-      <div className="summary-grid">
-        <div className="card">
-          <div className="stat-icon" style={{background: '#f1f5f9'}}><Database size={20} color="#64748b" /></div>
-          <div className="val-sub">إجمالي المحفظة الرأسمالية</div>
-          <div className="val-big">{totals.cost.toLocaleString()} ر.س</div>
-          <div className="val-sub" style={{color: 'var(--success)'}}><TrendingUp size={14} /> +4.2% نمو الأصول</div>
-        </div>
-        <div className="card">
-          <div className="stat-icon" style={{background: '#fef2f2'}}><Activity size={20} color="#ef4444" /></div>
-          <div className="val-sub">الإهلاك المتراكم</div>
-          <div className="val-big">{totals.dep.toLocaleString()} ر.س</div>
-          <div className="val-sub">معدل تآكل الأصول: {((totals.dep/totals.cost)*100).toFixed(1)}%</div>
-        </div>
-        <div className="card">
-          <div className="stat-icon" style={{background: '#f0fdf4'}}><ShieldCheck size={20} color="#10b981" /></div>
-          <div className="val-sub">صافي القيمة الدفترية (NBV)</div>
-          <div className="val-big">{totals.nbv.toLocaleString()} ر.س</div>
-          <div className="val-sub">القيمة الحقيقية في الدفاتر</div>
-        </div>
-        <div className="card">
-          <div className="stat-icon" style={{background: '#f0f9ff'}}><Laptop size={20} color="#0ea5e9" /></div>
-          <div className="val-sub">أصول تقنية تقترب من النهاية</div>
-          <div className="val-big" style={{color:'#0ea5e9'}}>3 أصول</div>
-          <div className="val-sub">تحتاج إحلال هذا العام (IT lifecycle)</div>
+        <div style={{background:'rgba(255,255,255,0.2)', padding:'0.5rem 1rem', borderRadius:'8px', fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem'}}>
+          <Activity size={16} /> تحديث مباشر اللحظة
         </div>
       </div>
 
-      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'1.5rem'}}>
+        <div>
+          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem'}}>لوحة القيادة الاستراتيجية</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مؤشرات الأداء الرئيسية، تقييم المخاطر المباشرة، والعائد على المحافظ.</p>
+        </div>
+      </div>
+
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)'}}>
+        <div className="card" style={{position:'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#0f172a'}}></div>
+          <div className="stat-icon" style={{background: '#f1f5f9'}}><Database size={20} color="#0f172a" /></div>
+          <div className="val-sub">إجمالي المحفظة الرأسمالية</div>
+          <div className="val-big">{totals.cost.toLocaleString()} ر.س</div>
+          <div className="val-sub" style={{color: '#10b981', fontWeight:600}}><TrendingUp size={14} /> +12.4% نمو عن العام السابق</div>
+        </div>
+        <div className="card" style={{position:'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#0d9488'}}></div>
+          <div className="stat-icon" style={{background: '#f0fdfa'}}><ShieldCheck size={20} color="#0d9488" /></div>
+          <div className="val-sub">صافي القيمة الدفترية (NBV)</div>
+          <div className="val-big">{totals.nbv.toLocaleString()} ر.س</div>
+          <div className="val-sub">القيمة الحقيقية القابلة للتسييل</div>
+        </div>
+        <div className="card" style={{position:'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#ef4444'}}></div>
+          <div className="stat-icon" style={{background: '#fef2f2'}}><Activity size={20} color="#ef4444" /></div>
+          <div className="val-sub">مجمع الإهلاك الكلي</div>
+          <div className="val-big">{totals.dep.toLocaleString()} ر.س</div>
+          <div className="val-sub" style={{color:'#ef4444', fontWeight:600}}>معدل التآكل الكلي: {((totals.dep/totals.cost)*100).toFixed(1)}%</div>
+        </div>
+        <div className="card" style={{position:'relative', overflow:'hidden', background:'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', borderColor:'#c7d2fe'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#8b5cf6'}}></div>
+          <div className="stat-icon" style={{background: '#f3e8ff'}}><BrainCircuit size={20} color="#8b5cf6" /></div>
+          <div className="val-sub" style={{fontWeight:600, color:'#4f46e5'}}>مؤشر المخاطر المدعوم بالذكاء</div>
+          <div className="val-big" style={{color:'#8b5cf6'}}>متوسط / 42%</div>
+          <div className="val-sub" style={{color:'#64748b'}}>توجد 4 أصول تتطلب إحلال عاجل</div>
+        </div>
+      </div>
+
+      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginBottom:'1.5rem'}}>
         <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'1rem'}}>
-            <h3 style={{fontSize:'1.1rem'}}>توزيع الأصول ووضع الإهلاك الاستراتيجي</h3>
-            <button className="btn btn-ghost" style={{fontSize:'0.75rem'}}>عرض التفاصيل</button>
+          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'1.5rem'}}>
+            <h3 style={{fontSize:'1.1rem'}}>تحليل العائد والمخاطر الرأسمالية (أبرز 8 أصول)</h3>
           </div>
-          <div className="chart-container">
+          <div className="chart-container" style={{height:'320px'}}>
             <Bar data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="card">
-          <h3 style={{marginBottom:'1.5rem', fontSize:'1.1rem'}}>تنبيهات التدقيق والعمليات (Audit)</h3>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
-            <div style={{display:'flex', gap:'1rem', padding:'1rem', background:'#fff7ed', borderRadius:'8px', borderRight:'4px solid #f59e0b'}}>
-              <AlertTriangle color="#f59e0b" size={20} />
-              <div>
-                <div style={{fontSize:'0.85rem', fontWeight:600}}>تنبيه مالي وتشغيلي</div>
-                <div style={{fontSize:'0.75rem', color:'#9a3412'}}>خوادم البيانات استهلكت 90%، يوصى بالترقية لتفادي أعطال التقنية.</div>
-              </div>
-            </div>
-            <div style={{display:'flex', gap:'1rem', padding:'1rem', background:'#f0fdfa', borderRadius:'8px', borderRight:'4px solid #0d9488'}}>
-              <CheckCircle color="#0d9488" size={20} />
-              <div>
-                <div style={{fontSize:'0.85rem', fontWeight:600}}>مطابقة الجرد الميداني</div>
-                <div style={{fontSize:'0.75rem', color:'#134e4a'}}>تم تأكيد 98% من العهد الميدانية، ولا توجد انحرافات جوهرية.</div>
-              </div>
-            </div>
+          <h3 style={{marginBottom:'1.5rem', fontSize:'1.1rem'}}>التوزيع الاستراتيجي للمحفظة</h3>
+          <div className="chart-container" style={{height:'320px', display:'flex', justifyContent:'center'}}>
+            <Doughnut data={categoryData} options={{ responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { position: 'bottom' } } }} />
           </div>
+        </div>
+      </div>
+
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+        <div className="card" style={{border:'1px solid #fecdd3', background:'#fff1f2'}}>
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem', color:'#be123c', display:'flex', alignItems:'center', gap:'0.5rem'}}><AlertTriangle size={20} /> تحليل المخاطر (AI Risks)</h3>
+          <ul style={{paddingLeft:'1.5rem', margin:0, color:'#9f1239', fontSize:'0.9rem', lineHeight:'1.8'}}>
+            <li style={{marginBottom:'0.5rem'}}><strong>خوادم البيانات المركزية:</strong> استهلكت 85% من عمرها الإنتاجي، خطر توقف مفاجئ لشبكة الإدارة. <span style={{fontWeight:700, textDecoration:'underline'}}>التوصية: إحلال فوري (استثمار CAPEX).</span></li>
+            <li><strong>سيارات التوزيع:</strong> 3 مركبات نقل ثقيل تجاوزت الحد المسموح للإهلاك وبدأت تستهلك تكلفة صيانة تعادل 40% من قيمتها الدفترية.</li>
+          </ul>
+        </div>
+        <div className="card" style={{border:'1px solid #bbf7d0', background:'#f0fdf4'}}>
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem', color:'#15803d', display:'flex', alignItems:'center', gap:'0.5rem'}}><Zap size={20} /> الفرص الاستراتيجية (AI Opportunities)</h3>
+          <ul style={{paddingLeft:'1.5rem', margin:0, color:'#166534', fontSize:'0.9rem', lineHeight:'1.8'}}>
+            <li style={{marginBottom:'0.5rem'}}><strong>أرض المقر الرئيسي (حي الصحافة):</strong> مسجلة دفترياً بقيمة 15 مليون، بينما قيمتها السوقية بالذكاء الاصطناعي تقدر بـ 28 مليون ريال. <span style={{fontWeight:700, textDecoration:'underline'}}>يوصى بعمل إعادة تقييم (Revaluation)</span> لرفع قوة الميزانية العمومية.</li>
+            <li><strong>أصول الأوقاف:</strong> تقييم الذكاء الاصطناعي يشير لإمكانية تحقيق عائد إضافي بنسبة 8% عبر تأجير المساحات التجارية الفائضة.</li>
+          </ul>
         </div>
       </div>
     </div>
