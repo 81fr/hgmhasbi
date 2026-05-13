@@ -955,37 +955,85 @@ const App = () => {
           <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> التحليلات التنبؤية بالذكاء الاصطناعي</h2>
           <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل المخاطر، التنبؤ بالإحلال، وفرص تحسين استغلال الأصول المدعومة بنماذج تعلم الآلة.</p>
         </div>
+        <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}><Activity size={18} /> تحديث نماذج التنبؤ</button>
       </div>
 
       <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
         <div className="card" style={{borderTop:'4px solid #8b5cf6'}}>
-          <div className="val-sub">مخاطر تعطل الأصول الحرجة</div>
+          <div className="val-sub">مؤشر مخاطر تعطل الأصول الحرجة</div>
           <div className="val-big" style={{color:'#8b5cf6'}}>12%</div>
-          <div className="val-sub">احتمالية تعطل خوادم البيانات خلال 3 أشهر بناءً على معدل الإهلاك.</div>
+          <div className="val-sub">احتمالية تعطل خوادم البيانات بناءً على أنماط الاستخدام.</div>
         </div>
         <div className="card" style={{borderTop:'4px solid #10b981'}}>
-          <div className="val-sub">وفر مالي متوقع (CAPEX)</div>
+          <div className="val-sub">وفر مالي استراتيجي (Forecast)</div>
           <div className="val-big" style={{color:'#10b981'}}>150,000 ر.س</div>
-          <div className="val-sub">عن طريق تأجيل إحلال مركبات التوزيع وتكثيف صيانتها.</div>
+          <div className="val-sub">عن طريق تحسين دورة الصيانة الوقائية للأصول.</div>
         </div>
         <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
-          <div className="val-sub">التوقيت الأمثل للجرد القادم</div>
-          <div className="val-big" style={{color:'#f59e0b'}}>أكتوبر 2024</div>
-          <div className="val-sub">بناءً على دورة حياة الأصول التقنية (IT Lifecycle).</div>
+          <div className="val-sub">دقة نماذج التنبؤ الحالية</div>
+          <div className="val-big" style={{color:'#f59e0b'}}>94.8%</div>
+          <div className="val-sub">بناءً على المطابقة التاريخية للبيانات الفعلية.</div>
+        </div>
+      </div>
+
+      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginTop:'1.5rem'}}>
+        <div className="card">
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+             <h3 style={{fontSize:'1.1rem'}}>التنبؤ بالاحتياجات الرأسمالية المستقبلية (CAPEX Forecast)</h3>
+             <Calendar size={20} color="var(--accent)" />
+          </div>
+          <div style={{height:'280px'}}>
+            <Bar data={{
+              labels: ['2024', '2025', '2026', '2027', '2028'],
+              datasets: [
+                {
+                  label: 'تكاليف الإحلال المتوقعة (ر.س)',
+                  data: [120000, 450000, 890000, 300000, 150000],
+                  backgroundColor: '#6366f1',
+                  borderRadius: 6
+                }
+              ]
+            }} options={{ responsive: true, maintainAspectRatio: false }} />
+          </div>
+          <div style={{marginTop:'1.5rem', fontSize:'0.85rem', color:'var(--text-muted)', background:'rgba(99, 102, 241, 0.05)', padding:'1rem', borderRadius:'8px', border:'1px solid rgba(99, 102, 241, 0.2)'}}>
+             <strong>رؤية استراتيجية:</strong> يتوقع الذكاء الاصطناعي "ذروة إنفاق" في عام 2026 نتيجة انتهاء العمر الافتراضي لأسطول النقل اللوجستي. نوصي بالبدء في تكوين احتياطي مالي من الآن.
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>خارطة مخاطر التعطل (AI Risk Map)</h3>
+          <div style={{display:'flex', flexDirection:'column', gap:'1.25rem'}}>
+             {[
+               {name: 'الخوادم المركزية', risk: 85, status: 'حرج', color: '#ef4444'},
+               {name: 'مركبات التوزيع', risk: 40, status: 'متوسط', color: '#f59e0b'},
+               {name: 'أجهزة الموظفين', risk: 15, status: 'آمن', color: '#10b981'},
+             ].map((item, idx) => (
+               <div key={idx} style={{padding:'1rem', borderRadius:'12px', background:'#f8fafc', border:'1px solid var(--border)'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:'0.5rem'}}>
+                     <span style={{fontWeight:700}}>{item.name}</span>
+                     <span style={{color:item.color, fontWeight:700}}>{item.status}</span>
+                  </div>
+                  <div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}>
+                     <div style={{width: `${item.risk}%`, background: item.color, height:'100%'}}></div>
+                  </div>
+                  <div style={{fontSize:'0.75rem', marginTop:'0.5rem', color:'var(--text-muted)'}}>احتمالية العطل: {item.risk}%</div>
+               </div>
+             ))}
+          </div>
         </div>
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop:'1.5rem'}}>
         <div className="card">
           <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>التنبؤ بتآكل القيمة الدفترية (5 سنوات)</h3>
-          <div className="chart-container" style={{height:'300px'}}>
+          <div className="chart-container" style={{height:'250px'}}>
             <Line data={{
               labels: ['2024', '2025', '2026', '2027', '2028'],
               datasets: [{
                 label: 'صافي القيمة الدفترية المتوقعة (NBV)',
                 data: [1850000, 1600000, 1300000, 950000, 600000],
                 borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 fill: true,
                 tension: 0.4
               }]
@@ -993,18 +1041,30 @@ const App = () => {
           </div>
         </div>
         <div className="card">
-          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>توزيع استغلال الأصول (AI Clustering)</h3>
-          <div className="chart-container" style={{height:'300px', display:'flex', justifyContent:'center'}}>
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>تحليل كفاءة استخدام الأصول</h3>
+          <div className="chart-container" style={{height:'250px', display:'flex', justifyContent:'center'}}>
             <Doughnut data={{
-              labels: ['أصول مستغلة بالكامل', 'أصول قيد الاستغلال الجزئي', 'أصول فائضة/غير مستغلة'],
+              labels: ['مستغلة بالكامل', 'استغلال جزئي', 'فائضة'],
               datasets: [{
                 data: [65, 25, 10],
                 backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
                 borderWidth: 0
               }]
-            }} options={{ responsive: true, maintainAspectRatio: false }} />
+            }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
           </div>
         </div>
+      </div>
+
+      <div className="card" style={{marginTop:'1.5rem', background:'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color:'white', border:'none'}}>
+         <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+            <div style={{background:'rgba(255,255,255,0.2)', padding:'1rem', borderRadius:'12px'}}>
+               <BrainCircuit size={32} />
+            </div>
+            <div>
+               <h4 style={{fontSize:'1.2rem', fontWeight:700, marginBottom:'0.25rem'}}>محرك التحليل الاستراتيجي (Strategic Advisor)</h4>
+               <p style={{fontSize:'0.9rem', opacity:0.9}}>بناءً على النمذجة الرياضية، نوصي ببيع "أجهزة التدريب التفاعلية" الآن نظراً لانخفاض معدل استخدامها (8%) وارتفاع تكلفتها التشغيلية؛ البيع الآن سيحقق عائداً رأسمالياً قدره 35,000 ريال قبل تآكل قيمتها بالكامل.</p>
+            </div>
+         </div>
       </div>
     </div>
   );
