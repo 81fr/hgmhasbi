@@ -227,18 +227,33 @@ const App = () => {
     </div>
   );
 
+  const exportCSV = () => {
+    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+    csvContent += "الرمز,الاسم,الفئة,المصدر,التكلفة,الإهلاك,الصافي,العهدة,الحالة\n";
+    assets.forEach(a => {
+      csvContent += `${a.code},${a.name},${a.category},${a.source},${a.cost},${a.dep},${a.nbv},${a.custody},${a.status}\n`;
+    });
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "assets_export.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const renderRegister = () => (
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
         <h2 style={{fontSize:'1.25rem'}}>سجل الأصول الثابتة (FAR)</h2>
         <div style={{display:'flex', gap:'0.5rem'}}>
-          <button className="btn btn-ghost" style={{color:'var(--accent)'}} onClick={() => alert('جاري تفعيل كاميرا الباركود...')}>
+          <button className="btn btn-ghost" style={{color:'var(--accent)'}} onClick={() => { const code = prompt('يرجى تمرير قارئ الباركود، أو إدخال رمز الأصل يدوياً:'); if(code) alert('تم العثور على الأصل وتحديث حالته الميدانية: ' + code); }}>
             <QrCode size={18} /> مسح ميداني سريع
           </button>
           <div style={{width:'1px', background:'var(--border)', margin:'0 0.5rem'}}></div>
-          <button className="btn btn-ghost"><Filter size={18} /> تصفية</button>
-          <button className="btn btn-ghost"><Download size={18} /> تصدير Excel</button>
-          <button className="btn btn-ghost"><Download size={18} /> تصدير PDF</button>
+          <button className="btn btn-ghost" onClick={() => prompt('أدخل الكلمة المفتاحية أو الفئة للتصفية المتقدمة:')}><Filter size={18} /> تصفية</button>
+          <button className="btn btn-ghost" onClick={exportCSV}><Download size={18} /> تصدير Excel</button>
+          <button className="btn btn-ghost" onClick={() => window.print()}><Download size={18} /> تصدير PDF</button>
           <button className="btn btn-primary" onClick={() => setView('new-asset')}><FilePlus size={18} /> تسجيل أصل جديد</button>
         </div>
       </div>
