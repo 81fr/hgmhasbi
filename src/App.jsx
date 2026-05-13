@@ -17,13 +17,13 @@ import {
   CheckCircle,
   Filter,
   FilePlus,
-  MoreHorizontal,
-  Search,
-  Bell,
-  ChevronDown,
   Edit,
   Trash2,
-  Download
+  Download,
+  QrCode,
+  Target,
+  Shield,
+  Laptop
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -149,56 +149,72 @@ const App = () => {
 
   const renderDashboard = () => (
     <div className="view-anim">
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'1.5rem'}}>
+        <div>
+          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem'}}>القيادة والتميز المؤسسي (Strategic View)</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مؤشرات الأداء الرئيسية، العائد على الأصول، ونسب الاستغلال.</p>
+        </div>
+        <div style={{display:'flex', gap:'1rem'}}>
+          <div style={{background:'rgba(16, 185, 129, 0.1)', color:'#10b981', padding:'0.5rem 1rem', borderRadius:'8px', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem'}}>
+            <Shield size={18} /> مؤشر الحوكمة: 98%
+          </div>
+          <div style={{background:'rgba(59, 130, 246, 0.1)', color:'#3b82f6', padding:'0.5rem 1rem', borderRadius:'8px', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem'}}>
+            <Target size={18} /> معدل استغلال الأصول: 85%
+          </div>
+        </div>
+      </div>
       <div className="summary-grid">
         <div className="card">
           <div className="stat-icon" style={{background: '#f1f5f9'}}><Database size={20} color="#64748b" /></div>
-          <div className="val-sub">إجمالي قيمة المحفظة</div>
+          <div className="val-sub">إجمالي المحفظة الرأسمالية</div>
           <div className="val-big">{totals.cost.toLocaleString()} ر.س</div>
-          <div className="val-sub" style={{color: 'var(--success)'}}><TrendingUp size={14} /> +4.2% نمو سنوي</div>
+          <div className="val-sub" style={{color: 'var(--success)'}}><TrendingUp size={14} /> +4.2% نمو الأصول</div>
         </div>
         <div className="card">
           <div className="stat-icon" style={{background: '#fef2f2'}}><Activity size={20} color="#ef4444" /></div>
           <div className="val-sub">الإهلاك المتراكم</div>
           <div className="val-big">{totals.dep.toLocaleString()} ر.س</div>
-          <div className="val-sub">يمثل {((totals.dep/totals.cost)*100).toFixed(1)}% من التكلفة</div>
+          <div className="val-sub">معدل تآكل الأصول: {((totals.dep/totals.cost)*100).toFixed(1)}%</div>
         </div>
         <div className="card">
           <div className="stat-icon" style={{background: '#f0fdf4'}}><ShieldCheck size={20} color="#10b981" /></div>
-          <div className="val-sub">صافي القيمة الدفترية</div>
+          <div className="val-sub">صافي القيمة الدفترية (NBV)</div>
           <div className="val-big">{totals.nbv.toLocaleString()} ر.س</div>
-          <div className="val-sub">قيمة الأصول الحالية في الدفاتر</div>
+          <div className="val-sub">القيمة الحقيقية في الدفاتر</div>
         </div>
         <div className="card">
-          <div className="stat-icon" style={{background: '#fffbeb'}}><Calendar size={20} color="#f59e0b" /></div>
-          <div className="val-sub">تقدم السنة المالية</div>
-          <div className="val-big">الربع الثالث</div>
-          <div className="fiscal-progress"><div className="fiscal-bar"></div></div>
-          <div className="val-sub" style={{marginTop:'0.5rem'}}>تم إقفال 65% من العمليات</div>
+          <div className="stat-icon" style={{background: '#f0f9ff'}}><Laptop size={20} color="#0ea5e9" /></div>
+          <div className="val-sub">أصول تقنية تقترب من النهاية</div>
+          <div className="val-big" style={{color:'#0ea5e9'}}>3 أصول</div>
+          <div className="val-sub">تحتاج إحلال هذا العام (IT lifecycle)</div>
         </div>
       </div>
 
       <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem'}}>
         <div className="card">
-          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>تحليل الأصول: التكلفة مقابل الإهلاك</h3>
+          <div style={{display:'flex', justifyContent:'space-between', marginBottom:'1rem'}}>
+            <h3 style={{fontSize:'1.1rem'}}>توزيع الأصول ووضع الإهلاك الاستراتيجي</h3>
+            <button className="btn btn-ghost" style={{fontSize:'0.75rem'}}>عرض التفاصيل</button>
+          </div>
           <div className="chart-container">
             <Bar data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
           </div>
         </div>
         <div className="card">
-          <h3 style={{marginBottom:'1.5rem', fontSize:'1.1rem'}}>تنبيهات التدقيق</h3>
+          <h3 style={{marginBottom:'1.5rem', fontSize:'1.1rem'}}>تنبيهات التدقيق والعمليات (Audit)</h3>
           <div style={{display: 'flex', flexDirection: 'column', gap: '1rem'}}>
             <div style={{display:'flex', gap:'1rem', padding:'1rem', background:'#fff7ed', borderRadius:'8px', borderRight:'4px solid #f59e0b'}}>
               <AlertTriangle color="#f59e0b" size={20} />
               <div>
-                <div style={{fontSize:'0.85rem', fontWeight:600}}>أصول قاربت على النفاد</div>
-                <div style={{fontSize:'0.75rem', color:'#9a3412'}}>خوادم البيانات وصلت إلى 90% إهلاك.</div>
+                <div style={{fontSize:'0.85rem', fontWeight:600}}>تنبيه مالي وتشغيلي</div>
+                <div style={{fontSize:'0.75rem', color:'#9a3412'}}>خوادم البيانات استهلكت 90%، يوصى بالترقية لتفادي أعطال التقنية.</div>
               </div>
             </div>
             <div style={{display:'flex', gap:'1rem', padding:'1rem', background:'#f0fdfa', borderRadius:'8px', borderRight:'4px solid #0d9488'}}>
               <CheckCircle color="#0d9488" size={20} />
               <div>
-                <div style={{fontSize:'0.85rem', fontWeight:600}}>الجرد السنوي مكتمل</div>
-                <div style={{fontSize:'0.75rem', color:'#134e4a'}}>تمت مطابقة 100% من الأصول المادية.</div>
+                <div style={{fontSize:'0.85rem', fontWeight:600}}>مطابقة الجرد الميداني</div>
+                <div style={{fontSize:'0.75rem', color:'#134e4a'}}>تم تأكيد 98% من العهد الميدانية، ولا توجد انحرافات جوهرية.</div>
               </div>
             </div>
           </div>
@@ -212,6 +228,10 @@ const App = () => {
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
         <h2 style={{fontSize:'1.25rem'}}>سجل الأصول الثابتة (FAR)</h2>
         <div style={{display:'flex', gap:'0.5rem'}}>
+          <button className="btn btn-ghost" style={{color:'var(--accent)'}} onClick={() => alert('جاري تفعيل كاميرا الباركود...')}>
+            <QrCode size={18} /> مسح ميداني سريع
+          </button>
+          <div style={{width:'1px', background:'var(--border)', margin:'0 0.5rem'}}></div>
           <button className="btn btn-ghost"><Filter size={18} /> تصفية</button>
           <button className="btn btn-ghost"><Download size={18} /> تصدير Excel</button>
           <button className="btn btn-ghost"><Download size={18} /> تصدير PDF</button>
@@ -470,17 +490,45 @@ const App = () => {
   const renderInventory = () => (
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>تقارير الجرد الميداني</h2>
+        <div>
+          <h2 style={{fontSize:'1.25rem'}}>تقارير الجرد الميداني والفروقات</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة لجان الجرد، تسويات العهد، والمطابقة الفردية</p>
+        </div>
         <button className="btn btn-primary" onClick={() => setView('new-inventory')}><CheckCircle size={18} /> بدء جرد جديد</button>
       </div>
+      
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom:'1.5rem'}}>
+        <div className="card" style={{borderRight:'4px solid var(--danger)'}}>
+          <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أصول مفقودة (لم تُجرد)</div>
+          <div style={{fontSize:'1.5rem', fontWeight:700, color:'var(--danger)'}}>2 أصل</div>
+          <div style={{fontSize:'0.75rem', marginTop:'0.5rem'}}>القيمة الدفترية: 4,500 ر.س - <a href="#" style={{color:'var(--danger)'}}>عرض التسوية</a></div>
+        </div>
+        <div className="card" style={{borderRight:'4px solid var(--success)'}}>
+          <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أصول زائدة (غير مسجلة)</div>
+          <div style={{fontSize:'1.5rem', fontWeight:700, color:'var(--success)'}}>1 أصل</div>
+          <div style={{fontSize:'0.75rem', marginTop:'0.5rem'}}>لابتوب ديل إضافي - <a href="#" style={{color:'var(--success)'}}>تسجيل كأصل جديد</a></div>
+        </div>
+      </div>
+
       <div style={{display: 'grid', gap: '1rem'}}>
         <div className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.5rem'}}>
           <div><div style={{fontWeight:600, fontSize:'1.1rem'}}>جرد الربع الأول 2024</div><div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تاريخ الإغلاق: 31-03-2024 - شامل جميع الفروع</div></div>
-          <div><span className="badge b-active" style={{fontSize:'0.9rem'}}>مكتمل 100%</span></div>
+          <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
+            <div style={{textAlign:'left'}}>
+              <div style={{fontSize:'0.85rem', fontWeight:600}}>تم جرد 1,450 / 1,452</div>
+              <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>نسبة التطابق 99.8%</div>
+            </div>
+            <span className="badge b-active" style={{fontSize:'0.9rem'}}>مكتمل ومغلق</span>
+          </div>
         </div>
         <div className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.5rem'}}>
-          <div><div style={{fontWeight:600, fontSize:'1.1rem'}}>جرد الربع الثاني 2024</div><div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>الفرع الرئيسي فقط</div></div>
-          <div><span className="badge" style={{background:'#fef3c7', color:'#92400e', fontSize:'0.9rem'}}>قيد التنفيذ 45%</span></div>
+          <div><div style={{fontWeight:600, fontSize:'1.1rem'}}>جرد مستودع التقنية</div><div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>لجنة الجرد: م. فهد، أ. محمد</div></div>
+          <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
+            <div style={{textAlign:'left'}}>
+              <div style={{fontSize:'0.85rem', fontWeight:600}}>تم جرد 45 / 100</div>
+            </div>
+            <span className="badge" style={{background:'#fef3c7', color:'#92400e', fontSize:'0.9rem'}}>قيد التنفيذ 45%</span>
+          </div>
         </div>
       </div>
     </div>
