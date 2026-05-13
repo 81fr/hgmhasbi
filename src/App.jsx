@@ -27,7 +27,14 @@ import {
   Search,
   Bell,
   ChevronDown,
-  MoreHorizontal
+  MoreHorizontal,
+  Bot,
+  BrainCircuit,
+  Sparkles,
+  MessageSquare,
+  Send,
+  X,
+  Zap
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -41,7 +48,7 @@ import {
   Legend,
   ArcElement,
 } from 'chart.js';
-import { Bar } from 'react-chartjs-2';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
 import './App.css';
 
 ChartJS.register(
@@ -68,6 +75,9 @@ const App = () => {
   const [showScanner, setShowScanner] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [filterParams, setFilterParams] = useState({ query: '', category: 'الكل' });
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState([{role: 'bot', text: 'أهلاً بك! أنا المساعد الذكي (Traouf AI). أستطيع مساعدتك في الاستعلام عن الأصول، أو إعطاء توصيات حوكمة وتحليلات استراتيجية. تفضل بطرح سؤالك.'}]);
+  const [chatInput, setChatInput] = useState('');
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -629,6 +639,67 @@ const App = () => {
     </div>
   );
 
+  const renderAIInsights = () => (
+    <div className="view-anim">
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+        <div>
+          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> التحليلات التنبؤية بالذكاء الاصطناعي</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل المخاطر، التنبؤ بالإحلال، وفرص تحسين استغلال الأصول المدعومة بنماذج تعلم الآلة.</p>
+        </div>
+      </div>
+
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+        <div className="card" style={{borderTop:'4px solid #8b5cf6'}}>
+          <div className="val-sub">مخاطر تعطل الأصول الحرجة</div>
+          <div className="val-big" style={{color:'#8b5cf6'}}>12%</div>
+          <div className="val-sub">احتمالية تعطل خوادم البيانات خلال 3 أشهر بناءً على معدل الإهلاك.</div>
+        </div>
+        <div className="card" style={{borderTop:'4px solid #10b981'}}>
+          <div className="val-sub">وفر مالي متوقع (CAPEX)</div>
+          <div className="val-big" style={{color:'#10b981'}}>150,000 ر.س</div>
+          <div className="val-sub">عن طريق تأجيل إحلال مركبات التوزيع وتكثيف صيانتها.</div>
+        </div>
+        <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+          <div className="val-sub">التوقيت الأمثل للجرد القادم</div>
+          <div className="val-big" style={{color:'#f59e0b'}}>أكتوبر 2024</div>
+          <div className="val-sub">بناءً على دورة حياة الأصول التقنية (IT Lifecycle).</div>
+        </div>
+      </div>
+
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop:'1.5rem'}}>
+        <div className="card">
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>التنبؤ بتآكل القيمة الدفترية (5 سنوات)</h3>
+          <div className="chart-container" style={{height:'300px'}}>
+            <Line data={{
+              labels: ['2024', '2025', '2026', '2027', '2028'],
+              datasets: [{
+                label: 'صافي القيمة الدفترية المتوقعة (NBV)',
+                data: [1850000, 1600000, 1300000, 950000, 600000],
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                fill: true,
+                tension: 0.4
+              }]
+            }} options={{ responsive: true, maintainAspectRatio: false }} />
+          </div>
+        </div>
+        <div className="card">
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>توزيع استغلال الأصول (AI Clustering)</h3>
+          <div className="chart-container" style={{height:'300px', display:'flex', justifyContent:'center'}}>
+            <Doughnut data={{
+              labels: ['أصول مستغلة بالكامل', 'أصول قيد الاستغلال الجزئي', 'أصول فائضة/غير مستغلة'],
+              datasets: [{
+                data: [65, 25, 10],
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
+                borderWidth: 0
+              }]
+            }} options={{ responsive: true, maintainAspectRatio: false }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const renderSettings = () => (
     <div className="view-anim">
       <h2 style={{fontSize:'1.25rem', marginBottom:'2rem'}}>إعدادات النظام</h2>
@@ -677,6 +748,13 @@ const App = () => {
         </div>
 
         <div className="nav-group">
+          <div className="nav-label">الذكاء الاصطناعي (AI)</div>
+          <div className={`nav-item ${view === 'ai-insights' ? 'active' : ''}`} onClick={() => setView('ai-insights')}>
+            <Sparkles size={18} /> التحليلات التنبؤية
+          </div>
+        </div>
+
+        <div className="nav-group">
           <div className="nav-label">التقارير</div>
           <div className={`nav-item ${view === 'budget' ? 'active' : ''}`} onClick={() => setView('budget')}><PieChart size={18} /> الميزانية التقديرية</div>
           <div className={`nav-item ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}><ClipboardList size={18} /> تقارير الجرد</div>
@@ -722,6 +800,7 @@ const App = () => {
           {view === 'budget' && renderBudget()}
           {view === 'inventory' && renderInventory()}
           {view === 'new-inventory' && renderNewInventory()}
+          {view === 'ai-insights' && renderAIInsights()}
           {view === 'settings' && renderSettings()}
         </div>
       </main>
@@ -748,6 +827,45 @@ const App = () => {
       {toastMessage && (
         <div style={{position:'fixed', bottom:'2rem', right:'2rem', background:'var(--accent)', color:'#fff', padding:'1rem 1.5rem', borderRadius:'8px', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.3)', zIndex:9999, display:'flex', alignItems:'center', gap:'0.75rem', fontWeight:600}}>
           <CheckCircle size={20} /> {toastMessage}
+        </div>
+      )}
+
+      <button 
+        style={{position:'fixed', bottom:'2rem', left:'2rem', background:'var(--accent)', color:'white', width:'60px', height:'60px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 10px 25px rgba(59,130,246,0.5)', zIndex:9998, border:'none', cursor:'pointer', transition:'transform 0.2s'}}
+        onClick={() => setIsChatOpen(true)}
+      >
+        <Bot size={28} />
+      </button>
+
+      {isChatOpen && (
+        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'350px', height:'500px', background:'var(--card-bg)', borderRadius:'16px', boxShadow:'0 15px 35px rgba(0,0,0,0.2)', zIndex:10000, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'fadeIn 0.2s'}}>
+          <div style={{background:'var(--accent)', color:'white', padding:'1rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
+              <Bot size={20} />
+              <div style={{fontWeight:600}}>المساعد الذكي (Traouf AI)</div>
+            </div>
+            <button style={{background:'transparent', border:'none', color:'white', cursor:'pointer'}} onClick={() => setIsChatOpen(false)}><X size={20} /></button>
+          </div>
+          <div style={{flex:1, padding:'1rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1rem', background:'var(--bg)'}}>
+            {chatMessages.map((msg, i) => (
+              <div key={i} style={{alignSelf: msg.role === 'bot' ? 'flex-start' : 'flex-end', background: msg.role === 'bot' ? 'var(--card-bg)' : 'var(--accent)', color: msg.role === 'bot' ? 'var(--text)' : 'white', padding:'0.75rem 1rem', borderRadius:'12px', maxWidth:'85%', fontSize:'0.85rem', border: msg.role === 'bot' ? '1px solid var(--border)' : 'none'}}>
+                {msg.text}
+              </div>
+            ))}
+          </div>
+          <form style={{display:'flex', padding:'1rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.5rem'}} onSubmit={(e) => {
+            e.preventDefault();
+            if(!chatInput.trim()) return;
+            setChatMessages([...chatMessages, {role: 'user', text: chatInput}]);
+            const prevInput = chatInput;
+            setChatInput('');
+            setTimeout(() => {
+              setChatMessages(prev => [...prev, {role: 'bot', text: `بناءً على تحليلات قواعد بيانات الأصول، أود الإفادة بأن "${prevInput}" يعكس حالة استقرار مالي حالياً. لمزيد من الدقة يمكنني إعداد تقرير مخصص، هل ترغب في ذلك؟`}]);
+            }, 1000);
+          }}>
+            <input type="text" placeholder="اسأل الذكاء الاصطناعي..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none'}} />
+            <button type="submit" style={{background:'var(--accent)', color:'white', border:'none', borderRadius:'8px', width:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}><Send size={16} /></button>
+          </form>
         </div>
       )}
     </div>
