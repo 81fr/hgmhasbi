@@ -518,61 +518,125 @@ const App = () => {
     </div>
   );
 
-  const renderJournal = () => (
-    <div className="view-anim">
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>قيود اليومية التلقائية</h2>
-        <div style={{display:'flex', gap:'0.5rem'}}>
-          <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)'}} onClick={() => { showToast('تم فك الترحيل وإعادة القيود لحالة المسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> فك / إلغاء الترحيل</button>
-          <button className="btn btn-primary" onClick={() => { showToast('تم ترحيل القيود المعلقة بنجاح'); setJournals(journals.map(j => ({...j, status: 'مرحل'}))); }}><FileText size={18} /> ترحيل القيود</button>
+  const renderJournal = () => {
+    const totalDebit = journals.reduce((acc, j) => acc + (j.debit || 0), 0);
+    const totalCredit = journals.reduce((acc, j) => acc + (j.credit || 0), 0);
+    const draftCount = journals.filter(j => j.status === 'مسودة').length;
+    
+    return (
+      <div className="view-anim">
+        <div style={{background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding:'1.5rem', borderRadius:'16px', color:'white', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.5)', display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1rem'}}>
+          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>إجمالي المدين</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#ef4444'}}>{totalDebit.toLocaleString()} ر.س</div>
+          </div>
+          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>إجمالي الدائن</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#10b981'}}>{totalCredit.toLocaleString()} ر.س</div>
+          </div>
+          <div>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>قيود معلقة (مسودة)</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#f59e0b'}}>{draftCount} قيود</div>
+          </div>
+        </div>
+
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+          <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><FileText size={24} color="var(--accent)" /> قيود اليومية التلقائية</h2>
+          <div style={{display:'flex', gap:'0.5rem'}}>
+            <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)'}} onClick={() => { showToast('تم فك الترحيل وإعادة القيود لحالة المسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> فك / إلغاء الترحيل</button>
+            <button className="btn btn-primary" onClick={() => { showToast('تم ترحيل القيود المعلقة بنجاح'); setJournals(journals.map(j => ({...j, status: 'مرحل'}))); }}><FileText size={18} /> ترحيل القيود</button>
+          </div>
+        </div>
+        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+            <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
+              <tr>
+                <th style={{padding:'1rem', textAlign:'right'}}>رقم القيد</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>البيان</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>مدين</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>دائن</th>
+                <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+              </tr>
+            </thead>
+            <tbody>
+              {journals.map((j, idx) => (
+                <tr key={idx} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                  <td style={{padding:'1rem', fontWeight:700, color:'#0f172a'}}>{j.id}</td>
+                  <td style={{padding:'1rem'}}>{j.date}</td>
+                  <td style={{padding:'1rem', fontWeight:600}}>{j.desc}</td>
+                  <td style={{padding:'1rem', color:'var(--danger)', fontWeight:700}}>{j.debit ? j.debit.toLocaleString() : '-'}</td>
+                  <td style={{padding:'1rem', color:'var(--success)', fontWeight:700}}>{j.credit ? j.credit.toLocaleString() : '-'}</td>
+                  <td style={{padding:'1rem', textAlign:'center'}}>
+                    {j.status === 'مرحل' ? 
+                      <span className="badge b-active" style={{padding:'0.4rem 1rem'}}>مرحل</span> : 
+                      <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem'}}>مسودة</span>
+                    }
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
-      <div className="table-wrapper">
-        <table>
-          <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>مدين</th><th>دائن</th><th>الحالة</th></tr></thead>
-          <tbody>
-            {journals.map((j, idx) => (
-              <tr key={idx}>
-                <td style={{fontWeight:600}}>{j.id}</td>
-                <td>{j.date}</td>
-                <td>{j.desc}</td>
-                <td style={{color:'var(--danger)', fontWeight:600}}>{j.debit ? j.debit.toLocaleString() : '-'}</td>
-                <td style={{color:'var(--success)', fontWeight:600}}>{j.credit ? j.credit.toLocaleString() : '-'}</td>
-                <td>
-                  {j.status === 'مرحل' ? 
-                    <span className="badge b-active">مرحل</span> : 
-                    <span className="badge" style={{background:'#fef3c7', color:'#92400e'}}>مسودة</span>
-                  }
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderTransfers = () => (
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>التحويلات العينية للأصول</h2>
+        <div>
+          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Shuffle color="var(--accent)" /> التحويلات العينية للأصول</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة ومراقبة حركة تنقلات الأصول بين الأقسام والفروع.</p>
+        </div>
         <button className="btn btn-primary" onClick={() => setView('new-transfer')}><Shuffle size={18} /> طلب تحويل جديد</button>
       </div>
-      <div className="table-wrapper">
-        <table>
-          <thead><tr><th>رقم الطلب</th><th>الأصل</th><th>من قسم</th><th>إلى قسم</th><th>التاريخ</th><th>الحالة</th></tr></thead>
+
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)', marginBottom:'2rem'}}>
+        <div className="card" style={{borderTop:'4px solid #3b82f6'}}>
+          <div className="val-sub">إجمالي الطلبات</div>
+          <div className="val-big" style={{color:'#3b82f6'}}>{transfers.length}</div>
+        </div>
+        <div className="card" style={{borderTop:'4px solid #10b981'}}>
+          <div className="val-sub">طلبات مكتملة</div>
+          <div className="val-big" style={{color:'#10b981'}}>{transfers.filter(t => t.status === 'مكتمل').length}</div>
+        </div>
+        <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+          <div className="val-sub">قيد المراجعة</div>
+          <div className="val-big" style={{color:'#f59e0b'}}>{transfers.filter(t => t.status === 'قيد المراجعة').length}</div>
+        </div>
+      </div>
+
+      <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
+        <table style={{width:'100%', borderCollapse:'collapse'}}>
+          <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
+            <tr>
+              <th style={{padding:'1rem', textAlign:'right'}}>رقم الطلب</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>الأصل</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>مسار التحويل</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
+              <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+            </tr>
+          </thead>
           <tbody>
-            {transfers.map(t => (
-              <tr key={t.id}>
-                <td style={{fontWeight:600}}>{t.id}</td>
-                <td>{t.asset}</td>
-                <td>{t.from}</td>
-                <td>{t.to}</td>
-                <td>{t.date}</td>
-                <td>
+            {transfers.map((t, index) => (
+              <tr key={t.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                <td style={{padding:'1rem', fontWeight:700, color:'var(--accent)'}}>{t.id}</td>
+                <td style={{padding:'1rem', fontWeight:600}}>{t.asset}</td>
+                <td style={{padding:'1rem'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:'0.5rem', fontWeight:600}}>
+                    <span style={{color:'#64748b'}}>{t.from}</span>
+                    <Shuffle size={14} color="#94a3b8" />
+                    <span style={{color:'#0f172a'}}>{t.to}</span>
+                  </div>
+                </td>
+                <td style={{padding:'1rem'}}>{t.date}</td>
+                <td style={{padding:'1rem', textAlign:'center'}}>
                   {t.status === 'مكتمل' ? 
-                    <span className="badge b-active">مكتمل</span> : 
-                    <span className="badge" style={{background:'#fef3c7', color:'#92400e'}}>قيد المراجعة</span>
+                    <span className="badge b-active" style={{padding:'0.4rem 1rem'}}>مكتمل</span> : 
+                    t.status === 'قيد المراجعة' ?
+                    <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem'}}>قيد المراجعة</span> :
+                    <span className="badge" style={{background:'#fee2e2', color:'#b91c1c', padding:'0.4rem 1rem'}}>مرفوض</span>
                   }
                 </td>
               </tr>
@@ -622,21 +686,43 @@ const App = () => {
 
   const renderBudget = () => (
     <div className="view-anim">
-      <div style={{marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>الميزانية التقديرية الرأسمالية (CAPEX)</h2>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+        <div>
+          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><PieChart color="var(--accent)" /> الميزانية التقديرية الرأسمالية (CAPEX)</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مراقبة وتحليل خطط الشراء والاستحواذ مقارنة بالميزانية المعتمدة.</p>
+        </div>
       </div>
       <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
-        <div className="card">
+        <div className="card" style={{position:'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#3b82f6'}}></div>
           <div className="val-sub">الميزانية المعتمدة لعام 2024</div>
-          <div className="val-big" style={{color:'var(--success)'}}>1,500,000 ر.س</div>
+          <div className="val-big" style={{color:'#3b82f6'}}>1,500,000 ر.س</div>
+          <div className="val-sub">خطة CAPEX السنوية</div>
         </div>
-        <div className="card">
+        <div className="card" style={{position:'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#ef4444'}}></div>
           <div className="val-sub">المنصرف الفعلي حتى الآن</div>
-          <div className="val-big" style={{color:'var(--danger)'}}>680,000 ر.س</div>
+          <div className="val-big" style={{color:'#ef4444'}}>680,000 ر.س</div>
+          <div className="val-sub">تم استهلاك 45% من الميزانية</div>
         </div>
-        <div className="card">
+        <div className="card" style={{position:'relative', overflow:'hidden'}}>
+          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#10b981'}}></div>
           <div className="val-sub">المتبقي من الميزانية</div>
-          <div className="val-big" style={{color:'var(--accent)'}}>820,000 ر.س</div>
+          <div className="val-big" style={{color:'#10b981'}}>820,000 ر.س</div>
+          <div className="val-sub">فائض متوفر للاستحواذات</div>
+        </div>
+      </div>
+
+      <div className="card" style={{marginTop:'1.5rem'}}>
+        <h3 style={{marginBottom:'1.5rem', fontSize:'1.1rem', color:'#1e293b'}}>مؤشر استهلاك الميزانية</h3>
+        <div style={{height:'24px', width:'100%', background:'#f1f5f9', borderRadius:'12px', overflow:'hidden', display:'flex', marginBottom:'1rem'}}>
+          <div style={{width:'45%', background:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'0.75rem', fontWeight:700}}>المنصرف 45%</div>
+          <div style={{width:'15%', background:'#f59e0b', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'0.75rem', fontWeight:700}}>تحت الطلب 15%</div>
+          <div style={{width:'40%', background:'#10b981', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'0.75rem', fontWeight:700}}>المتبقي 40%</div>
+        </div>
+        <div style={{background:'#f0fdf4', padding:'1rem', borderRadius:'8px', border:'1px solid #bbf7d0', color:'#166534', fontSize:'0.85rem', display:'flex', gap:'0.5rem'}}>
+          <Sparkles size={18} />
+          <strong>تحليل الذكاء الاصطناعي:</strong> المتبقي من الميزانية كافٍ جداً لتغطية نفقات إحلال خوادم البيانات الموصى بها (تكلفة تقديرية 120,000 ر.س) دون تجاوز السقف السنوي المعتمد.
         </div>
       </div>
     </div>
@@ -644,45 +730,60 @@ const App = () => {
 
   const renderInventory = () => (
     <div className="view-anim">
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
         <div>
-          <h2 style={{fontSize:'1.25rem'}}>تقارير الجرد الميداني والفروقات</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة لجان الجرد، تسويات العهد، والمطابقة الفردية</p>
+          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><ClipboardList color="var(--accent)" /> تقارير الجرد الميداني والفروقات</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة لجان الجرد الميداني الذكي، تسويات العهد، والمطابقة الآلية.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setView('new-inventory')}><CheckCircle size={18} /> بدء جرد جديد</button>
+        <button className="btn btn-primary" onClick={() => setView('new-inventory')} style={{padding:'0.75rem 2rem'}}><CheckCircle size={18} /> بدء حملة جرد</button>
       </div>
       
-      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom:'1.5rem'}}>
-        <div className="card" style={{borderRight:'4px solid var(--danger)'}}>
-          <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أصول مفقودة (لم تُجرد)</div>
-          <div style={{fontSize:'1.5rem', fontWeight:700, color:'var(--danger)'}}>2 أصل</div>
-          <div style={{fontSize:'0.75rem', marginTop:'0.5rem'}}>القيمة الدفترية: 4,500 ر.س - <a href="#" style={{color:'var(--danger)'}}>عرض التسوية</a></div>
+      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom:'2rem'}}>
+        <div className="card" style={{borderLeft:'6px solid var(--danger)', background:'linear-gradient(to right, #fff1f2, #ffffff)'}}>
+          <div style={{fontSize:'0.9rem', color:'var(--danger)', fontWeight:700, marginBottom:'0.5rem'}}>أصول مفقودة (لم تُجرد)</div>
+          <div style={{fontSize:'2rem', fontWeight:800, color:'#9f1239'}}>2 <span style={{fontSize:'1rem', fontWeight:600}}>أصل</span></div>
+          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#881337'}}>القيمة الدفترية: 4,500 ر.س - <a href="#" style={{color:'var(--danger)', textDecoration:'underline'}}>عرض التسوية لتكوين قيد إعدام</a></div>
         </div>
-        <div className="card" style={{borderRight:'4px solid var(--success)'}}>
-          <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أصول زائدة (غير مسجلة)</div>
-          <div style={{fontSize:'1.5rem', fontWeight:700, color:'var(--success)'}}>1 أصل</div>
-          <div style={{fontSize:'0.75rem', marginTop:'0.5rem'}}>لابتوب ديل إضافي - <a href="#" style={{color:'var(--success)'}}>تسجيل كأصل جديد</a></div>
+        <div className="card" style={{borderLeft:'6px solid var(--success)', background:'linear-gradient(to right, #f0fdf4, #ffffff)'}}>
+          <div style={{fontSize:'0.9rem', color:'var(--success)', fontWeight:700, marginBottom:'0.5rem'}}>أصول زائدة (غير مسجلة)</div>
+          <div style={{fontSize:'2rem', fontWeight:800, color:'#166534'}}>1 <span style={{fontSize:'1rem', fontWeight:600}}>أصل</span></div>
+          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#14532d'}}>لابتوب ديل إضافي (مجهول المصدر) - <a href="#" style={{color:'var(--success)', textDecoration:'underline'}}>تسجيل كأصل جديد من تبرع</a></div>
         </div>
       </div>
 
+      <h3 style={{fontSize:'1.1rem', marginBottom:'1rem'}}>حملات الجرد النشطة والمغلقة</h3>
       <div style={{display: 'grid', gap: '1rem'}}>
-        <div className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.5rem'}}>
-          <div><div style={{fontWeight:600, fontSize:'1.1rem'}}>جرد الربع الأول 2024</div><div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تاريخ الإغلاق: 31-03-2024 - شامل جميع الفروع</div></div>
-          <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
-            <div style={{textAlign:'left'}}>
-              <div style={{fontSize:'0.85rem', fontWeight:600}}>تم جرد 1,450 / 1,452</div>
-              <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>نسبة التطابق 99.8%</div>
+        <div className="card" style={{border:'1px solid var(--border)'}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+            <div>
+              <div style={{fontWeight:700, fontSize:'1.1rem'}}>جرد الربع الأول 2024</div>
+              <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تاريخ الإغلاق: 31-03-2024 - شامل جميع الفروع</div>
             </div>
-            <span className="badge b-active" style={{fontSize:'0.9rem'}}>مكتمل ومغلق</span>
+            <span className="badge b-active" style={{fontSize:'0.9rem', padding:'0.5rem 1rem'}}><CheckCircle size={14}/> مكتمل ومغلق</span>
+          </div>
+          <div style={{background:'#f1f5f9', height:'8px', borderRadius:'4px', overflow:'hidden', marginBottom:'0.5rem'}}>
+            <div style={{background:'#10b981', width:'100%', height:'100%'}}></div>
+          </div>
+          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem'}}>
+            <span style={{fontWeight:600}}>تم جرد 1,450 / 1,452</span>
+            <span style={{color:'#10b981', fontWeight:700}}>نسبة التطابق 99.8%</span>
           </div>
         </div>
-        <div className="card" style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1.5rem'}}>
-          <div><div style={{fontWeight:600, fontSize:'1.1rem'}}>جرد مستودع التقنية</div><div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>لجنة الجرد: م. فهد، أ. محمد</div></div>
-          <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
-            <div style={{textAlign:'left'}}>
-              <div style={{fontSize:'0.85rem', fontWeight:600}}>تم جرد 45 / 100</div>
+
+        <div className="card" style={{border:'1px solid #fcd34d', background:'#fffbeb'}}>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+            <div>
+              <div style={{fontWeight:700, fontSize:'1.1rem', color:'#92400e'}}>جرد مستودع التقنية</div>
+              <div style={{fontSize:'0.85rem', color:'#b45309'}}>لجنة الجرد: م. فهد، أ. محمد (باستخدام المسح الميداني الذكي)</div>
             </div>
-            <span className="badge" style={{background:'#fef3c7', color:'#92400e', fontSize:'0.9rem'}}>قيد التنفيذ 45%</span>
+            <span className="badge" style={{background:'#f59e0b', color:'#fff', fontSize:'0.9rem', padding:'0.5rem 1rem'}}><Activity size={14}/> قيد التنفيذ</span>
+          </div>
+          <div style={{background:'#fde68a', height:'8px', borderRadius:'4px', overflow:'hidden', marginBottom:'0.5rem'}}>
+            <div style={{background:'#d97706', width:'45%', height:'100%', animation:'pulse 2s infinite'}}></div>
+          </div>
+          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem'}}>
+            <span style={{fontWeight:600, color:'#92400e'}}>تم جرد 45 / 100 أصل تقني</span>
+            <span style={{color:'#d97706', fontWeight:700}}>مُنجز 45%</span>
           </div>
         </div>
       </div>
