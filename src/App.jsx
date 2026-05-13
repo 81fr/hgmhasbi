@@ -341,7 +341,8 @@ const App = () => {
         {filteredAssets.length === 0 && <div style={{padding:'3rem', textAlign:'center', color:'var(--text-muted)'}}>لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
       </div>
     </div>
-  );
+    );
+  };
 
   const handleAddAsset = (e) => {
     e.preventDefault();
