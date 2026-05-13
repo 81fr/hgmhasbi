@@ -801,12 +801,12 @@ const App = () => {
         <div className="card" style={{borderLeft:'6px solid var(--danger)', background:'linear-gradient(to right, #fff1f2, #ffffff)'}}>
           <div style={{fontSize:'0.9rem', color:'var(--danger)', fontWeight:700, marginBottom:'0.5rem'}}>أصول مفقودة (لم تُجرد)</div>
           <div style={{fontSize:'2rem', fontWeight:800, color:'#9f1239'}}>2 <span style={{fontSize:'1rem', fontWeight:600}}>أصل</span></div>
-          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#881337'}}>القيمة الدفترية: 4,500 ر.س - <a href="#" style={{color:'var(--danger)', textDecoration:'underline'}}>عرض التسوية لتكوين قيد إعدام</a></div>
+          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#881337'}}>القيمة الدفترية: 4,500 ر.س - <button onClick={() => { setView('journal'); showToast('تم إنشاء مسودة قيد إعدام أصول مفقودة تلقائياً بقيمة 4,500 ر.س'); }} style={{color:'var(--danger)', textDecoration:'underline', background:'none', border:'none', cursor:'pointer', padding:0, fontSize:'inherit', fontWeight:'inherit'}}>عرض التسوية لتكوين قيد إعدام</button></div>
         </div>
         <div className="card" style={{borderLeft:'6px solid var(--success)', background:'linear-gradient(to right, #f0fdf4, #ffffff)'}}>
           <div style={{fontSize:'0.9rem', color:'var(--success)', fontWeight:700, marginBottom:'0.5rem'}}>أصول زائدة (غير مسجلة)</div>
           <div style={{fontSize:'2rem', fontWeight:800, color:'#166534'}}>1 <span style={{fontSize:'1rem', fontWeight:600}}>أصل</span></div>
-          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#14532d'}}>لابتوب ديل إضافي (مجهول المصدر) - <a href="#" style={{color:'var(--success)', textDecoration:'underline'}}>تسجيل كأصل جديد من تبرع</a></div>
+          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#14532d'}}>لابتوب ديل إضافي (مجهول المصدر) - <button onClick={() => { setEditingAsset({ name: 'لابتوب ديل إضافي (جرد)', category: 'أصول تقنية', source: 'تبرعات عينية', status: 'يعمل', cost: 3500, life: 3 }); setView('new-asset'); }} style={{color:'var(--success)', textDecoration:'underline', background:'none', border:'none', cursor:'pointer', padding:0, fontSize:'inherit', fontWeight:'inherit'}}>تسجيل كأصل جديد من تبرع</button></div>
         </div>
       </div>
 
