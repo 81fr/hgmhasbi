@@ -328,10 +328,32 @@ const App = () => {
       return matchQuery && matchCat;
     });
 
+    const activeAssets = accountingEngine.filter(a => a.status === 'يعمل').length;
+    const alertAssets = accountingEngine.filter(a => a.accumulatedDep >= a.cost * 0.8 && a.category !== 'أراضي').length;
+
     return (
       <div className="view-anim">
+        <div style={{background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding:'1.5rem', borderRadius:'16px', color:'white', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.5)', display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1rem'}}>
+          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>إجمالي الأصول المسجلة</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700}}>{accountingEngine.length} أصل</div>
+          </div>
+          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>الأصول التشغيلية النشطة</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#10b981'}}>{activeAssets} أصل</div>
+          </div>
+          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>تحذير الذكاء الاصطناعي (AI)</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700, color:'#f59e0b'}}>{alertAssets} أصول متهالكة</div>
+          </div>
+          <div>
+            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.25rem'}}>إجمالي القيمة الدفترية</div>
+            <div style={{fontSize:'1.5rem', fontWeight:700}}>{totals.nbv.toLocaleString()} ر.س</div>
+          </div>
+        </div>
+
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-          <h2 style={{fontSize:'1.25rem'}}>سجل الأصول الثابتة (FAR)</h2>
+          <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={24} color="var(--accent)" /> سجل الأصول الثابتة (FAR)</h2>
           <div style={{display:'flex', gap:'0.5rem'}}>
             <button className="btn btn-ghost" style={{color:'var(--accent)', background: 'rgba(59,130,246,0.1)'}} onClick={() => setShowScanner(true)}>
               <QrCode size={18} /> مسح ميداني ذكي
@@ -358,52 +380,60 @@ const App = () => {
           </div>
         )}
 
-        <div className="table-wrapper">
-          <table>
-          <thead>
+        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+          <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
             <tr>
-              <th>الرمز الموحد</th>
-              <th>بيانات الأصل</th>
-              <th>العهدة/المصدر</th>
-              <th>التكلفة (مع الضريبة)</th>
-              <th>الإهلاك المتراكم</th>
-              <th>صافي القيمة</th>
-              <th>الحالة</th>
-              <th>إجراءات</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>الرمز / الباركود</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>بيانات الأصل (Category)</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>الفرع / العهدة / المورد</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>التكلفة (مع الضريبة)</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>الإهلاك المتراكم</th>
+              <th style={{padding:'1rem', textAlign:'right'}}>صافي القيمة (NBV)</th>
+              <th style={{padding:'1rem', textAlign:'center'}}>الحالة / الذكاء الاصطناعي</th>
+              <th style={{padding:'1rem', textAlign:'center'}}>إجراءات</th>
             </tr>
           </thead>
           <tbody>
-            {filteredAssets.map(asset => (
-              <tr key={asset.id}>
-                <td style={{color:'var(--accent)', fontWeight:600}}>{asset.code}</td>
-                <td>
-                  <div style={{fontWeight:600}}>{asset.name}</div>
-                  <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{asset.category} | {DEPRECIATION_METHODS[asset.method]}</div>
+            {filteredAssets.map((asset, index) => {
+              const isWarning = asset.accumulatedDep >= asset.cost * 0.8 && asset.category !== 'أراضي';
+              return (
+              <tr key={asset.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)', transition:'background 0.2s'}} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}>
+                <td style={{padding:'1rem'}}>
+                  <div style={{color:'var(--accent)', fontWeight:700, display:'flex', alignItems:'center', gap:'0.25rem'}}><QrCode size={14} /> {asset.code}</div>
+                  <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>{asset.id}</div>
                 </td>
-                <td>
-                  <div style={{fontWeight:600}}>{asset.custody}</div>
-                  <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{asset.source}</div>
+                <td style={{padding:'1rem'}}>
+                  <div style={{fontWeight:600, color:'var(--text)'}}>{asset.name}</div>
+                  <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>{asset.category} | {DEPRECIATION_METHODS[asset.method]}</div>
                 </td>
-                <td>{(asset.cost + (asset.vat || 0)).toLocaleString()} ر.س</td>
-                <td style={{color:'var(--danger)'}}>{asset.category === 'أراضي' ? '-' : `-${asset.accumulatedDep.toLocaleString()}`}</td>
-                <td style={{fontWeight:700}}>{asset.netBookValue.toLocaleString()} ر.س</td>
-                <td>
-                  {asset.isExpense ? 
-                    <span className="badge" style={{background:'#fef2f2', color:'#ef4444'}}>مصروف</span> :
-                    <span className={`badge ${asset.status === 'يعمل' ? 'b-active' : ''}`} style={asset.status === 'بالمستودع' ? {background:'#fef3c7', color:'#92400e'} : asset.status === 'تالف' ? {background:'#fee2e2', color:'#b91c1c'} : {}}>{asset.status}</span>
-                  }
+                <td style={{padding:'1rem'}}>
+                  <div style={{fontWeight:600, fontSize:'0.85rem'}}>{asset.custody}</div>
+                  <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'}}><span style={{color:'#64748b'}}>المورد:</span> {asset.source}</div>
                 </td>
-                <td>
-                  <div style={{display:'flex', gap:'0.5rem'}}>
-                    <button className="btn btn-ghost" style={{padding:'0.25rem'}} title="تعديل"><Edit size={16} /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.25rem', color:'var(--danger)'}} title="استبعاد/بيع"><Trash2 size={16} /></button>
+                <td style={{padding:'1rem', fontWeight:600}}>{(asset.cost + (asset.vat || 0)).toLocaleString()} ر.س</td>
+                <td style={{padding:'1rem', color:'var(--danger)', fontWeight:500}}>{asset.category === 'أراضي' ? '-' : `-${asset.accumulatedDep.toLocaleString()}`}</td>
+                <td style={{padding:'1rem', fontWeight:700, color:'#0f172a'}}>{asset.netBookValue.toLocaleString()} ر.س</td>
+                <td style={{padding:'1rem', textAlign:'center'}}>
+                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem'}}>
+                    {asset.isExpense ? 
+                      <span className="badge" style={{background:'#fef2f2', color:'#ef4444'}}>مصروف</span> :
+                      <span className={`badge ${asset.status === 'يعمل' ? 'b-active' : ''}`} style={asset.status === 'بالمستودع' ? {background:'#fef3c7', color:'#92400e'} : asset.status === 'تالف' ? {background:'#fee2e2', color:'#b91c1c'} : {}}>{asset.status}</span>
+                    }
+                    {isWarning && <span style={{fontSize:'0.7rem', background:'#fee2e2', color:'#b91c1c', padding:'0.2rem 0.5rem', borderRadius:'4px', display:'flex', alignItems:'center', gap:'0.25rem'}}><AlertTriangle size={10} /> إحلال مقترح (AI)</span>}
+                  </div>
+                </td>
+                <td style={{padding:'1rem', textAlign:'center'}}>
+                  <div style={{display:'flex', justifyContent:'center', gap:'0.5rem'}}>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', background:'#f1f5f9'}} title="تعديل"><Edit size={16} color="#475569" /></button>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', background:'#fef2f2'}} title="استبعاد/بيع"><Trash2 size={16} color="#ef4444" /></button>
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
-        {filteredAssets.length === 0 && <div style={{padding:'3rem', textAlign:'center', color:'var(--text-muted)'}}>لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
+        {filteredAssets.length === 0 && <div style={{padding:'4rem', textAlign:'center', color:'var(--text-muted)'}}><Box size={48} color="#cbd5e1" style={{margin:'0 auto 1rem'}} />لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
       </div>
     </div>
     );
