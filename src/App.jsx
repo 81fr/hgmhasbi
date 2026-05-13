@@ -23,7 +23,11 @@ import {
   QrCode,
   Target,
   Shield,
-  Laptop
+  Laptop,
+  Search,
+  Bell,
+  ChevronDown,
+  MoreHorizontal
 } from 'lucide-react';
 import {
   Chart as ChartJS,
