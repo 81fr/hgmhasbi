@@ -37,7 +37,9 @@ import {
   Zap,
   Mic,
   MicOff,
-  Volume2
+  Volume2,
+  VolumeX,
+  Plus
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -50,8 +52,10 @@ import {
   Tooltip,
   Legend,
   ArcElement,
+  RadialLinearScale,
+  Filler,
 } from 'chart.js';
-import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import { Bar, Line, Doughnut, Radar } from 'react-chartjs-2';
 import './App.css';
 
 ChartJS.register(
@@ -63,7 +67,9 @@ ChartJS.register(
   ArcElement,
   Title,
   Tooltip,
-  Legend
+  Legend,
+  RadialLinearScale,
+  Filler
 );
 
 const DEPRECIATION_METHODS = {
