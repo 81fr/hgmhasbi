@@ -437,7 +437,10 @@ const App = () => {
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
         <h2 style={{fontSize:'1.25rem'}}>قيود اليومية التلقائية</h2>
-        <button className="btn btn-primary" onClick={() => setJournals(journals.map(j => ({...j, status: 'مرحل'})))}><FileText size={18} /> ترحيل القيود</button>
+        <div style={{display:'flex', gap:'0.5rem'}}>
+          <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)'}} onClick={() => { showToast('تم فك الترحيل وإعادة القيود لحالة المسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> فك / إلغاء الترحيل</button>
+          <button className="btn btn-primary" onClick={() => { showToast('تم ترحيل القيود المعلقة بنجاح'); setJournals(journals.map(j => ({...j, status: 'مرحل'}))); }}><FileText size={18} /> ترحيل القيود</button>
+        </div>
       </div>
       <div className="table-wrapper">
         <table>
