@@ -82,6 +82,14 @@ const App = () => {
   const [chatMessages, setChatMessages] = useState([{role: 'bot', text: 'أهلاً بك! أنا المساعد الذكي (Traouf AI). أستطيع مساعدتك في الاستعلام عن الأصول، أو إعطاء توصيات حوكمة وتحليلات استراتيجية. تفضل بطرح سؤالك.'}]);
   const [chatInput, setChatInput] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [editingAsset, setEditingAsset] = useState(null);
+
+  const deleteAsset = (id) => {
+    if(window.confirm('هل أنت متأكد من حذف هذا الأصل نهائياً من السجل؟')) {
+      setAssets(assets.filter(a => a.id !== id));
+      showToast('🗑️ تم حذف الأصل بنجاح');
+    }
+  };
 
   const speak = (text) => {
     if (!window.speechSynthesis) return;
@@ -453,8 +461,8 @@ const App = () => {
                 </td>
                 <td style={{padding:'1rem', textAlign:'center'}}>
                   <div style={{display:'flex', justifyContent:'center', gap:'0.5rem'}}>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', background:'#f1f5f9'}} title="تعديل"><Edit size={16} color="#475569" /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', background:'#fef2f2'}} title="استبعاد/بيع"><Trash2 size={16} color="#ef4444" /></button>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', background:'#f1f5f9'}} title="تعديل" onClick={() => { setEditingAsset(asset); setView('new-asset'); }}><Edit size={16} color="#475569" /></button>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', background:'#fef2f2'}} title="استبعاد/بيع" onClick={() => deleteAsset(asset.id)}><Trash2 size={16} color="#ef4444" /></button>
                   </div>
                 </td>
               </tr>
@@ -473,40 +481,63 @@ const App = () => {
     const cost = parseFloat(fd.get('cost') || 0);
     const life = parseFloat(fd.get('life') || 0);
     
-    if (cost < 3000 || life < 1) {
-      alert("تنبيه: سيتم تسجيل هذا البند كمصروف دوري فوراً وفقاً لسياسة الحد الأدنى لرسملة الأصول (أقل من 3000 ريال أو عمر أقل من سنة).");
+    const assetData = {
+      id: editingAsset ? editingAsset.id : `AST-${Math.floor(Math.random()*10000)}`,
+      code: editingAsset ? editingAsset.code : `CD-${Math.floor(Math.random()*1000)}`,
+      name: fd.get('name'),
+      category: fd.get('category'),
+      cost: cost,
+      vat: parseFloat(fd.get('vat') || 0),
+      salvage: editingAsset ? editingAsset.salvage : 0,
+      life: life || 1,
+      date: editingAsset ? editingAsset.date : new Date().toISOString().split('T')[0],
+      method: editingAsset ? editingAsset.method : 'SL',
+      status: fd.get('status'),
+      custody: fd.get('custody'),
+      source: fd.get('source'),
+      isExpense: (cost < 3000 || life < 1)
+    };
+
+    if (editingAsset) {
+      setAssets(assets.map(a => a.id === editingAsset.id ? assetData : a));
+      showToast('✅ تم تحديث بيانات الأصل بنجاح');
     } else {
-      alert("تم اعتماد الأصل بنجاح وتوليد رمز تتبع موحد له (Barcode/Serial).");
+      setAssets([...assets, assetData]);
+      showToast('✅ تم تسجيل الأصل الجديد بنجاح');
     }
+    setEditingAsset(null);
     setView('register');
   };
 
   const renderNewAsset = () => (
     <div className="view-anim">
-      <div style={{marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>تسجيل أصل جديد</h2>
-        <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>أدخل بيانات الأصل الثابت الجديد لإضافته إلى السجل</p>
+      <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <div>
+          <h2 style={{fontSize:'1.25rem'}}>{editingAsset ? 'تعديل بيانات الأصل' : 'تسجيل أصل جديد'}</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>{editingAsset ? `تعديل الأصل: ${editingAsset.name}` : 'أدخل بيانات الأصل الثابت الجديد لإضافته إلى السجل'}</p>
+        </div>
+        <button className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }}>عودة للسجل</button>
       </div>
       <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
         <form onSubmit={handleAddAsset} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>اسم الأصل</label>
-            <input name="name" type="text" placeholder="مثال: سيارة نقل تويوتا" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            <input name="name" type="text" defaultValue={editingAsset?.name} placeholder="مثال: سيارة نقل تويوتا" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>الفئة التصنيفية</label>
-            <select name="category" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+            <select name="category" defaultValue={editingAsset?.category} required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
               <option value="أراضي">أراضي</option>
               <option value="مباني">مباني</option>
               <option value="مركبات">سيارات ومركبات</option>
               <option value="أصول تقنية">أجهزة تقنية</option>
-              <option value="أثاث">أثاث ومعدات</option>
+              <option value="أثاث ومعدات">أثاث ومعدات</option>
               <option value="أصول أوقاف">أصول أوقاف</option>
             </select>
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>مصدر الأصل / وسيلة الدفع</label>
-            <select name="source" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+            <select name="source" defaultValue={editingAsset?.source} required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
               <option value="بنك الراجحي">بنك الراجحي</option>
               <option value="بنك البلاد">بنك البلاد</option>
               <option value="موردين">موردين (آجل)</option>
@@ -515,7 +546,7 @@ const App = () => {
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>الحالة التشغيلية</label>
-            <select name="status" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+            <select name="status" defaultValue={editingAsset?.status} required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
               <option value="يعمل">يعمل</option>
               <option value="بالمستودع">بالمستودع</option>
               <option value="تالف">تالف</option>
@@ -523,23 +554,23 @@ const App = () => {
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>تحديد العهدة (اسم الموظف)</label>
-            <input name="custody" type="text" placeholder="مثال: أحمد سالم" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            <input name="custody" type="text" defaultValue={editingAsset?.custody} placeholder="مثال: أحمد سالم" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>التكلفة الأساسية (ر.س)</label>
-            <input name="cost" type="number" placeholder="0.00" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            <input name="cost" type="number" defaultValue={editingAsset?.cost} placeholder="0.00" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>الضريبة المضافة (VAT)</label>
-            <input name="vat" type="number" placeholder="0.00" defaultValue="0" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            <input name="vat" type="number" defaultValue={editingAsset?.vat || 0} placeholder="0.00" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
           </div>
           <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
             <label style={{fontSize: '0.85rem', fontWeight: 600}}>العمر الإنتاجي (سنوات)</label>
-            <input name="life" type="number" placeholder="مثال: 5 (اتركه فارغاً للأراضي)" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            <input name="life" type="number" defaultValue={editingAsset?.life} placeholder="مثال: 5 (اتركه فارغاً للأراضي)" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
           </div>
           <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
-            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>حفظ الأصل</button>
-            <button type="button" className="btn btn-ghost" onClick={() => setView('register')} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
+            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>{editingAsset ? 'تحديث البيانات' : 'حفظ الأصل'}</button>
+            <button type="button" className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
           </div>
         </form>
       </div>
