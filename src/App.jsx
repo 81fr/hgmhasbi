@@ -948,6 +948,92 @@ const App = () => {
     </div>
   );
 
+  const renderGeneralReports = () => {
+    const totalCost = assets.reduce((acc, a) => acc + a.cost, 0);
+    const totalDep = accountingEngine.reduce((acc, a) => acc + a.accumulatedDep, 0);
+    const totalNBV = accountingEngine.reduce((acc, a) => acc + a.netBookValue, 0);
+    
+    return (
+      <div className="view-anim">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+          <div>
+            <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Database color="var(--accent)" /> التقارير والتحليلات المؤسسية</h2>
+            <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>عرض شامل لأداء المحفظة الرأسمالية، تحليل الإهلاك، وحالة الامتثال.</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => showToast('📥 جاري تصدير التقرير المؤسسي الشامل...')}><Download size={18} /> استخراج التقرير السنوي</button>
+        </div>
+
+        <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
+          <div className="card" style={{borderRight:'4px solid var(--accent)'}}>
+            <div className="val-sub">إجمالي التكلفة التاريخية</div>
+            <div className="val-big" style={{fontSize:'1.2rem'}}>{totalCost.toLocaleString()} ر.س</div>
+          </div>
+          <div className="card" style={{borderRight:'4px solid var(--danger)'}}>
+            <div className="val-sub">مجمع الإهلاك المتراكم</div>
+            <div className="val-big" style={{fontSize:'1.2rem', color:'var(--danger)'}}>{totalDep.toLocaleString()} ر.س</div>
+          </div>
+          <div className="card" style={{borderRight:'4px solid var(--success)'}}>
+            <div className="val-sub">صافي القيمة الدفترية (NBV)</div>
+            <div className="val-big" style={{fontSize:'1.2rem', color:'var(--success)'}}>{totalNBV.toLocaleString()} ر.س</div>
+          </div>
+          <div className="card" style={{borderRight:'4px solid #f59e0b'}}>
+            <div className="val-sub">العائد على الأصول (ROA)</div>
+            <div className="val-big" style={{fontSize:'1.2rem', color:'#f59e0b'}}>14.2%</div>
+          </div>
+        </div>
+
+        <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
+          <div className="card">
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+              <h3 style={{fontSize:'1.1rem'}}>تحليل حالة الأصول (Asset Condition)</h3>
+              <Activity size={20} color="var(--accent)" />
+            </div>
+            <div style={{height:'300px'}}>
+              <Bar data={{
+                labels: ['يعمل بكفاءة', 'يحتاج صيانة', 'تحت المستودع', 'تالف/إعدام'],
+                datasets: [{
+                  label: 'عدد الأصول',
+                  data: [15, 3, 2, 1],
+                  backgroundColor: ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'],
+                  borderRadius: 8
+                }]
+              }} options={{ responsive: true, maintainAspectRatio: false }} />
+            </div>
+          </div>
+          <div className="card">
+            <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>توزيع الفئات</h3>
+            <div style={{height:'250px', display:'flex', justifyContent:'center'}}>
+              <Doughnut data={{
+                labels: ['تقنية', 'مركبات', 'مباني', 'أثاث'],
+                datasets: [{
+                  data: [40, 25, 20, 15],
+                  backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'],
+                  borderWidth: 0
+                }]
+              }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
+            </div>
+          </div>
+        </div>
+
+        <div className="card" style={{background:'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border:'1px solid #bae6fd'}}>
+          <div style={{display:'flex', gap:'1rem', alignItems:'flex-start'}}>
+            <div style={{background:'white', padding:'0.75rem', borderRadius:'12px', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}}>
+              <TrendingUp color="#0369a1" size={24} />
+            </div>
+            <div>
+              <h4 style={{color:'#0369a1', fontWeight:700, marginBottom:'0.5rem'}}>توصيات الذكاء الاصطناعي للتحسين (Report Insights)</h4>
+              <ul style={{fontSize:'0.85rem', color:'#075985', paddingRight:'1.2rem', display:'flex', flexDirection:'column', gap:'0.5rem'}}>
+                <li>• يُلاحظ تركز 40% من الأصول في الفئة التقنية؛ نوصي بمراجعة عقود الصيانة الدورية لتقليل مخاطر التعطل.</li>
+                <li>• معدل الإهلاك السنوي ارتفع بنسبة 5% نتيجة الاستحواذات الأخيرة، مما يتطلب مراجعة التدفقات النقدية التشغيلية.</li>
+                <li>• هناك 3 أصول في "المستودع" منذ أكثر من 6 أشهر؛ نوصي بإعادة تخصيصها أو بيعها لتجنب تآكل قيمتها دون فائدة.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const renderSettings = () => (
     <div className="view-anim">
       <h2 style={{fontSize:'1.25rem', marginBottom:'2rem'}}>إعدادات النظام</h2>
@@ -1004,6 +1090,7 @@ const App = () => {
 
         <div className="nav-group">
           <div className="nav-label">التقارير</div>
+          <div className={`nav-item ${view === 'reports' ? 'active' : ''}`} onClick={() => setView('reports')}><BarChart3 size={18} /> التقارير الشاملة</div>
           <div className={`nav-item ${view === 'budget' ? 'active' : ''}`} onClick={() => setView('budget')}><PieChart size={18} /> الميزانية التقديرية</div>
           <div className={`nav-item ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}><ClipboardList size={18} /> تقارير الجرد</div>
         </div>
@@ -1047,6 +1134,7 @@ const App = () => {
           {view === 'new-transfer' && renderNewTransfer()}
           {view === 'budget' && renderBudget()}
           {view === 'inventory' && renderInventory()}
+          {view === 'reports' && renderGeneralReports()}
           {view === 'new-inventory' && renderNewInventory()}
           {view === 'ai-insights' && renderAIInsights()}
           {view === 'settings' && renderSettings()}
