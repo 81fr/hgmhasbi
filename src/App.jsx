@@ -750,38 +750,99 @@ const App = () => {
           <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><PieChart color="var(--accent)" /> الميزانية التقديرية الرأسمالية (CAPEX)</h2>
           <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مراقبة وتحليل خطط الشراء والاستحواذ مقارنة بالميزانية المعتمدة.</p>
         </div>
+        <div style={{display:'flex', gap:'0.5rem'}}>
+           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}><Settings size={16} /> ضبط السقف المالي</button>
+           <button className="btn btn-primary"><FilePlus size={16} /> طلب تعزيز ميزانية</button>
+        </div>
       </div>
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
-        <div className="card" style={{position:'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#3b82f6'}}></div>
-          <div className="val-sub">الميزانية المعتمدة لعام 2024</div>
+      
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)', marginBottom:'1.5rem'}}>
+        <div className="card" style={{position:'relative', overflow:'hidden', borderTop:'4px solid #3b82f6'}}>
+          <div className="val-sub">الميزانية المعتمدة (2024)</div>
           <div className="val-big" style={{color:'#3b82f6'}}>1,500,000 ر.س</div>
-          <div className="val-sub">خطة CAPEX السنوية</div>
+          <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>تم اعتمادها في: 01-01-2024</div>
         </div>
-        <div className="card" style={{position:'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#ef4444'}}></div>
-          <div className="val-sub">المنصرف الفعلي حتى الآن</div>
+        <div className="card" style={{position:'relative', overflow:'hidden', borderTop:'4px solid #ef4444'}}>
+          <div className="val-sub">المنصرف الفعلي + الالتزامات</div>
           <div className="val-big" style={{color:'#ef4444'}}>680,000 ر.س</div>
-          <div className="val-sub">تم استهلاك 45% من الميزانية</div>
+          <div style={{fontSize:'0.75rem', color:'var(--danger)', fontWeight:600}}>معدل استهلاك: 45.3%</div>
         </div>
-        <div className="card" style={{position:'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#10b981'}}></div>
-          <div className="val-sub">المتبقي من الميزانية</div>
+        <div className="card" style={{position:'relative', overflow:'hidden', borderTop:'4px solid #10b981'}}>
+          <div className="val-sub">الرصيد المتاح للارتباط</div>
           <div className="val-big" style={{color:'#10b981'}}>820,000 ر.س</div>
-          <div className="val-sub">فائض متوفر للاستحواذات</div>
+          <div style={{fontSize:'0.75rem', color:'var(--success)', fontWeight:600}}>وفر مالي متاح</div>
         </div>
       </div>
 
-      <div className="card" style={{marginTop:'1.5rem'}}>
-        <h3 style={{marginBottom:'1.5rem', fontSize:'1.1rem', color:'#1e293b'}}>مؤشر استهلاك الميزانية</h3>
-        <div style={{height:'24px', width:'100%', background:'#f1f5f9', borderRadius:'12px', overflow:'hidden', display:'flex', marginBottom:'1rem'}}>
-          <div style={{width:'45%', background:'#ef4444', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'0.75rem', fontWeight:700}}>المنصرف 45%</div>
-          <div style={{width:'15%', background:'#f59e0b', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'0.75rem', fontWeight:700}}>تحت الطلب 15%</div>
-          <div style={{width:'40%', background:'#10b981', display:'flex', alignItems:'center', justifyContent:'center', color:'white', fontSize:'0.75rem', fontWeight:700}}>المتبقي 40%</div>
+      <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
+        <div className="card">
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+             <h3 style={{fontSize:'1.1rem'}}>تحليل معدل الحرق (Budget Burn Rate)</h3>
+             <TrendingUp size={20} color="var(--accent)" />
+          </div>
+          <div style={{height:'280px'}}>
+             <Line data={{
+               labels: ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس'],
+               datasets: [
+                 { 
+                   label: 'السقف المخطط الموزع', 
+                   data: [187500, 375000, 562500, 750000, 937500, 1125000, 1312500, 1500000], 
+                   borderColor: '#94a3b8', 
+                   borderDash: [5, 5], 
+                   pointRadius: 0,
+                   fill: false 
+                 },
+                 { 
+                   label: 'الإنفاق الفعلي التراكمي', 
+                   data: [120000, 290000, 480000, 680000], 
+                   borderColor: '#3b82f6', 
+                   backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                   tension: 0.4, 
+                   fill: true 
+                 }
+               ]
+             }} options={{ responsive: true, maintainAspectRatio: false }} />
+          </div>
         </div>
-        <div style={{background:'#f0fdf4', padding:'1rem', borderRadius:'8px', border:'1px solid #bbf7d0', color:'#166534', fontSize:'0.85rem', display:'flex', gap:'0.5rem'}}>
-          <Sparkles size={18} />
-          <strong>تحليل الذكاء الاصطناعي:</strong> المتبقي من الميزانية كافٍ جداً لتغطية نفقات إحلال خوادم البيانات الموصى بها (تكلفة تقديرية 120,000 ر.س) دون تجاوز السقف السنوي المعتمد.
+        <div className="card">
+          <h3 style={{fontSize:'1.1rem', marginBottom:'1rem'}}>الانحراف حسب الفئة</h3>
+          <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+             {[
+               {label: 'أصول تقنية', budget: 500000, actual: 420000, color: '#6366f1'},
+               {label: 'مركبات', budget: 400000, actual: 150000, color: '#f43f5e'},
+               {label: 'مباني وأوقاف', budget: 600000, actual: 110000, color: '#10b981'},
+             ].map((cat, idx) => {
+               const perc = (cat.actual / cat.budget) * 100;
+               return (
+                 <div key={idx}>
+                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'0.4rem'}}>
+                       <span style={{fontWeight:600}}>{cat.label}</span>
+                       <span style={{color:'var(--text-muted)'}}>{perc.toFixed(1)}%</span>
+                    </div>
+                    <div style={{height:'8px', background:'#f1f5f9', borderRadius:'4px', overflow:'hidden'}}>
+                       <div style={{width: `${perc}%`, background: cat.color, height:'100%'}}></div>
+                    </div>
+                    <div style={{fontSize:'0.75rem', marginTop:'0.3rem', color:'var(--text-muted)'}}>
+                       المنصرف: {cat.actual.toLocaleString()} / {cat.budget.toLocaleString()}
+                    </div>
+                 </div>
+               );
+             })}
+          </div>
+          <div style={{marginTop:'1.5rem', padding:'1rem', background:'#f8fafc', borderRadius:'8px', border:'1px solid var(--border)'}}>
+             <div style={{fontSize:'0.8rem', fontWeight:700, marginBottom:'0.5rem'}}>ملخص الانحراف الإجمالي</div>
+             <div style={{fontSize:'1.1rem', fontWeight:800, color:'var(--success)'}}>32.4% <span style={{fontSize:'0.8rem', fontWeight:400, color:'var(--text-muted)'}}>تحت الميزانية</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{borderLeft:'4px solid var(--success)', background:'rgba(16, 185, 129, 0.05)'}}>
+        <div style={{display:'flex', gap:'0.75rem', alignItems:'center'}}>
+          <Sparkles size={20} color="var(--success)" />
+          <div>
+            <strong style={{color:'var(--success)'}}>توصية المحافظ الذكي (Budget Guardian):</strong> 
+            <span style={{fontSize:'0.85rem', marginLeft:'0.5rem'}}>معدل الإنفاق الفعلي أقل من المخطط بـ 32%، نوصي باستغلال الوفر الحالي في تعزيز البنية التحتية للشبكات (فئة التقنية) قبل نهاية الربع الثالث لضمان استغلال الميزانية الرأسمالية بكفاءة.</span>
+          </div>
         </div>
       </div>
     </div>
