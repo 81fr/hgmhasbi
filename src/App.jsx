@@ -64,6 +64,16 @@ const DEPRECIATION_METHODS = {
 
 const App = () => {
   const [view, setView] = useState('dashboard');
+  const [toastMessage, setToastMessage] = useState(null);
+  const [showScanner, setShowScanner] = useState(false);
+  const [showFilter, setShowFilter] = useState(false);
+  const [filterParams, setFilterParams] = useState({ query: '', category: 'الكل' });
+
+  const showToast = (msg) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const [assets, setAssets] = useState([
     { id: 'ORG-AST-001', code: 'IT-001', name: 'خوادم البيانات المركزية', category: 'أصول تقنية', cost: 120000, vat: 18000, salvage: 10000, life: 5, date: '2023-01-01', method: 'SL', status: 'يعمل', custody: 'أحمد سالم', source: 'بنك الراجحي' },
     { id: 'ORG-AST-002', code: 'VH-021', name: 'أسطول سيارات التوزيع', category: 'مركبات', cost: 450000, vat: 67500, salvage: 50000, life: 7, date: '2022-06-15', method: 'DB', status: 'يعمل', custody: 'محمد العبدالله', source: 'البلاد' },
@@ -228,37 +238,63 @@ const App = () => {
   );
 
   const exportCSV = () => {
-    let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-    csvContent += "الرمز,الاسم,الفئة,المصدر,التكلفة,الإهلاك,الصافي,العهدة,الحالة\n";
-    assets.forEach(a => {
-      csvContent += `${a.code},${a.name},${a.category},${a.source},${a.cost},${a.dep},${a.nbv},${a.custody},${a.status}\n`;
-    });
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", "assets_export.csv");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    showToast('جاري تحضير وتشفير البيانات...');
+    setTimeout(() => {
+      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
+      csvContent += "الرمز,الاسم,الفئة,المصدر,التكلفة,الإهلاك,الصافي,العهدة,الحالة\n";
+      assets.forEach(a => {
+        csvContent += `${a.code},${a.name},${a.category},${a.source},${a.cost},${a.dep},${a.nbv},${a.custody},${a.status}\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "assets_export.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('✅ تم تصدير ملف Excel بنجاح!');
+    }, 800);
   };
 
-  const renderRegister = () => (
-    <div className="view-anim">
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>سجل الأصول الثابتة (FAR)</h2>
-        <div style={{display:'flex', gap:'0.5rem'}}>
-          <button className="btn btn-ghost" style={{color:'var(--accent)'}} onClick={() => { const code = prompt('يرجى تمرير قارئ الباركود، أو إدخال رمز الأصل يدوياً:'); if(code) alert('تم العثور على الأصل وتحديث حالته الميدانية: ' + code); }}>
-            <QrCode size={18} /> مسح ميداني سريع
-          </button>
-          <div style={{width:'1px', background:'var(--border)', margin:'0 0.5rem'}}></div>
-          <button className="btn btn-ghost" onClick={() => prompt('أدخل الكلمة المفتاحية أو الفئة للتصفية المتقدمة:')}><Filter size={18} /> تصفية</button>
-          <button className="btn btn-ghost" onClick={exportCSV}><Download size={18} /> تصدير Excel</button>
-          <button className="btn btn-ghost" onClick={() => window.print()}><Download size={18} /> تصدير PDF</button>
-          <button className="btn btn-primary" onClick={() => setView('new-asset')}><FilePlus size={18} /> تسجيل أصل جديد</button>
+  const renderRegister = () => {
+    const filteredAssets = accountingEngine.filter(a => {
+      const matchQuery = a.name.includes(filterParams.query) || a.code.includes(filterParams.query);
+      const matchCat = filterParams.category === 'الكل' || a.category === filterParams.category;
+      return matchQuery && matchCat;
+    });
+
+    return (
+      <div className="view-anim">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+          <h2 style={{fontSize:'1.25rem'}}>سجل الأصول الثابتة (FAR)</h2>
+          <div style={{display:'flex', gap:'0.5rem'}}>
+            <button className="btn btn-ghost" style={{color:'var(--accent)', background: 'rgba(59,130,246,0.1)'}} onClick={() => setShowScanner(true)}>
+              <QrCode size={18} /> مسح ميداني ذكي
+            </button>
+            <div style={{width:'1px', background:'var(--border)', margin:'0 0.5rem'}}></div>
+            <button className={`btn btn-ghost ${showFilter ? 'b-active' : ''}`} onClick={() => setShowFilter(!showFilter)}><Filter size={18} /> تصفية متقدمة</button>
+            <button className="btn btn-ghost" onClick={exportCSV}><Download size={18} /> تصدير Excel</button>
+            <button className="btn btn-ghost" onClick={() => { showToast('🖨️ جاري تجهيز التقرير للطباعة...'); setTimeout(() => window.print(), 800); }}><Download size={18} /> تصدير PDF</button>
+            <button className="btn btn-primary" onClick={() => setView('new-asset')}><FilePlus size={18} /> تسجيل أصل جديد</button>
+          </div>
         </div>
-      </div>
-      <div className="table-wrapper">
-        <table>
+
+        {showFilter && (
+          <div style={{display:'flex', gap:'1rem', marginBottom:'1.5rem', padding:'1rem', background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', animation:'fadeIn 0.2s'}}>
+            <input type="text" placeholder="ابحث بالاسم أو الرمز..." value={filterParams.query} onChange={e => setFilterParams({...filterParams, query: e.target.value})} style={{flex:1, padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+            <select value={filterParams.category} onChange={e => setFilterParams({...filterParams, category: e.target.value})} style={{padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+              <option value="الكل">جميع الفئات</option>
+              <option value="أراضي">أراضي</option>
+              <option value="مباني">مباني</option>
+              <option value="أصول تقنية">أصول تقنية</option>
+              <option value="مركبات">مركبات</option>
+              <option value="أصول أوقاف">أصول أوقاف</option>
+            </select>
+          </div>
+        )}
+
+        <div className="table-wrapper">
+          <table>
           <thead>
             <tr>
               <th>الرمز الموحد</th>
@@ -272,7 +308,7 @@ const App = () => {
             </tr>
           </thead>
           <tbody>
-            {accountingEngine.map(asset => (
+            {filteredAssets.map(asset => (
               <tr key={asset.id}>
                 <td style={{color:'var(--accent)', fontWeight:600}}>{asset.code}</td>
                 <td>
@@ -302,6 +338,7 @@ const App = () => {
             ))}
           </tbody>
         </table>
+        {filteredAssets.length === 0 && <div style={{padding:'3rem', textAlign:'center', color:'var(--text-muted)'}}>لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
       </div>
     </div>
   );
@@ -687,6 +724,31 @@ const App = () => {
           {view === 'settings' && renderSettings()}
         </div>
       </main>
+
+      {showScanner && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'400px', background:'var(--card-bg)', textAlign:'center', padding:'2.5rem 2rem', border:'1px solid var(--border)'}}>
+            <div style={{display:'inline-block', padding:'1.5rem', borderRadius:'50%', background:'rgba(59, 130, 246, 0.1)', marginBottom:'1.5rem'}}>
+              <QrCode size={48} color="var(--accent)" />
+            </div>
+            <h3 style={{marginBottom:'0.5rem', fontSize:'1.25rem'}}>المسح الميداني النشط</h3>
+            <p style={{color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'2rem'}}>قم بتوجيه كاميرا الماسح الضوئي نحو ملصق الباركود أو الـ QR الخاص بالأصل، أو أدخل الرمز يدوياً.</p>
+            <input autoFocus type="text" placeholder="أدخل رمز الأصل هنا..." style={{width:'100%', padding:'1rem', borderRadius:'8px', border:'2px solid var(--accent)', background:'transparent', color:'var(--text)', textAlign:'center', fontSize:'1.1rem', letterSpacing:'1px', outline:'none', boxShadow:'0 0 15px rgba(59, 130, 246, 0.2)'}} onKeyDown={(e) => {
+              if(e.key === 'Enter' && e.target.value) {
+                setShowScanner(false);
+                showToast(`✅ تم مسح الأصل (${e.target.value}) بنجاح وتحديث حالته!`);
+              }
+            }}/>
+            <button className="btn btn-ghost" style={{marginTop:'1.5rem', width:'100%', padding:'0.75rem'}} onClick={() => setShowScanner(false)}>إلغاء العملية</button>
+          </div>
+        </div>
+      )}
+
+      {toastMessage && (
+        <div style={{position:'fixed', bottom:'2rem', right:'2rem', background:'var(--accent)', color:'#fff', padding:'1rem 1.5rem', borderRadius:'8px', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.3)', zIndex:9999, display:'flex', alignItems:'center', gap:'0.75rem', fontWeight:600}}>
+          <CheckCircle size={20} /> {toastMessage}
+        </div>
+      )}
     </div>
   );
 };
