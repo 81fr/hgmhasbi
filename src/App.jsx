@@ -646,62 +646,91 @@ const App = () => {
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem'}}>
         <div>
           <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Shuffle color="var(--accent)" /> التحويلات العينية للأصول</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة ومراقبة حركة تنقلات الأصول بين الأقسام والفروع.</p>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة ومراقبة حركة تنقلات الأصول بين الأقسام والفروع لضمان دقة العهدة.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setView('new-transfer')}><Shuffle size={18} /> طلب تحويل جديد</button>
+        <button className="btn btn-primary" onClick={() => setView('new-transfer')} style={{padding:'0.75rem 2rem'}}><Shuffle size={18} /> طلب تحويل جديد</button>
       </div>
 
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)', marginBottom:'2rem'}}>
-        <div className="card" style={{borderTop:'4px solid #3b82f6'}}>
-          <div className="val-sub">إجمالي الطلبات</div>
-          <div className="val-big" style={{color:'#3b82f6'}}>{transfers.length}</div>
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+           <div style={{background:'rgba(59, 130, 246, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Shuffle color="#3b82f6" size={24} /></div>
+           <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي الطلبات</div><div style={{fontSize:'1.2rem', fontWeight:800}}>{transfers.length}</div></div>
         </div>
-        <div className="card" style={{borderTop:'4px solid #10b981'}}>
-          <div className="val-sub">طلبات مكتملة</div>
-          <div className="val-big" style={{color:'#10b981'}}>{transfers.filter(t => t.status === 'مكتمل').length}</div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+           <div style={{background:'rgba(16, 185, 129, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><CheckCircle color="#10b981" size={24} /></div>
+           <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>تم النقل بنجاح</div><div style={{fontSize:'1.2rem', fontWeight:800, color:'#10b981'}}>{transfers.filter(t => t.status === 'مكتمل').length}</div></div>
         </div>
-        <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
-          <div className="val-sub">قيد المراجعة</div>
-          <div className="val-big" style={{color:'#f59e0b'}}>{transfers.filter(t => t.status === 'قيد المراجعة').length}</div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+           <div style={{background:'rgba(245, 158, 11, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Activity color="#f59e0b" size={24} /></div>
+           <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>قيد المراجعة</div><div style={{fontSize:'1.2rem', fontWeight:800, color:'#f59e0b'}}>{transfers.filter(t => t.status === 'قيد المراجعة').length}</div></div>
+        </div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center'}}>
+           <div style={{background:'rgba(239, 68, 68, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><AlertTriangle color="#ef4444" size={24} /></div>
+           <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>طلبات مرفوضة</div><div style={{fontSize:'1.2rem', fontWeight:800, color:'#ef4444'}}>{transfers.filter(t => t.status === 'مرفوض').length}</div></div>
         </div>
       </div>
 
-      <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
-        <table style={{width:'100%', borderCollapse:'collapse'}}>
-          <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
-            <tr>
-              <th style={{padding:'1rem', textAlign:'right'}}>رقم الطلب</th>
-              <th style={{padding:'1rem', textAlign:'right'}}>الأصل</th>
-              <th style={{padding:'1rem', textAlign:'right'}}>مسار التحويل</th>
-              <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
-              <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
-            </tr>
-          </thead>
-          <tbody>
-            {transfers.map((t, index) => (
-              <tr key={t.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
-                <td style={{padding:'1rem', fontWeight:700, color:'var(--accent)'}}>{t.id}</td>
-                <td style={{padding:'1rem', fontWeight:600}}>{t.asset}</td>
-                <td style={{padding:'1rem'}}>
-                  <div style={{display:'flex', alignItems:'center', gap:'0.5rem', fontWeight:600}}>
-                    <span style={{color:'#64748b'}}>{t.from}</span>
-                    <Shuffle size={14} color="#94a3b8" />
-                    <span style={{color:'#0f172a'}}>{t.to}</span>
-                  </div>
-                </td>
-                <td style={{padding:'1rem'}}>{t.date}</td>
-                <td style={{padding:'1rem', textAlign:'center'}}>
-                  {t.status === 'مكتمل' ? 
-                    <span className="badge b-active" style={{padding:'0.4rem 1rem'}}>مكتمل</span> : 
-                    t.status === 'قيد المراجعة' ?
-                    <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem'}}>قيد المراجعة</span> :
-                    <span className="badge" style={{background:'#fee2e2', color:'#b91c1c', padding:'0.4rem 1rem'}}>مرفوض</span>
-                  }
-                </td>
+      <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
+        <div className="card">
+           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+              <h3 style={{fontSize:'1.1rem'}}>تحليل التدفق (In/Out Flow)</h3>
+              <TrendingUp size={18} color="var(--accent)" />
+           </div>
+           <div style={{height:'350px'}}>
+             <Bar data={{
+               labels: ['الإنتاج', 'المبيعات', 'التقنية', 'الإدارة'],
+               datasets: [
+                 { label: 'أصول صادرة', data: [5, 2, 8, 3], backgroundColor: '#f43f5e', borderRadius: 4 },
+                 { label: 'أصول واردة', data: [3, 9, 4, 7], backgroundColor: '#10b981', borderRadius: 4 }
+               ]
+             }} options={{ responsive: true, maintainAspectRatio: false, indexAxis: 'y' }} />
+           </div>
+           <div style={{marginTop:'1rem', background:'#f0f9ff', padding:'0.85rem', borderRadius:'8px', fontSize:'0.8rem', color:'#0369a1', border:'1px solid #bae6fd'}}>
+              <Sparkles size={14} style={{marginLeft:'0.4rem'}} />
+              <strong>تحليل الذكاء الاصطناعي:</strong> يلاحظ ارتفاع معدل طلب الأصول في "قسم المبيعات" بنسبة 40%؛ نوصي بدراسة الحاجة لتوريد عهدة ثابتة جديدة لهم بدلاً من التحويلات المتكررة.
+           </div>
+        </div>
+
+        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+            <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
+              <tr>
+                <th style={{padding:'1rem', textAlign:'right'}}>رقم الطلب</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>الأصل / العهدة</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>مسار التحويل (Logistics)</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
+                <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {transfers.map((t, index) => (
+                <tr key={t.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                  <td style={{padding:'1rem', fontWeight:700, color:'var(--accent)'}}>{t.id}</td>
+                  <td style={{padding:'1rem'}}>
+                    <div style={{fontWeight:600}}>{t.asset}</div>
+                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>كود تتبع نشط</div>
+                  </td>
+                  <td style={{padding:'1rem'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'0.75rem', fontWeight:600}}>
+                      <span style={{color:'#64748b', background:'#f1f5f9', padding:'0.2rem 0.5rem', borderRadius:'4px'}}>{t.from}</span>
+                      <Shuffle size={14} color="var(--accent)" />
+                      <span style={{color:'#0f172a', background:'rgba(59, 130, 246, 0.05)', padding:'0.2rem 0.5rem', borderRadius:'4px', border:'1px solid rgba(59, 130, 246, 0.1)'}}>{t.to}</span>
+                    </div>
+                  </td>
+                  <td style={{padding:'1rem'}}>{t.date}</td>
+                  <td style={{padding:'1rem', textAlign:'center'}}>
+                    {t.status === 'مكتمل' ? 
+                      <span className="badge b-active" style={{padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><CheckCircle size={12}/> مكتمل</span> : 
+                      t.status === 'قيد المراجعة' ?
+                      <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><Activity size={12}/> قيد المراجعة</span> :
+                      <span className="badge" style={{background:'#fee2e2', color:'#b91c1c', padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><X size={12}/> مرفوض</span>
+                    }
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
