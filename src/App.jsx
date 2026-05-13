@@ -34,7 +34,10 @@ import {
   MessageSquare,
   Send,
   X,
-  Zap
+  Zap,
+  Mic,
+  MicOff,
+  Volume2
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -78,6 +81,31 @@ const App = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState([{role: 'bot', text: 'أهلاً بك! أنا المساعد الذكي (Traouf AI). أستطيع مساعدتك في الاستعلام عن الأصول، أو إعطاء توصيات حوكمة وتحليلات استراتيجية. تفضل بطرح سؤالك.'}]);
   const [chatInput, setChatInput] = useState('');
+  const [isListening, setIsListening] = useState(false);
+
+  const speak = (text) => {
+    if (!window.speechSynthesis) return;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'ar-SA';
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const startListening = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('⚠️ متصفحك لا يدعم التعرف على الكلام');
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'ar-SA';
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setChatInput(transcript);
+    };
+    recognition.start();
+  };
 
   const showToast = (msg) => {
     setToastMessage(msg);
@@ -1049,10 +1077,15 @@ const App = () => {
             const prevInput = chatInput;
             setChatInput('');
             setTimeout(() => {
-              setChatMessages(prev => [...prev, {role: 'bot', text: `بناءً على تحليلات قواعد بيانات الأصول، أود الإفادة بأن "${prevInput}" يعكس حالة استقرار مالي حالياً. لمزيد من الدقة يمكنني إعداد تقرير مخصص، هل ترغب في ذلك؟`}]);
+              const botResponse = `بناءً على تحليلات قواعد بيانات الأصول، أود الإفادة بأن "${prevInput}" يعكس حالة استقرار مالي حالياً. لمزيد من الدقة يمكنني إعداد تقرير مخصص، هل ترغب في ذلك؟`;
+              setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
+              speak(botResponse);
             }, 1000);
           }}>
-            <input type="text" placeholder="اسأل الذكاء الاصطناعي..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none'}} />
+            <button type="button" onClick={startListening} style={{background: isListening ? '#ef4444' : 'var(--bg)', color: isListening ? 'white' : '#64748b', border:'1px solid var(--border)', borderRadius:'8px', width:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', animation: isListening ? 'pulse 1.5s infinite' : 'none'}}>
+              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            </button>
+            <input type="text" placeholder="اسأل أو تحدث مع الذكاء الاصطناعي..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none'}} />
             <button type="submit" style={{background:'var(--accent)', color:'white', border:'none', borderRadius:'8px', width:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}><Send size={16} /></button>
           </form>
         </div>
