@@ -79,9 +79,11 @@ const App = () => {
   const [showFilter, setShowFilter] = useState(false);
   const [filterParams, setFilterParams] = useState({ query: '', category: 'الكل' });
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([{role: 'bot', text: 'أهلاً بك! أنا المساعد الذكي (Traouf AI). أستطيع مساعدتك في الاستعلام عن الأصول، أو إعطاء توصيات حوكمة وتحليلات استراتيجية. تفضل بطرح سؤالك.'}]);
+  const [chatMessages, setChatMessages] = useState([{role: 'bot', text: 'أهلاً بك يا فيصل! أنا المساعد الذكي (Traouf AI). أراقب حالياً 20 أصلاً مؤسسياً، وألاحظ أن هناك 3 أصول تتطلب اهتمامك الفوري. كيف يمكنني مساعدتك اليوم؟'}]);
   const [chatInput, setChatInput] = useState('');
   const [isListening, setIsListening] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
 
   const deleteAsset = (id) => {
@@ -1446,38 +1448,101 @@ const App = () => {
       </button>
 
       {isChatOpen && (
-        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'350px', height:'500px', background:'var(--card-bg)', borderRadius:'16px', boxShadow:'0 15px 35px rgba(0,0,0,0.2)', zIndex:10000, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'fadeIn 0.2s'}}>
-          <div style={{background:'var(--accent)', color:'white', padding:'1rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-            <div style={{display:'flex', alignItems:'center', gap:'0.5rem'}}>
-              <Bot size={20} />
-              <div style={{fontWeight:600}}>المساعد الذكي (Traouf AI)</div>
+        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'400px', height:'600px', background:'var(--card-bg)', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', zIndex:10000, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'slideUp 0.3s ease-out'}}>
+          {/* AI Header */}
+          <div style={{background:'linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%)', color:'white', padding:'1.5rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+            <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
+              <div style={{background:'rgba(255,255,255,0.2)', padding:'0.5rem', borderRadius:'12px', position:'relative'}}>
+                 <Bot size={24} />
+                 <div style={{position:'absolute', bottom:'-2px', right:'-2px', width:'10px', height:'10px', background:'#10b981', borderRadius:'50%', border:'2px solid white'}}></div>
+              </div>
+              <div>
+                 <div style={{fontWeight:800, fontSize:'1rem'}}>Traouf Strategic AI</div>
+                 <div style={{fontSize:'0.7rem', opacity:0.8}}>متصل | جاهز لتحليل البيانات</div>
+              </div>
             </div>
-            <button style={{background:'transparent', border:'none', color:'white', cursor:'pointer'}} onClick={() => setIsChatOpen(false)}><X size={20} /></button>
+            <div style={{display:'flex', gap:'0.5rem'}}>
+               <button onClick={() => setAutoSpeak(!autoSpeak)} style={{background:'transparent', border:'none', color:'white', cursor:'pointer', opacity: autoSpeak ? 1 : 0.5}} title="التحدث تلقائياً">
+                  {autoSpeak ? <Volume2 size={20}/> : <VolumeX size={20}/>}
+               </button>
+               <button style={{background:'transparent', border:'none', color:'white', cursor:'pointer'}} onClick={() => setIsChatOpen(false)}><X size={20} /></button>
+            </div>
           </div>
-          <div style={{flex:1, padding:'1rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1rem', background:'var(--bg)'}}>
+
+          {/* Messages Area */}
+          <div style={{flex:1, padding:'1.5rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1.25rem', background:'#f8fafc'}}>
             {chatMessages.map((msg, i) => (
-              <div key={i} style={{alignSelf: msg.role === 'bot' ? 'flex-start' : 'flex-end', background: msg.role === 'bot' ? 'var(--card-bg)' : 'var(--accent)', color: msg.role === 'bot' ? 'var(--text)' : 'white', padding:'0.75rem 1rem', borderRadius:'12px', maxWidth:'85%', fontSize:'0.85rem', border: msg.role === 'bot' ? '1px solid var(--border)' : 'none'}}>
-                {msg.text}
+              <div key={i} style={{alignSelf: msg.role === 'bot' ? 'flex-start' : 'flex-end', display:'flex', flexDirection:'column', gap:'0.25rem', maxWidth:'85%'}}>
+                <div style={{
+                  background: msg.role === 'bot' ? 'white' : 'var(--accent)', 
+                  color: msg.role === 'bot' ? '#1e293b' : 'white', 
+                  padding:'1rem 1.25rem', 
+                  borderRadius: msg.role === 'bot' ? '0 16px 16px 16px' : '16px 16px 0 16px', 
+                  fontSize:'0.9rem', 
+                  lineHeight:1.5,
+                  boxShadow: msg.role === 'bot' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : '0 10px 15px -3px rgba(59,130,246,0.3)',
+                  border: msg.role === 'bot' ? '1px solid #e2e8f0' : 'none'
+                }}>
+                  {msg.text}
+                </div>
+                <div style={{fontSize:'0.65rem', color:'#94a3b8', textAlign: msg.role === 'bot' ? 'right' : 'left', padding:'0 0.5rem'}}>
+                  {msg.role === 'bot' ? 'تراؤف ذكاء اصطناعي' : 'أنت'}
+                </div>
               </div>
             ))}
+            {isTyping && (
+              <div style={{alignSelf:'flex-start', background:'white', padding:'0.75rem 1.25rem', borderRadius:'0 16px 16px 16px', border:'1px solid #e2e8f0', display:'flex', gap:'4px'}}>
+                 <div className="typing-dot"></div>
+                 <div className="typing-dot"></div>
+                 <div className="typing-dot"></div>
+              </div>
+            )}
           </div>
-          <form style={{display:'flex', padding:'1rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.5rem'}} onSubmit={(e) => {
+
+          {/* Quick Actions Area */}
+          <div style={{padding:'0.5rem 1rem', display:'flex', gap:'0.5rem', overflowX:'auto', background:'white', borderTop:'1px solid #f1f5f9'}}>
+             {[
+               {label: 'حلل الميزانية', icon: <PieChart size={12}/>},
+               {label: 'أصول حرجة', icon: <AlertTriangle size={12}/>},
+               {label: 'فرص الوفر', icon: <Zap size={12}/>},
+               {label: 'حالة الجرد', icon: <Activity size={12}/>}
+             ].map((chip, idx) => (
+               <button key={idx} onClick={() => setChatInput(chip.label)} style={{whiteSpace:'nowrap', padding:'0.4rem 0.8rem', borderRadius:'20px', border:'1px solid #e2e8f0', background:'white', fontSize:'0.75rem', fontWeight:600, color:'#475569', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.4rem', transition:'all 0.2s'}} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}>
+                 {chip.icon} {chip.label}
+               </button>
+             ))}
+          </div>
+
+          {/* Input Area */}
+          <form style={{display:'flex', padding:'1.25rem', background:'white', borderTop:'1px solid #f1f5f9', gap:'0.75rem'}} onSubmit={(e) => {
             e.preventDefault();
             if(!chatInput.trim()) return;
-            setChatMessages([...chatMessages, {role: 'user', text: chatInput}]);
-            const prevInput = chatInput;
+            const userInput = chatInput;
+            setChatMessages(prev => [...prev, {role: 'user', text: userInput}]);
             setChatInput('');
+            setIsTyping(true);
+            
             setTimeout(() => {
-              const botResponse = `بناءً على تحليلات قواعد بيانات الأصول، أود الإفادة بأن "${prevInput}" يعكس حالة استقرار مالي حالياً. لمزيد من الدقة يمكنني إعداد تقرير مخصص، هل ترغب في ذلك؟`;
+              let botResponse = '';
+              if(userInput.includes('ميزانية') || userInput.includes('وفر')) {
+                botResponse = 'بناءً على تحليل بند CAPEX الحالي، يظهر وفر مالي بنسبة 12% في قسم التقنية. أوصي بإعادة تدوير هذا الوفر لتحديث خوادم المستودعات قبل نهاية الربع الحالي.';
+              } else if(userInput.includes('أصول') || userInput.includes('حرجة') || userInput.includes('مخاطر')) {
+                botResponse = 'أراقب 3 أصول تقنية (Firewalls) تقترب من نهاية عمرها الإنتاجي. احتمال التعطل يقدر بـ 15% خلال الأشهر الثلاثة القادمة. هل ترغب في طلب عروض أسعار للبدائل؟';
+              } else if(userInput.includes('جرد')) {
+                botResponse = 'حملة الجرد الحالية في فرع الرياض مكتملة بنسبة 94%. تبقى 6 أصول لم تُطابق بعد. هل تريد مني إرسال إشعار تذكيري للجنة الميدانية؟';
+              } else {
+                botResponse = `بصفتي مساعدك الذكي، قمت بتحليل مدخلاتك (${userInput}). أقترح عليك البدء بمراجعة لوحة القيادة الاستراتيجية للوقوف على أحدث مؤشرات الأداء. كيف يمكنني خدمتك بشكل أعمق؟`;
+              }
               setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
-              speak(botResponse);
-            }, 1000);
+              setIsTyping(false);
+              if(autoSpeak) speak(botResponse);
+            }, 1500);
           }}>
-            <button type="button" onClick={startListening} style={{background: isListening ? '#ef4444' : 'var(--bg)', color: isListening ? 'white' : '#64748b', border:'1px solid var(--border)', borderRadius:'8px', width:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', animation: isListening ? 'pulse 1.5s infinite' : 'none'}}>
-              {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+            <button type="button" onClick={startListening} style={{background: isListening ? '#ef4444' : '#f1f5f9', color: isListening ? 'white' : '#64748b', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s'}}>
+              {isListening ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
-            <input type="text" placeholder="اسأل أو تحدث مع الذكاء الاصطناعي..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none'}} />
-            <button type="submit" style={{background:'var(--accent)', color:'white', border:'none', borderRadius:'8px', width:'40px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer'}}><Send size={16} /></button>
+            <input type="text" placeholder="تحدث أو اكتب سؤالك هنا..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0 1rem', borderRadius:'12px', border:'1px solid #e2e8f0', background:'#f8fafc', color:'var(--text)', outline:'none', fontSize:'0.9rem'}} />
+            <button type="submit" style={{background:'var(--accent)', color:'white', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 4px 6px -1px rgba(59,130,246,0.5)'}}><Send size={20} /></button>
           </form>
         </div>
       )}
