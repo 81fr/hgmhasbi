@@ -1,46 +1,11 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
-  LayoutGrid, 
-  Box, 
-  FileText, 
-  Shuffle, 
-  PieChart, 
-  ClipboardList, 
-  Settings, 
-  BarChart3, 
-  Database,
-  TrendingUp,
-  Activity,
-  ShieldCheck,
-  Calendar,
-  AlertTriangle,
-  CheckCircle,
-  Filter,
-  FilePlus,
-  Edit,
-  Trash2,
-  Download,
-  QrCode,
-  Target,
-  Shield,
-  Laptop,
-  Search,
-  Bell,
-  ChevronDown,
-  MoreHorizontal,
-  Bot,
-  BrainCircuit,
-  Sparkles,
-  MessageSquare,
-  Send,
-  X,
-  Zap,
-  Mic,
-  MicOff,
-  Volume2,
-  VolumeX,
-  Plus,
-  UserCircle
+  LayoutGrid, Box, FileText, Shuffle, PieChart, ClipboardList, Settings, BarChart3, Database,
+  TrendingUp, Activity, ShieldCheck, Calendar, AlertTriangle, CheckCircle, Filter, FilePlus,
+  Edit, Trash2, Download, QrCode, Target, Shield, Laptop, Search, Bell, ChevronDown,
+  MoreHorizontal, Bot, BrainCircuit, Sparkles, MessageSquare, Send, X, Zap, Mic, MicOff,
+  Volume2, VolumeX, Plus, UserCircle, Warehouse, Package, PackageCheck, PackagePlus,
+  RotateCcw, ScanLine, MapPin, ArrowRightLeft, TrendingDown, Eye, Boxes
 } from 'lucide-react';
 import {
   Chart as ChartJS,
@@ -92,6 +57,20 @@ const App = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
   const [editingAsset, setEditingAsset] = useState(null);
+  const chatEndRef = useRef(null);
+
+  // Warehouse RADAR State
+  const [warehouseItems, setWarehouseItems] = useState([
+    { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
+    { id: 'WH-002', sku: 'OF-SKU-202', name: 'مكتب إداري فاخر', category: 'أثاث ومعدات', qty: 3, minQty: 2, location: 'B-02-01', status: 'مخصص', stage: 'Allocate', lastAudit: '2024-07-20' },
+    { id: 'WH-003', sku: 'VH-SKU-303', name: 'سيارة نقل تويوتا هايلكس', category: 'مركبات', qty: 1, minQty: 1, location: 'G-01-01', status: 'صيانة', stage: 'Audit', lastAudit: '2024-09-01' },
+    { id: 'WH-004', sku: 'IT-SKU-104', name: 'طابعة HP LaserJet Pro', category: 'أصول تقنية', qty: 25, minQty: 10, location: 'A-02-05', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-28' },
+    { id: 'WH-005', sku: 'OF-SKU-205', name: 'كرسي مكتبي مريح', category: 'أثاث ومعدات', qty: 0, minQty: 5, location: 'B-03-02', status: 'نفاد', stage: 'Receive', lastAudit: '2024-06-10' },
+    { id: 'WH-006', sku: 'IT-SKU-106', name: 'شاشة عرض تفاعلية 65 بوصة', category: 'أصول تقنية', qty: 4, minQty: 2, location: 'C-01-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-10' },
+    { id: 'WH-007', sku: 'VH-SKU-307', name: 'رافعة شوكية كاتربيلر', category: 'مركبات', qty: 2, minQty: 1, location: 'G-02-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-05' },
+    { id: 'WH-008', sku: 'OF-SKU-208', name: 'مكيف مركزي سبليت', category: 'أثاث ومعدات', qty: 8, minQty: 3, location: 'D-01-04', status: 'تالف', stage: 'Retire', lastAudit: '2024-05-20' },
+  ]);
+  const [warehouseFilter, setWarehouseFilter] = useState('الكل');
 
   const deleteAsset = (id) => {
     if(window.confirm('هل أنت متأكد من حذف هذا الأصل نهائياً من السجل؟')) {
@@ -1338,52 +1317,220 @@ const App = () => {
     </div>
   );
 
+  // ===== WAREHOUSE RADAR SYSTEM =====
+  const renderWarehouse = () => {
+    const filteredItems = warehouseItems.filter(item => 
+      warehouseFilter === 'الكل' || item.status === warehouseFilter
+    );
+    const totalQty = warehouseItems.reduce((s, i) => s + i.qty, 0);
+    const availableQty = warehouseItems.filter(i => i.status === 'متاح').reduce((s, i) => s + i.qty, 0);
+    const lowStock = warehouseItems.filter(i => i.qty <= i.minQty && i.qty > 0).length;
+    const outOfStock = warehouseItems.filter(i => i.qty === 0).length;
+
+    const stageCount = (stage) => warehouseItems.filter(i => i.stage === stage).length;
+
+    return (
+    <div className="view-anim">
+      {/* Hero Banner */}
+      <div className="dash-hero">
+        <div style={{zIndex:1}}>
+          <h2 style={{fontSize:'1.6rem', fontWeight:800, margin:'0 0 6px'}}>🏭 نظام المستودعات المتكامل</h2>
+          <p style={{opacity:0.85, fontSize:'0.95rem'}}>إدارة ذكية وفق منهجية RADAR — استلام · تخصيص · نشر · مراجعة · إحلال</p>
+        </div>
+        <div style={{zIndex:1, textAlign:'center'}}>
+          <div style={{fontSize:'2.5rem', fontWeight:800}}>{totalQty}</div>
+          <div style={{fontSize:'0.8rem', opacity:0.8}}>وحدة في المخزون</div>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--brand-teal)'}}>
+          <div style={{background:'rgba(0, 165, 155, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Boxes color="var(--brand-teal)" size={24} /></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي المخزون</div><div style={{fontSize:'1.4rem', fontWeight:800}}>{totalQty} <span style={{fontSize:'0.7rem', fontWeight:400}}>وحدة</span></div></div>
+        </div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--brand-green)'}}>
+          <div style={{background:'rgba(140, 194, 64, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><PackageCheck color="var(--brand-green)" size={24} /></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>جاهز للتسليم</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--brand-green)'}}>{availableQty}</div></div>
+        </div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--warning)'}}>
+          <div style={{background:'rgba(245, 158, 11, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><AlertTriangle color="var(--warning)" size={24} /></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>مخزون منخفض</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--warning)'}}>{lowStock}</div></div>
+        </div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--danger)'}}>
+          <div style={{background:'rgba(239, 68, 68, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Package color="var(--danger)" size={24} /></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>نفاد كامل</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--danger)'}}>{outOfStock}</div></div>
+        </div>
+      </div>
+
+      {/* RADAR Stages + Chart */}
+      <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem', marginBottom:'2rem'}}>
+        <div className="card">
+          <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Target size={20} color="var(--brand-teal)" /> مراحل RADAR</h3>
+          <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
+            {[
+              { key: 'Receive', label: 'الاستلام (Receive)', icon: <PackagePlus size={16}/>, color: '#3b82f6' },
+              { key: 'Allocate', label: 'التخصيص (Allocate)', icon: <ArrowRightLeft size={16}/>, color: '#8b5cf6' },
+              { key: 'Deploy', label: 'النشر (Deploy)', icon: <MapPin size={16}/>, color: 'var(--brand-green)' },
+              { key: 'Audit', label: 'المراجعة (Audit)', icon: <ScanLine size={16}/>, color: '#f59e0b' },
+              { key: 'Retire', label: 'الإحلال (Retire)', icon: <RotateCcw size={16}/>, color: '#ef4444' },
+            ].map(s => (
+              <div key={s.key} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.75rem 1rem', borderRadius:'12px', background: `${s.color}08`, border:`1px solid ${s.color}20`}}>
+                <div style={{display:'flex', alignItems:'center', gap:'0.5rem', color: s.color, fontWeight:600, fontSize:'0.85rem'}}>{s.icon} {s.label}</div>
+                <div style={{background: s.color, color:'white', borderRadius:'20px', padding:'0.2rem 0.75rem', fontSize:'0.8rem', fontWeight:700}}>{stageCount(s.key)}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="card">
+          <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>خريطة RADAR الخماسية</h3>
+          <div style={{height:'300px'}}>
+            <Radar data={{
+              labels: ['الاستلام', 'التخصيص', 'النشر', 'المراجعة', 'الإحلال'],
+              datasets: [{
+                label: 'توزيع الأصول',
+                data: [stageCount('Receive'), stageCount('Allocate'), stageCount('Deploy'), stageCount('Audit'), stageCount('Retire')],
+                backgroundColor: 'rgba(0, 165, 155, 0.15)',
+                borderColor: 'var(--brand-teal)',
+                pointBackgroundColor: 'var(--brand-teal)',
+                pointBorderColor: '#fff',
+                pointHoverRadius: 8,
+                borderWidth: 2,
+              }]
+            }} options={{ responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }} />
+          </div>
+          <div style={{marginTop:'1rem', background:'linear-gradient(to right, #f0fdf4, #ffffff)', padding:'1rem', borderRadius:'12px', fontSize:'0.8rem', color:'#166534', border:'1px solid #bbf7d0'}}>
+            <Sparkles size={14} style={{marginLeft:'0.4rem'}} />
+            <strong>تحليل RADAR:</strong> النسبة الأكبر من الأصول في مرحلة "النشر" مما يدل على كفاءة توزيع عالية. يُوصى بمراجعة الأصول في مرحلة "الإحلال" لاتخاذ قرار التقاعد.
+          </div>
+        </div>
+      </div>
+
+      {/* Inventory Table */}
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+        <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Warehouse size={24} color="var(--brand-teal)" /> جدول المخزون المباشر</h2>
+        <div style={{display:'flex', gap:'0.5rem'}}>
+          {['الكل', 'متاح', 'مخصص', 'صيانة', 'نفاد', 'تالف'].map(f => (
+            <button key={f} onClick={() => setWarehouseFilter(f)} className={`btn ${warehouseFilter === f ? 'btn-primary' : 'btn-ghost'}`} style={{padding:'0.4rem 1rem', fontSize:'0.8rem'}}>{f}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="table-wrapper" style={{borderRadius:'16px', overflow:'hidden'}}>
+        <table>
+          <thead style={{borderBottom:'2px solid var(--border)'}}>
+            <tr>
+              <th>SKU</th>
+              <th>اسم الصنف</th>
+              <th>الفئة</th>
+              <th>الكمية</th>
+              <th>الحد الأدنى</th>
+              <th>الموقع (Bin)</th>
+              <th>مرحلة RADAR</th>
+              <th>الحالة</th>
+              <th>الإجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {filteredItems.map((item, idx) => {
+              const statusColors = { 'متاح': '#10b981', 'مخصص': '#3b82f6', 'صيانة': '#f59e0b', 'نفاد': '#ef4444', 'تالف': '#6b7280' };
+              const stageColors = { Receive: '#3b82f6', Allocate: '#8b5cf6', Deploy: '#10b981', Audit: '#f59e0b', Retire: '#ef4444' };
+              const stageLabels = { Receive: 'استلام', Allocate: 'تخصيص', Deploy: 'نشر', Audit: 'مراجعة', Retire: 'إحلال' };
+              return (
+              <tr key={item.id} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                <td style={{fontWeight:700, color:'var(--brand-teal)', fontFamily:'monospace'}}>{item.sku}</td>
+                <td><div style={{fontWeight:600}}>{item.name}</div><div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>{item.id}</div></td>
+                <td style={{fontSize:'0.85rem'}}>{item.category}</td>
+                <td>
+                  <div style={{fontWeight:800, fontSize:'1.1rem', color: item.qty <= item.minQty ? 'var(--danger)' : 'var(--brand-ink)'}}>{item.qty}</div>
+                  {item.qty <= item.minQty && item.qty > 0 && <div style={{fontSize:'0.65rem', color:'var(--warning)', fontWeight:600}}>⚠️ منخفض</div>}
+                </td>
+                <td style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>{item.minQty}</td>
+                <td><span style={{background:'var(--thead-bg)', padding:'0.3rem 0.75rem', borderRadius:'8px', fontSize:'0.8rem', fontWeight:600, fontFamily:'monospace'}}><MapPin size={12} style={{marginLeft:'0.3rem'}} />{item.location}</span></td>
+                <td><span style={{background: `${stageColors[item.stage]}15`, color: stageColors[item.stage], padding:'0.3rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{stageLabels[item.stage]}</span></td>
+                <td><span style={{background: `${statusColors[item.status]}15`, color: statusColors[item.status], padding:'0.3rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700, border:`1px solid ${statusColors[item.status]}30`}}>{item.status}</span></td>
+                <td>
+                  <div style={{display:'flex', gap:'0.4rem'}}>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="عرض"><Eye size={14} color="var(--brand-teal)" /></button>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="تعديل"><Edit size={14} color="var(--text-muted)" /></button>
+                  </div>
+                </td>
+              </tr>
+            )})}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    );
+  };
+
   return (
     <div className="app-container">
       <aside className="sidebar">
+        {/* Logo */}
         <div className="logo-area">
-          <div className="logo-box"><BarChart3 size={20} color="white" /></div>
-          <span style={{fontWeight:800, fontSize:'1.2rem'}}>تراؤف <span style={{color:'var(--accent-light)'}}>V3.0</span></span>
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="تراؤف" />
+          <span className="version-badge">V5.0 RADAR</span>
+        </div>
+
+        {/* User Profile */}
+        <div className="sidebar-profile">
+          <div className="sidebar-profile-avatar">FA</div>
+          <div className="sidebar-profile-name">فيصل المحاسب</div>
+          <div className="sidebar-profile-role"><ShieldCheck size={11} /> المدير التقني والمالي</div>
         </div>
 
         <div className="nav-group">
           <div className="nav-label">الرئيسية</div>
           <div className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
-            <LayoutGrid size={18} /> لوحة التحكم
+            <div className="nav-icon-box"><LayoutGrid size={18} /></div> لوحة التحكم
           </div>
         </div>
 
         <div className="nav-group">
           <div className="nav-label">إدارة الأصول</div>
           <div className={`nav-item ${view === 'register' ? 'active' : ''}`} onClick={() => setView('register')}>
-            <Box size={18} /> سجل الأصول الثابتة
+            <div className="nav-icon-box"><Box size={18} /></div> سجل الأصول الثابتة
           </div>
-          <div className={`nav-item ${view === 'journal' ? 'active' : ''}`} onClick={() => setView('journal')}><FileText size={18} /> قيود اليومية</div>
-          <div className={`nav-item ${view === 'transfers' ? 'active' : ''}`} onClick={() => setView('transfers')}><Shuffle size={18} /> التحويلات العينية</div>
+          <div className={`nav-item ${view === 'journal' ? 'active' : ''}`} onClick={() => setView('journal')}>
+            <div className="nav-icon-box"><FileText size={18} /></div> قيود اليومية
+          </div>
+          <div className={`nav-item ${view === 'transfers' ? 'active' : ''}`} onClick={() => setView('transfers')}>
+            <div className="nav-icon-box"><Shuffle size={18} /></div> التحويلات العينية
+          </div>
         </div>
 
         <div className="nav-group">
-          <div className="nav-label">الذكاء الاصطناعي (AI)</div>
+          <div className="nav-label">المستودعات (RADAR)</div>
+          <div className={`nav-item ${view === 'warehouse' ? 'active' : ''}`} onClick={() => setView('warehouse')}>
+            <div className="nav-icon-box"><Warehouse size={18} /></div> إدارة المستودعات
+          </div>
+        </div>
+
+        <div className="nav-group">
+          <div className="nav-label">الذكاء الاصطناعي</div>
           <div className={`nav-item ${view === 'ai-insights' ? 'active' : ''}`} onClick={() => setView('ai-insights')}>
-            <Sparkles size={18} /> التحليلات التنبؤية
+            <div className="nav-icon-box"><Sparkles size={18} /></div> التحليلات التنبؤية
           </div>
         </div>
 
         <div className="nav-group">
           <div className="nav-label">التقارير</div>
-          <div className={`nav-item ${view === 'reports' ? 'active' : ''}`} onClick={() => setView('reports')}><BarChart3 size={18} /> التقارير الشاملة</div>
-          <div className={`nav-item ${view === 'budget' ? 'active' : ''}`} onClick={() => setView('budget')}><PieChart size={18} /> الميزانية التقديرية</div>
-          <div className={`nav-item ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}><ClipboardList size={18} /> تقارير الجرد</div>
+          <div className={`nav-item ${view === 'reports' ? 'active' : ''}`} onClick={() => setView('reports')}>
+            <div className="nav-icon-box"><BarChart3 size={18} /></div> التقارير الشاملة
+          </div>
+          <div className={`nav-item ${view === 'budget' ? 'active' : ''}`} onClick={() => setView('budget')}>
+            <div className="nav-icon-box"><PieChart size={18} /></div> الميزانية التقديرية
+          </div>
+          <div className={`nav-item ${view === 'inventory' ? 'active' : ''}`} onClick={() => setView('inventory')}>
+            <div className="nav-icon-box"><ClipboardList size={18} /></div> تقارير الجرد
+          </div>
         </div>
 
-        <div style={{marginTop: 'auto'}}>
-          <div className={`nav-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}><Settings size={18} /> الإعدادات</div>
-          <div style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'1rem', background:'rgba(255,255,255,0.05)', borderRadius:'12px', marginTop:'1rem'}}>
-            <div style={{width:'35px', height:'35px', background:'var(--accent)', borderRadius:'50%', display:'flex', justifyContent:'center', alignItems:'center', fontSize:'0.8rem', fontWeight:700}}>FA</div>
-            <div>
-              <div style={{fontSize:'0.8rem', fontWeight:600}}>فيصل المحاسب</div>
-              <div style={{fontSize:'0.65rem', color:'#94a3b8'}}>المدير التقني والمالي</div>
-            </div>
+        <div style={{marginTop: 'auto', padding:'0 0.75rem'}}>
+          <div className={`nav-item ${view === 'settings' ? 'active' : ''}`} onClick={() => setView('settings')}>
+            <div className="nav-icon-box"><Settings size={18} /></div> الإعدادات
           </div>
         </div>
       </aside>
@@ -1391,13 +1538,13 @@ const App = () => {
       <main className="main-content">
         <header className="top-bar">
           <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
-            <div style={{display:'flex', background:'#f1f5f9', padding:'0.5rem 1rem', borderRadius:'20px', gap:'0.5rem', alignItems:'center'}}>
-              <Search size={16} color="#64748b" />
-              <input type="text" placeholder="بحث سريع..." style={{border:'none', background:'transparent', outline:'none', fontSize:'0.85rem', width:'200px'}} />
+            <div style={{display:'flex', background:'var(--thead-bg)', padding:'0.5rem 1rem', borderRadius:'20px', gap:'0.5rem', alignItems:'center'}}>
+              <Search size={16} color="var(--text-muted)" />
+              <input type="text" placeholder="بحث سريع في الأصول والمستودعات..." style={{border:'none', background:'transparent', outline:'none', fontSize:'0.85rem', width:'250px', color:'var(--text)'}} />
             </div>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'1.5rem'}}>
-            <Bell size={20} color="#64748b" style={{cursor:'pointer'}} />
+            <Bell size={20} color="var(--text-muted)" style={{cursor:'pointer'}} />
             <div style={{height:'30px', width:'1px', background:'var(--border)'}}></div>
             <div style={{display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer'}}>
               <span style={{fontSize:'0.85rem', fontWeight:600}}>2024</span>
@@ -1418,6 +1565,7 @@ const App = () => {
           {view === 'reports' && renderGeneralReports()}
           {view === 'new-inventory' && renderNewInventory()}
           {view === 'ai-insights' && renderAIInsights()}
+          {view === 'warehouse' && renderWarehouse()}
           {view === 'settings' && renderSettings()}
         </div>
       </main>
@@ -1448,24 +1596,26 @@ const App = () => {
       )}
 
       <button 
-        style={{position:'fixed', bottom:'2rem', left:'2rem', background:'var(--accent)', color:'white', width:'60px', height:'60px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'0 10px 25px rgba(59,130,246,0.5)', zIndex:9998, border:'none', cursor:'pointer', transition:'transform 0.2s'}}
+        style={{position:'fixed', bottom:'2rem', left:'2rem', background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', width:'60px', height:'60px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-accent)', zIndex:9998, border:'none', cursor:'pointer', transition:'transform 0.2s'}}
         onClick={() => setIsChatOpen(true)}
+        onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
+        onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
       >
         <Bot size={28} />
       </button>
 
       {isChatOpen && (
-        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'400px', height:'600px', background:'var(--card-bg)', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', zIndex:10000, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'slideUp 0.3s ease-out'}}>
-          {/* AI Header */}
-          <div style={{background:'linear-gradient(135deg, var(--accent) 0%, #4f46e5 100%)', color:'white', padding:'1.5rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'420px', height:'620px', background:'var(--card-bg)', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', zIndex:10000, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'slideUp 0.3s ease-out'}}>
+          {/* AI Header - Manafez Brand */}
+          <div style={{background:'linear-gradient(135deg, var(--brand-teal) 0%, var(--brand-green) 100%)', color:'white', padding:'1.5rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
               <div style={{background:'rgba(255,255,255,0.2)', padding:'0.5rem', borderRadius:'12px', position:'relative'}}>
                  <Bot size={24} />
-                 <div style={{position:'absolute', bottom:'-2px', right:'-2px', width:'10px', height:'10px', background:'#10b981', borderRadius:'50%', border:'2px solid white'}}></div>
+                 <div style={{position:'absolute', bottom:'-2px', right:'-2px', width:'10px', height:'10px', background:'#fff', borderRadius:'50%', border:'2px solid var(--brand-green)'}}></div>
               </div>
               <div>
-                 <div style={{fontWeight:800, fontSize:'1rem'}}>Traouf Strategic AI</div>
-                 <div style={{fontSize:'0.7rem', opacity:0.8}}>متصل | جاهز لتحليل البيانات</div>
+                 <div style={{fontWeight:800, fontSize:'1rem'}}>تراؤف AI V5.0</div>
+                 <div style={{fontSize:'0.7rem', opacity:0.9}}>متصل | أصول + مستودعات + RADAR</div>
               </div>
             </div>
             <div style={{display:'flex', gap:'0.5rem'}}>
@@ -1477,51 +1627,52 @@ const App = () => {
           </div>
 
           {/* Messages Area */}
-          <div style={{flex:1, padding:'1.5rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1.25rem', background:'#f8fafc'}}>
+          <div style={{flex:1, padding:'1.5rem', overflowY:'auto', display:'flex', flexDirection:'column', gap:'1.25rem', background:'var(--bg)'}}>
             {chatMessages.map((msg, i) => (
               <div key={i} style={{alignSelf: msg.role === 'bot' ? 'flex-start' : 'flex-end', display:'flex', flexDirection:'column', gap:'0.25rem', maxWidth:'85%'}}>
                 <div style={{
-                  background: msg.role === 'bot' ? 'white' : 'var(--accent)', 
-                  color: msg.role === 'bot' ? '#1e293b' : 'white', 
+                  background: msg.role === 'bot' ? 'var(--card-bg)' : 'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', 
+                  color: msg.role === 'bot' ? 'var(--text)' : 'white', 
                   padding:'1rem 1.25rem', 
                   borderRadius: msg.role === 'bot' ? '0 16px 16px 16px' : '16px 16px 0 16px', 
-                  fontSize:'0.9rem', 
-                  lineHeight:1.5,
-                  boxShadow: msg.role === 'bot' ? '0 4px 6px -1px rgba(0,0,0,0.05)' : '0 10px 15px -3px rgba(59,130,246,0.3)',
-                  border: msg.role === 'bot' ? '1px solid #e2e8f0' : 'none'
+                  fontSize:'0.9rem', lineHeight:1.6,
+                  boxShadow: msg.role === 'bot' ? 'var(--shadow-sm)' : 'var(--shadow-accent)',
+                  border: msg.role === 'bot' ? '1px solid var(--border)' : 'none'
                 }}>
                   {msg.text}
                 </div>
-                <div style={{fontSize:'0.65rem', color:'#94a3b8', textAlign: msg.role === 'bot' ? 'right' : 'left', padding:'0 0.5rem'}}>
+                <div style={{fontSize:'0.65rem', color:'var(--text-muted)', textAlign: msg.role === 'bot' ? 'right' : 'left', padding:'0 0.5rem'}}>
                   {msg.role === 'bot' ? 'تراؤف ذكاء اصطناعي' : 'أنت'}
                 </div>
               </div>
             ))}
             {isTyping && (
-              <div style={{alignSelf:'flex-start', background:'white', padding:'0.75rem 1.25rem', borderRadius:'0 16px 16px 16px', border:'1px solid #e2e8f0', display:'flex', gap:'4px'}}>
+              <div style={{alignSelf:'flex-start', background:'var(--card-bg)', padding:'0.75rem 1.25rem', borderRadius:'0 16px 16px 16px', border:'1px solid var(--border)', display:'flex', gap:'4px'}}>
                  <div className="typing-dot"></div>
                  <div className="typing-dot"></div>
                  <div className="typing-dot"></div>
               </div>
             )}
+            <div ref={chatEndRef} />
           </div>
 
-          {/* Quick Actions Area */}
-          <div style={{padding:'0.5rem 1rem', display:'flex', gap:'0.5rem', overflowX:'auto', background:'white', borderTop:'1px solid #f1f5f9'}}>
+          {/* Quick Actions - Enhanced with Warehouse */}
+          <div style={{padding:'0.5rem 1rem', display:'flex', gap:'0.5rem', overflowX:'auto', background:'var(--card-bg)', borderTop:'1px solid var(--border)'}}>
              {[
-               {label: 'حلل الميزانية', icon: <PieChart size={12}/>},
+               {label: 'حالة المخزون', icon: <Warehouse size={12}/>},
                {label: 'أصول حرجة', icon: <AlertTriangle size={12}/>},
+               {label: 'تحليل RADAR', icon: <Target size={12}/>},
                {label: 'فرص الوفر', icon: <Zap size={12}/>},
-               {label: 'حالة الجرد', icon: <Activity size={12}/>}
+               {label: 'تقرير شامل', icon: <BarChart3 size={12}/>},
              ].map((chip, idx) => (
-               <button key={idx} onClick={() => setChatInput(chip.label)} style={{whiteSpace:'nowrap', padding:'0.4rem 0.8rem', borderRadius:'20px', border:'1px solid #e2e8f0', background:'white', fontSize:'0.75rem', fontWeight:600, color:'#475569', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.4rem', transition:'all 0.2s'}} onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'} onMouseLeave={e => e.currentTarget.style.borderColor = '#e2e8f0'}>
+               <button key={idx} onClick={() => setChatInput(chip.label)} style={{whiteSpace:'nowrap', padding:'0.4rem 0.8rem', borderRadius:'20px', border:'1px solid var(--border)', background:'var(--card-bg)', fontSize:'0.75rem', fontWeight:600, color:'var(--text-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.4rem', transition:'all 0.2s'}} onMouseEnter={e => {e.currentTarget.style.borderColor = 'var(--brand-teal)'; e.currentTarget.style.color = 'var(--brand-teal)';}} onMouseLeave={e => {e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)';}}>
                  {chip.icon} {chip.label}
                </button>
              ))}
           </div>
 
           {/* Input Area */}
-          <form style={{display:'flex', padding:'1.25rem', background:'white', borderTop:'1px solid #f1f5f9', gap:'0.75rem'}} onSubmit={(e) => {
+          <form style={{display:'flex', padding:'1.25rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.75rem'}} onSubmit={(e) => {
             e.preventDefault();
             if(!chatInput.trim()) return;
             const userInput = chatInput;
@@ -1531,25 +1682,37 @@ const App = () => {
             
             setTimeout(() => {
               let botResponse = '';
-              if(userInput.includes('ميزانية') || userInput.includes('وفر')) {
-                botResponse = 'بناءً على تحليل بند CAPEX الحالي، يظهر وفر مالي بنسبة 12% في قسم التقنية. أوصي بإعادة تدوير هذا الوفر لتحديث خوادم المستودعات قبل نهاية الربع الحالي.';
+              const totalWH = warehouseItems.reduce((s,i) => s + i.qty, 0);
+              const lowWH = warehouseItems.filter(i => i.qty <= i.minQty && i.qty > 0).length;
+              const outWH = warehouseItems.filter(i => i.qty === 0).length;
+
+              if(userInput.includes('مخزون') || userInput.includes('مستودع')) {
+                botResponse = `📦 تقرير المخزون اللحظي:\n• إجمالي الوحدات: ${totalWH} وحدة\n• أصناف منخفضة المخزون: ${lowWH}\n• أصناف نفدت بالكامل: ${outWH}\n\nأوصي بإصدار أوامر شراء عاجلة للأصناف المنفدة لتجنب تعطل العمليات.`;
+              } else if(userInput.includes('RADAR') || userInput.includes('رادار')) {
+                const stages = ['Receive','Allocate','Deploy','Audit','Retire'].map(s => warehouseItems.filter(i => i.stage === s).length);
+                botResponse = `🎯 تحليل مراحل RADAR:\n• الاستلام: ${stages[0]} أصول\n• التخصيص: ${stages[1]} أصول\n• النشر: ${stages[2]} أصول\n• المراجعة: ${stages[3]} أصول\n• الإحلال: ${stages[4]} أصول\n\nتحليلي: ${stages[2] > 3 ? 'نسبة النشر عالية (إيجابي). ' : ''}${stages[4] > 0 ? 'يوجد أصول بحاجة لقرار إحلال عاجل.' : 'لا توجد أصول في مرحلة الإحلال حالياً.'}`;
+              } else if(userInput.includes('ميزانية') || userInput.includes('وفر')) {
+                botResponse = '💰 بناءً على تحليل بند CAPEX الحالي، يظهر وفر مالي بنسبة 12% في قسم التقنية (حوالي 150,000 ر.س). أوصي بتدوير هذا الوفر لتحديث خوادم المستودعات وتعزيز منظومة RADAR.';
               } else if(userInput.includes('أصول') || userInput.includes('حرجة') || userInput.includes('مخاطر')) {
-                botResponse = 'أراقب 3 أصول تقنية (Firewalls) تقترب من نهاية عمرها الإنتاجي. احتمال التعطل يقدر بـ 15% خلال الأشهر الثلاثة القادمة. هل ترغب في طلب عروض أسعار للبدائل؟';
+                botResponse = '⚠️ أراقب 3 أصول تقنية (Firewalls) تقترب من نهاية عمرها الإنتاجي. احتمال التعطل يقدر بـ 15% خلال الأشهر الثلاثة القادمة. كما يوجد ' + lowWH + ' صنف بمستوى مخزون منخفض في المستودعات.';
               } else if(userInput.includes('جرد')) {
-                botResponse = 'حملة الجرد الحالية في فرع الرياض مكتملة بنسبة 94%. تبقى 6 أصول لم تُطابق بعد. هل تريد مني إرسال إشعار تذكيري للجنة الميدانية؟';
+                botResponse = '📋 حملة الجرد الحالية في فرع الرياض مكتملة بنسبة 94%. تبقى 6 أصول لم تُطابق بعد. نظام RADAR يقترح بدء مراجعة ميدانية للمخزون المتبقي.';
+              } else if(userInput.includes('تقرير') || userInput.includes('شامل')) {
+                botResponse = `📊 التقرير الشامل لمنظومة تراؤف V5.0:\n• الأصول المسجلة: ${assets.length} أصل\n• القيمة الرأسمالية: ${totals.cost.toLocaleString()} ر.س\n• صافي القيمة: ${totals.nbv.toLocaleString()} ر.س\n• المستودعات: ${totalWH} وحدة مخزون\n• حالة RADAR: فعّال ✅\n\nالنظام يعمل بكفاءة 94.8%. هل تحتاج تفاصيل إضافية؟`;
               } else {
-                botResponse = `بصفتي مساعدك الذكي، قمت بتحليل مدخلاتك (${userInput}). أقترح عليك البدء بمراجعة لوحة القيادة الاستراتيجية للوقوف على أحدث مؤشرات الأداء. كيف يمكنني خدمتك بشكل أعمق؟`;
+                botResponse = `🤖 مرحباً! أنا تراؤف AI V5.0 المدعوم بمنهجية RADAR. تحليلي لمدخلاتك: "${userInput}"\n\nيمكنني مساعدتك في:\n• تحليل الأصول والمستودعات\n• تقارير RADAR الخماسية\n• التنبؤ بالإحلال والمخاطر\n• تحليل الميزانية والوفر\n\nتفضل بسؤالك!`;
               }
               setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
               setIsTyping(false);
               if(autoSpeak) speak(botResponse);
+              setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
             }, 1500);
           }}>
-            <button type="button" onClick={startListening} style={{background: isListening ? '#ef4444' : '#f1f5f9', color: isListening ? 'white' : '#64748b', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s'}}>
+            <button type="button" onClick={startListening} style={{background: isListening ? '#ef4444' : 'var(--thead-bg)', color: isListening ? 'white' : 'var(--text-muted)', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s'}}>
               {isListening ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
-            <input type="text" placeholder="تحدث أو اكتب سؤالك هنا..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0 1rem', borderRadius:'12px', border:'1px solid #e2e8f0', background:'#f8fafc', color:'var(--text)', outline:'none', fontSize:'0.9rem'}} />
-            <button type="submit" style={{background:'var(--accent)', color:'white', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'0 4px 6px -1px rgba(59,130,246,0.5)'}}><Send size={20} /></button>
+            <input type="text" placeholder="اسأل عن الأصول، المستودعات، RADAR..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0 1rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none', fontSize:'0.9rem'}} />
+            <button type="submit" style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'var(--shadow-accent)'}}><Send size={20} /></button>
           </form>
         </div>
       )}

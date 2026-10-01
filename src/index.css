@@ -1,20 +1,69 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&display=swap');
 
 :root {
-  --primary: #0f172a;
-  --accent: #0d9488;
+  /* === تراؤف / منافذ — الهوية البصرية الرسمية === */
+  --brand-green: #8CC240;
+  --brand-teal: #00A59B;
+  --brand-ink: #3E4559;
+  --brand-white: #FFFFFF;
+
+  /* Semantic Tokens */
+  --primary: #3E4559;
+  --accent: #00A59B;
   --accent-light: #2dd4bf;
+  --accent-gradient: linear-gradient(90deg, #00A59B, #8CC240);
   --success: #10b981;
   --warning: #f59e0b;
   --danger: #ef4444;
-  --bg-main: #f1f5f9;
-  --bg-sidebar: #0f172a;
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --radius: 12px;
+  --info: #3b82f6;
+  --ai-violet: #8b5cf6;
+
+  /* Backgrounds */
+  --bg: #f7f9fb;
+  --bg-sidebar: linear-gradient(180deg, #ffffff 0%, #f8fbfc 100%);
+  --bg-main: #f7f9fb;
+  --card-bg: #ffffff;
+  --card-hover: #fafcfe;
+  --thead-bg: #f1f6f9;
+
+  /* Text */
+  --text: #3E4559;
+  --text-main: #3E4559;
+  --text-muted: #627089;
+  --text-secondary: #8c97a8;
+
+  /* Borders & Radius */
+  --border: #e6ecf2;
+  --radius: 14px;
+  --radius-sm: 10px;
+  --radius-lg: 22px;
+
+  /* Shadows */
+  --shadow: 0 8px 24px rgba(0, 0, 0, .08);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --shadow-accent: 0 6px 20px rgba(0, 165, 155, 0.25);
+  --shadow-lg: 0 12px 40px rgba(0, 165, 155, 0.15);
+
+  /* Glass */
   --glass: blur(12px) saturate(180%);
-  --shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+/* ===== DARK MODE ===== */
+body.dark-mode {
+  --bg: #1a1d23;
+  --bg-main: #1a1d23;
+  --bg-sidebar: linear-gradient(180deg, #22262e 0%, #1a1d23 100%);
+  --card-bg: #22262e;
+  --card-hover: #2a2e38;
+  --text: #e4e8ef;
+  --text-main: #e4e8ef;
+  --text-muted: #9aa3b4;
+  --text-secondary: #7a8494;
+  --border: #333842;
+  --brand-ink: #e4e8ef;
+  --brand-white: #1a1d23;
+  --shadow: 0 8px 24px rgba(0, 0, 0, .25);
+  --thead-bg: #272b34;
 }
 
 * {
@@ -24,32 +73,30 @@
 }
 
 body {
-  font-family: 'IBM Plex Sans Arabic', sans-serif;
-  background-color: var(--bg-main);
-  color: var(--text-main);
+  font-family: 'Tajawal', 'Cairo', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background-color: var(--bg);
+  color: var(--text);
   direction: rtl;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior-y: none;
 }
 
 /* Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
 
 /* Shared Classes */
 .card {
-  background: white;
+  background: var(--card-bg);
   border-radius: var(--radius);
   padding: 1.5rem;
   border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow 0.3s, transform 0.2s;
+}
+.card:hover {
   box-shadow: var(--shadow);
 }
 
@@ -72,13 +119,50 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+/* Typing Indicator */
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-teal);
+  animation: typingBounce 1.4s infinite ease-in-out;
+}
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes typingBounce {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
+}
+
 button {
   font-family: inherit;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-input {
+input, select, textarea {
   font-family: inherit;
   direction: rtl;
 }
