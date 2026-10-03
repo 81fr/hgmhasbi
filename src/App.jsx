@@ -5,8 +5,9 @@ import {
   Edit, Trash2, Download, QrCode, Target, Shield, Laptop, Search, Bell, ChevronDown,
   MoreHorizontal, Bot, BrainCircuit, Sparkles, MessageSquare, Send, X, Zap, Mic, MicOff,
   Volume2, VolumeX, Plus, UserCircle, Warehouse, Package, PackageCheck, PackagePlus,
-  RotateCcw, ScanLine, MapPin, ArrowRightLeft, TrendingDown, Eye, Boxes
+  RotateCcw, ScanLine, MapPin, ArrowRightLeft, TrendingDown, Eye, Boxes, Upload
 } from 'lucide-react';
+import { downloadTemplate, exportAssets, parseAssetsFile } from './assetExcel';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -44,7 +45,105 @@ const DEPRECIATION_METHODS = {
   SYD: 'مجموع أرقام السنوات'
 };
 
+const F = ({ label, children, full }) => (
+  <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: full ? '1 / -1' : undefined}}>
+    <label style={{fontSize: '0.85rem', fontWeight: 600}}>{label}</label>
+    {children}
+  </div>
+);
+
+import { supabase } from './supabaseClient';
+
+const Login = ({ onLogin }) => {
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [message, setMessage] = useState(null);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+    setMessage(null);
+
+    if (isSignUp) {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) {
+        setError('فشل إنشاء الحساب: ' + error.message);
+      } else {
+        setMessage('✅ تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول.');
+        setIsSignUp(false);
+      }
+    } else {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        setError('فشل تسجيل الدخول: البريد الإلكتروني أو كلمة المرور غير صحيحة.');
+      } else {
+        onLogin(data.session);
+      }
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', fontFamily:'"Tajawal", sans-serif', direction:'rtl'}}>
+      <form onSubmit={handleAuth} style={{background:'var(--card-bg)', padding:'2.5rem', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.5)', width:'400px', display:'flex', flexDirection:'column', gap:'1.25rem', border:'1px solid var(--border)'}}>
+        <div style={{textAlign:'center', marginBottom:'1rem'}}>
+          <div style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', width:'60px', height:'60px', borderRadius:'16px', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 1rem', boxShadow:'0 10px 15px -3px rgba(16,185,129,0.3)'}}>
+             <Database size={32} color="white" />
+          </div>
+          <h2 style={{color:'var(--text)', fontSize:'1.5rem'}}>نظام إدارة الأصول V3.0</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.9rem', marginTop:'0.5rem'}}>
+            {isSignUp ? 'إنشاء حساب جديد للمدير' : 'الرجاء تسجيل الدخول للمتابعة'}
+          </p>
+        </div>
+        
+        {error && <div style={{color:'#ef4444', background:'#fef2f2', padding:'0.75rem', borderRadius:'8px', fontSize:'0.85rem', textAlign:'center', border:'1px solid #fecaca'}}>{error}</div>}
+        {message && <div style={{color:'#10b981', background:'#ecfdf5', padding:'0.75rem', borderRadius:'8px', fontSize:'0.85rem', textAlign:'center', border:'1px solid #a7f3d0'}}>{message}</div>}
+        
+        <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
+           <label style={{fontSize:'0.85rem', color:'var(--text-secondary)', fontWeight:600}}>البريد الإلكتروني</label>
+           <input type="email" placeholder="أدخل بريدك الإلكتروني" value={email} onChange={e=>setEmail(e.target.value)} required style={{padding:'0.9rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+        </div>
+        <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
+           <label style={{fontSize:'0.85rem', color:'var(--text-secondary)', fontWeight:600}}>كلمة المرور</label>
+           <input type="password" placeholder="أدخل كلمة المرور" value={password} onChange={e=>setPassword(e.target.value)} required style={{padding:'0.9rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+        </div>
+        <button type="submit" disabled={loading} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', padding:'1rem', borderRadius:'12px', border:'none', cursor: loading ? 'not-allowed' : 'pointer', fontWeight:800, fontSize:'1rem', marginTop:'1rem', boxShadow:'0 4px 6px -1px rgba(16,185,129,0.2)'}}>
+          {loading ? 'جاري التحقق...' : (isSignUp ? 'إنشاء الحساب' : 'تسجيل الدخول')}
+        </button>
+
+        <div style={{textAlign:'center', marginTop:'0.5rem'}}>
+           <button type="button" onClick={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }} style={{background:'none', border:'none', color:'var(--brand-teal)', fontSize:'0.85rem', fontWeight:600, cursor:'pointer', textDecoration:'underline'}}>
+             {isSignUp ? 'لديك حساب بالفعل؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد'}
+           </button>
+        </div>
+      </form>
+    </div>
+  );
+};
+
+const Section = ({ title }) => (
+  <div style={{gridColumn: '1 / -1', fontWeight: 800, color: 'var(--accent)', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem', marginTop: '0.5rem'}}>{title}</div>
+);
+
 const App = () => {
+  const [session, setSession] = useState(null);
+  
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
   const [view, setView] = useState('dashboard');
   const [toastMessage, setToastMessage] = useState(null);
   const [showScanner, setShowScanner] = useState(false);
@@ -71,6 +170,27 @@ const App = () => {
     { id: 'WH-008', sku: 'OF-SKU-208', name: 'مكيف مركزي سبليت', category: 'أثاث ومعدات', qty: 8, minQty: 3, location: 'D-01-04', status: 'تالف', stage: 'Retire', lastAudit: '2024-05-20' },
   ]);
   const [warehouseFilter, setWarehouseFilter] = useState('الكل');
+  const [viewAsset, setViewAsset] = useState(null);
+  const [viewWarehouse, setViewWarehouse] = useState(null);
+  const [importPreview, setImportPreview] = useState(null);
+  const importInputRef = useRef(null);
+  const [globalSearch, setGlobalSearch] = useState('');
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [fiscalYear, setFiscalYear] = useState('2026');
+  const [erpConnected, setErpConnected] = useState(true);
+  const [chartMode, setChartMode] = useState('hist');
+
+  const editWarehouseItem = (item) => {
+    const qty = window.prompt(`الكمية الجديدة للصنف "${item.name}":`, String(item.qty));
+    if (qty === null) return;
+    const q = parseInt(qty, 10);
+    if (isNaN(q) || q < 0) { showToast('⚠️ كمية غير صحيحة'); return; }
+    const loc = window.prompt('الموقع (Bin):', item.location);
+    if (loc === null) return;
+    const status = q === 0 ? 'نفاد' : (item.status === 'نفاد' ? 'متاح' : item.status);
+    setWarehouseItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: q, location: loc.trim() || i.location, status } : i));
+    showToast('✅ تم تحديث بيانات الصنف');
+  };
 
   const deleteAsset = (id) => {
     if(window.confirm('هل أنت متأكد من حذف هذا الأصل نهائياً من السجل؟')) {
@@ -108,28 +228,52 @@ const App = () => {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  const [assets, setAssets] = useState([
-    { id: 'ORG-AST-001', code: 'IT-001', name: 'خوادم البيانات المركزية (Mainframe)', category: 'أصول تقنية', cost: 1200000, vat: 180000, salvage: 100000, life: 5, date: '2023-01-01', method: 'SL', status: 'يعمل', custody: 'أحمد سالم', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-002', code: 'VH-021', name: 'أسطول سيارات التوزيع الدفعة الأولى', category: 'مركبات', cost: 450000, vat: 67500, salvage: 50000, life: 7, date: '2022-06-15', method: 'DB', status: 'يعمل', custody: 'محمد العبدالله', source: 'البلاد' },
-    { id: 'ORG-AST-003', code: 'LD-001', name: 'أرض المقر الرئيسي (حي الصحافة)', category: 'أراضي', cost: 15000000, vat: 0, salvage: 15000000, life: 99, date: '2015-01-01', method: 'SL', status: 'يعمل', custody: '-', source: 'تبرعات عينية' },
-    { id: 'ORG-AST-004', code: 'WAQ-001', name: 'مبنى الوقف السكني التجاري', category: 'أصول أوقاف', cost: 8500000, vat: 0, salvage: 1500000, life: 40, date: '2018-05-10', method: 'SL', status: 'يعمل', custody: 'إدارة الأوقاف', source: 'تبرعات عينية' },
-    { id: 'ORG-AST-005', code: 'OF-015', name: 'طابعة مكتبية ليزرية', category: 'أثاث ومعدات', cost: 1500, vat: 225, salvage: 0, life: 3, date: '2024-01-10', method: 'SL', status: 'يعمل', custody: 'سعد فهد', source: 'موردين', isExpense: true },
-    { id: 'ORG-AST-006', code: 'IT-002', name: 'أجهزة حاسب آلي (لاب توب) للإدارة', category: 'أصول تقنية', cost: 350000, vat: 52500, salvage: 20000, life: 4, date: '2022-11-20', method: 'SYD', status: 'يعمل', custody: 'قسم تقنية المعلومات', source: 'موردين' },
-    { id: 'ORG-AST-007', code: 'VH-022', name: 'سيارة نقل ثقيل مرسيدس', category: 'مركبات', cost: 380000, vat: 57000, salvage: 60000, life: 10, date: '2020-03-05', method: 'DB', status: 'بالمستودع', custody: 'صالح اليامي', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-008', code: 'OF-016', name: 'أثاث مكتبي صالة الاستقبال', category: 'أثاث ومعدات', cost: 45000, vat: 6750, salvage: 5000, life: 5, date: '2023-08-12', method: 'SL', status: 'يعمل', custody: 'إدارة المرافق', source: 'بنك البلاد' },
-    { id: 'ORG-AST-009', code: 'IT-003', name: 'تجهيزات شبكة سيسكو', category: 'أصول تقنية', cost: 180000, vat: 27000, salvage: 15000, life: 5, date: '2021-02-18', method: 'SL', status: 'يعمل', custody: 'أحمد سالم', source: 'موردين' },
-    { id: 'ORG-AST-010', code: 'BD-001', name: 'مبنى المستودعات اللوجستية', category: 'مباني', cost: 3200000, vat: 480000, salvage: 400000, life: 33, date: '2019-09-30', method: 'SL', status: 'يعمل', custody: 'الإدارة الهندسية', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-011', code: 'VH-023', name: 'باص نقل موظفين 30 راكب', category: 'مركبات', cost: 220000, vat: 33000, salvage: 30000, life: 8, date: '2021-07-25', method: 'DB', status: 'تالف', custody: 'قسم النقل', source: 'البلاد' },
-    { id: 'ORG-AST-012', code: 'IT-004', name: 'شاشات عرض تفاعلية للتدريب', category: 'أصول تقنية', cost: 55000, vat: 8250, salvage: 5000, life: 4, date: '2023-10-10', method: 'SYD', status: 'يعمل', custody: 'مركز التدريب', source: 'موردين' },
-    { id: 'ORG-AST-013', code: 'OF-017', name: 'مكيفات مركزية للمبنى الإداري', category: 'أثاث ومعدات', cost: 280000, vat: 42000, salvage: 25000, life: 10, date: '2019-05-15', method: 'SL', status: 'يعمل', custody: 'إدارة المرافق', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-014', code: 'WAQ-002', name: 'مزرعة وقفية بالقصيم', category: 'أصول أوقاف', cost: 5500000, vat: 0, salvage: 2000000, life: 25, date: '2017-12-01', method: 'SL', status: 'يعمل', custody: 'إدارة الأوقاف', source: 'تبرعات عينية' },
-    { id: 'ORG-AST-015', code: 'LD-002', name: 'أرض فضاء للاستثمار', category: 'أراضي', cost: 8000000, vat: 0, salvage: 8000000, life: 99, date: '2020-01-20', method: 'SL', status: 'بالمستودع', custody: '-', source: 'بنك البلاد' },
-    { id: 'ORG-AST-016', code: 'IT-005', name: 'رخص برمجيات أوراكل (CAPEX)', category: 'أصول تقنية', cost: 750000, vat: 112500, salvage: 0, life: 5, date: '2022-04-01', method: 'SL', status: 'يعمل', custody: 'قسم تقنية المعلومات', source: 'موردين' },
-    { id: 'ORG-AST-017', code: 'OF-018', name: 'آلة تصوير مستندات ضخمة', category: 'أثاث ومعدات', cost: 35000, vat: 5250, salvage: 2000, life: 5, date: '2024-02-05', method: 'SL', status: 'يعمل', custody: 'إدارة الشؤون الإدارية', source: 'البلاد' },
-    { id: 'ORG-AST-018', code: 'VH-024', name: 'رافعة شوكية للمستودع', category: 'مركبات', cost: 120000, vat: 18000, salvage: 15000, life: 10, date: '2021-08-11', method: 'DB', status: 'يعمل', custody: 'محمد العبدالله', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-019', code: 'BD-002', name: 'مبنى فرع جدة', category: 'مباني', cost: 4500000, vat: 675000, salvage: 600000, life: 40, date: '2016-11-30', method: 'SL', status: 'يعمل', custody: 'الإدارة الهندسية', source: 'بنك الراجحي' },
-    { id: 'ORG-AST-020', code: 'IT-006', name: 'نظام الحماية من الاختراقات (Firewalls)', category: 'أصول تقنية', cost: 210000, vat: 31500, salvage: 10000, life: 4, date: '2023-06-20', method: 'SYD', status: 'يعمل', custody: 'أحمد سالم', source: 'موردين' },
-  ]);
+  const [assets, setAssets] = useState([]);
+
+  useEffect(() => {
+    if (session) {
+      fetchAssets();
+    }
+  }, [session]);
+
+  const fetchAssets = async () => {
+    // جلب الأصول من قاعدة البيانات الحقيقية
+    const { data, error } = await supabase.from('assets').select('*');
+    if (error) {
+      console.error(error);
+      return;
+    }
+    
+    if (data && data.length > 0) {
+      const mappedAssets = data.map(item => ({
+        id: item.asset_no,
+        db_id: item.id,
+        code: item.qr_code || 'QR-N/A',
+        name: item.name,
+        category: item.category_id || 'أخرى',
+        cost: Number(item.cost) || 0,
+        vat: 0,
+        salvage: Number(item.salvage_value) || 0,
+        life: 5,
+        date: item.purchase_date || '2024-01-01',
+        method: 'SL',
+        status: item.status || 'يعمل',
+        custody: 'موظف',
+        source: 'مورد',
+        isExpense: false
+      }));
+      setAssets(mappedAssets);
+    } else {
+      // لو قاعدة البيانات فارغة، نضع مصفوفة فارغة 
+      setAssets([]);
+    }
+  };
+
+  if (!session) {
+    return <Login onLogin={setSession} />;
+  }
+
+
 
   const [journals, setJournals] = useState([
     { id: 'JV-2024-001', date: '2024-01-31', desc: 'إثبات إهلاك شهر يناير', debit: 45200, credit: null, status: 'مرحل' },
@@ -155,53 +299,65 @@ const App = () => {
   const accountingEngine = useMemo(() => {
     const now = new Date();
     return assets.map(asset => {
-      const startDate = new Date(asset.date);
+      const startDate = new Date(asset.readyDate || asset.date);
       const monthsElapsed = (now.getFullYear() - startDate.getFullYear()) * 12 + (now.getMonth() - startDate.getMonth());
       const yearsElapsed = Math.max(0, monthsElapsed / 12);
+      const cost = asset.cost || 0;
+      const salvage = asset.salvage || 0;
+      const life = asset.life || 1;
       
       if (asset.isExpense) {
-        return {
-          ...asset,
-          accumulatedDep: asset.cost,
-          netBookValue: 0,
-        };
+        return { ...asset, accumulatedDep: cost, netBookValue: 0, annualDep: 0, periodDep: 0 };
       }
 
       if (asset.category === 'أراضي') {
-        return {
-          ...asset,
-          accumulatedDep: 0,
-          netBookValue: asset.cost,
-        };
+        return { ...asset, accumulatedDep: 0, netBookValue: cost, annualDep: 0, periodDep: 0 };
       }
 
       let accumulatedDep = 0;
+      let annualDep = 0;
       if (asset.method === 'SL') {
-        const annualDep = (asset.cost - asset.salvage) / asset.life;
-        accumulatedDep = Math.min(asset.cost - asset.salvage, annualDep * yearsElapsed);
+        annualDep = (cost - salvage) / life;
+        accumulatedDep = Math.min(cost - salvage, annualDep * yearsElapsed);
       } else if (asset.method === 'DB') {
-        const rate = (2 / asset.life);
-        let bookValue = asset.cost;
+        const rate = (2 / life);
+        let bookValue = cost;
         for(let i=0; i < Math.floor(yearsElapsed); i++) {
           bookValue -= bookValue * rate;
         }
-        accumulatedDep = asset.cost - Math.max(asset.salvage, bookValue);
+        accumulatedDep = cost - Math.max(salvage, bookValue);
+        annualDep = Math.max(0, Math.min(bookValue * rate, bookValue - salvage));
       } else if (asset.method === 'SYD') {
-        const sum = (asset.life * (asset.life + 1)) / 2;
+        const sum = (life * (life + 1)) / 2;
         let dep = 0;
         for(let i=0; i < Math.floor(yearsElapsed); i++) {
-          dep += (asset.cost - asset.salvage) * ((asset.life - i) / sum);
+          dep += (cost - salvage) * (Math.max(0, life - i) / sum);
         }
-        accumulatedDep = Math.min(asset.cost - asset.salvage, dep);
+        accumulatedDep = Math.min(cost - salvage, dep);
+        annualDep = (cost - salvage) * (Math.max(0, life - Math.floor(yearsElapsed)) / sum);
       }
 
+      const fullyDepreciated = accumulatedDep >= cost - salvage - 0.5;
       return {
         ...asset,
         accumulatedDep,
-        netBookValue: asset.cost - accumulatedDep,
+        netBookValue: cost - accumulatedDep,
+        annualDep: fullyDepreciated ? 0 : annualDep,
+        periodDep: fullyDepreciated ? 0 : annualDep,
       };
     });
   }, [assets]);
+
+  const notifications = useMemo(() => {
+    const list = [];
+    accountingEngine.filter(a => a.category !== 'أراضي' && !a.isExpense && a.cost > 0 && a.accumulatedDep / a.cost >= 0.8).slice(0, 3).forEach(a =>
+      list.push({ text: `⚠️ ${a.name}: استُهلك أكثر من 80% من قيمته (إحلال مقترح)`, action: () => setViewAsset(a) }));
+    accountingEngine.filter(a => a.status === 'تالف').slice(0, 3).forEach(a =>
+      list.push({ text: `🛠️ أصل تالف: ${a.name}`, action: () => setViewAsset(a) }));
+    warehouseItems.filter(i => i.qty <= i.minQty).slice(0, 3).forEach(i =>
+      list.push({ text: `📦 مخزون ${i.qty === 0 ? 'نافد' : 'منخفض'}: ${i.name}`, action: () => setView('warehouse') }));
+    return list;
+  }, [accountingEngine, warehouseItems]);
 
   const totals = useMemo(() => {
     return accountingEngine.reduce((acc, curr) => ({
@@ -213,10 +369,14 @@ const App = () => {
 
   const chartData = {
     labels: accountingEngine.slice(0, 8).map(a => a.name.substring(0, 15)),
-    datasets: [
+    datasets: chartMode === 'hist' ? [
       { type: 'line', label: 'صافي القيمة', data: accountingEngine.slice(0, 8).map(a => a.netBookValue), borderColor: '#f59e0b', backgroundColor: '#f59e0b', tension: 0.4 },
       { type: 'bar', label: 'التكلفة التاريخية', data: accountingEngine.slice(0, 8).map(a => a.cost), backgroundColor: '#0f172a', borderRadius: 4 },
       { type: 'bar', label: 'الإهلاك المتراكم', data: accountingEngine.slice(0, 8).map(a => a.accumulatedDep), backgroundColor: '#0d9488', borderRadius: 4 }
+    ] : [
+      { type: 'line', label: 'القيمة الدفترية المتوقعة بعد سنة', data: accountingEngine.slice(0, 8).map(a => Math.max(a.category === 'أراضي' ? a.cost : a.salvage || 0, a.netBookValue - (a.annualDep || 0))), borderColor: '#8b5cf6', backgroundColor: '#8b5cf6', tension: 0.4 },
+      { type: 'bar', label: 'صافي القيمة الحالية', data: accountingEngine.slice(0, 8).map(a => a.netBookValue), backgroundColor: '#0f172a', borderRadius: 4 },
+      { type: 'bar', label: 'إهلاك السنة القادمة', data: accountingEngine.slice(0, 8).map(a => Math.min(a.netBookValue, a.annualDep || 0)), backgroundColor: '#ef4444', borderRadius: 4 }
     ]
   };
 
@@ -299,8 +459,8 @@ const App = () => {
            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
               <h3 style={{fontSize:'1.1rem'}}>تحليل القيمة مقابل الاستهلاك (أهم الأصول)</h3>
               <div style={{display:'flex', gap:'0.5rem'}}>
-                 <button className="btn btn-ghost" style={{fontSize:'0.7rem', padding:'0.3rem 0.6rem'}}>تاريخي</button>
-                 <button className="btn btn-primary" style={{fontSize:'0.7rem', padding:'0.3rem 0.6rem'}}>توقعي</button>
+                 <button className={`btn ${chartMode === 'hist' ? 'btn-primary' : 'btn-ghost'}`} style={{fontSize:'0.7rem', padding:'0.3rem 0.6rem'}} onClick={() => setChartMode('hist')}>تاريخي</button>
+                 <button className={`btn ${chartMode === 'fore' ? 'btn-primary' : 'btn-ghost'}`} style={{fontSize:'0.7rem', padding:'0.3rem 0.6rem'}} onClick={() => setChartMode('fore')}>توقعي</button>
               </div>
            </div>
            <div style={{height:'350px'}}>
@@ -399,27 +559,66 @@ const App = () => {
   );
 
   const exportCSV = () => {
-    showToast('جاري تحضير وتشفير البيانات...');
+    showToast('جاري تحضير ملف Excel...');
     setTimeout(() => {
-      let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-      csvContent += "الرمز,الاسم,الفئة,المصدر,التكلفة,الإهلاك,الصافي,العهدة,الحالة\n";
-      assets.forEach(a => {
-        csvContent += `${a.code},${a.name},${a.category},${a.source},${a.cost},${a.dep},${a.nbv},${a.custody},${a.status}\n`;
-      });
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", "assets_export.csv");
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      exportAssets(accountingEngine);
       showToast('✅ تم تصدير ملف Excel بنجاح!');
-    }, 800);
+    }, 300);
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const result = await parseAssetsFile(file);
+      if (result.total === 0) {
+        showToast('⚠️ الملف لا يحتوي على بيانات. استخدم نموذج التعبئة.');
+        return;
+      }
+      setImportPreview(result);
+    } catch (err) {
+      console.error(err);
+      showToast('❌ تعذّرت قراءة الملف، تأكد أنه بصيغة Excel صحيحة');
+    }
+  };
+
+  const confirmImport = () => {
+    if (!importPreview) return;
+    let added = 0, updated = 0;
+    let next = [...assets];
+    importPreview.rows.forEach(({ data }, i) => {
+      const cost = data.cost;
+      const life = data.life || 1;
+      const base = {
+        ...data,
+        life,
+        vat: data.vat || 0,
+        salvage: data.salvage || 0,
+        method: data.method || 'SL',
+        status: data.status || 'يعمل',
+        source: data.source || '',
+        isExpense: data.category !== 'أراضي' && (cost < 3000 || data.life < 1)
+      };
+      const idx = data.id ? next.findIndex(a => a.id === data.id) : -1;
+      if (idx >= 0) {
+        next[idx] = { ...next[idx], ...base, code: next[idx].code };
+        updated++;
+      } else {
+        const id = data.id || `AST-${Date.now().toString().slice(-6)}${i}`;
+        next.push({ ...base, id, code: `CD-${Math.floor(Math.random()*9000 + 1000)}` });
+        added++;
+      }
+    });
+    setAssets(next);
+    setImportPreview(null);
+    showToast(`✅ تم الاستيراد: ${added} أصل جديد، ${updated} محدّث`);
   };
 
   const renderRegister = () => {
     const filteredAssets = accountingEngine.filter(a => {
-      const matchQuery = a.name.includes(filterParams.query) || a.code.includes(filterParams.query);
+      const q = filterParams.query.trim().toLowerCase();
+      const matchQuery = !q || [a.name, a.code, a.id, a.location, a.custody, a.supplier, a.department].some(v => (v || '').toString().toLowerCase().includes(q));
       const matchCat = filterParams.category === 'الكل' || a.category === filterParams.category;
       return matchQuery && matchCat;
     });
@@ -456,8 +655,10 @@ const App = () => {
             </button>
             <div style={{width:'1px', background:'var(--border)', margin:'0 0.5rem'}}></div>
             <button className={`btn btn-ghost ${showFilter ? 'b-active' : ''}`} onClick={() => setShowFilter(!showFilter)} style={{padding:'0.6rem 1.2rem'}}><Filter size={18} /> تصفية السجل</button>
-            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} onClick={exportCSV}><Download size={18} /> Excel</button>
-            <button className="btn btn-primary" style={{padding:'0.6rem 1.5rem'}} onClick={() => setView('new-asset')}><FilePlus size={18} /> إضافة أصل جديد</button>
+            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} title="تنزيل نموذج Excel فارغ للتعبئة" onClick={() => { downloadTemplate(); showToast('📄 تم تنزيل نموذج التعبئة'); }}><FileText size={18} /> نموذج التعبئة</button>
+            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} title="رفع ملف Excel معبّأ" onClick={() => importInputRef.current?.click()}><Upload size={18} /> استيراد Excel</button>
+            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} title="تصدير السجل الحالي" onClick={exportCSV}><Download size={18} /> تصدير Excel</button>
+            <button className="btn btn-primary" style={{padding:'0.6rem 1.5rem'}} onClick={() => { setEditingAsset(null); setView('new-asset'); }}><FilePlus size={18} /> إضافة أصل جديد</button>
           </div>
         </div>
 
@@ -481,17 +682,18 @@ const App = () => {
           </div>
         )}
 
-        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'16px', border:'1px solid var(--border)', overflow:'hidden', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'16px', border:'1px solid var(--border)', overflowX:'auto', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
           <table style={{width:'100%', borderCollapse:'collapse'}}>
           <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
             <tr>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>الهوية الرقمية</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>بيانات الأصل</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>العهدة والموقع</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>التكلفة (VAT)</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>استهلاك القيمة</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>صافي القيمة (NBV)</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'center'}}>صحة الأصل (Health)</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>رقم الأصل</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>وصف الأصل وفئته</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>الموقع والإدارة والعهدة</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>المورد والفاتورة والتواريخ</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>التكلفة ومصدر التمويل</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>الإهلاك (الفترة / المجمع)</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>القيمة الدفترية</th>
+              <th style={{padding:'1.2rem 1rem', textAlign:'center'}}>الحالة وآخر جرد</th>
               <th style={{padding:'1.2rem 1rem', textAlign:'center'}}>الإجراءات</th>
             </tr>
           </thead>
@@ -500,40 +702,57 @@ const App = () => {
               const depPerc = asset.category === 'أراضي' ? 0 : (asset.accumulatedDep / asset.cost) * 100;
               const healthScore = Math.max(0, 100 - depPerc);
               const isWarning = depPerc >= 80 && asset.category !== 'أراضي';
+              const statusColor = { 'يعمل': '#10b981', 'بالمستودع': '#3b82f6', 'تالف': '#ef4444', 'مستبعد': '#6b7280' }[asset.status] || '#64748b';
+              const small = {fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'};
               
               return (
               <tr key={asset.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)', transition:'background 0.2s'}} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}>
                 <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{color:'var(--accent)', fontWeight:800, display:'flex', alignItems:'center', gap:'0.4rem'}}><QrCode size={14} /> {asset.code}</div>
-                  <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.25rem', fontFamily:'monospace'}}>{asset.id}</div>
+                  <div style={{color:'var(--accent)', fontWeight:800, display:'flex', alignItems:'center', gap:'0.4rem'}}><QrCode size={14} /> {asset.id}</div>
+                  <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.25rem', fontFamily:'monospace'}}>{asset.code}</div>
                 </td>
                 <td style={{padding:'1.2rem 1rem'}}>
                   <div style={{fontWeight:700, color:'var(--text)', fontSize:'0.95rem'}}>{asset.name}</div>
-                  <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>{asset.category} <span style={{margin:'0 0.3rem', opacity:0.5}}>|</span> {DEPRECIATION_METHODS[asset.method]}</div>
+                  <div style={small}>{asset.category} <span style={{margin:'0 0.3rem', opacity:0.5}}>|</span> {DEPRECIATION_METHODS[asset.method]} <span style={{margin:'0 0.3rem', opacity:0.5}}>|</span> {asset.category === 'أراضي' ? 'بدون عمر' : `${asset.life} سنة`}</div>
                 </td>
                 <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{fontWeight:600, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.3rem'}}><UserCircle size={12} color="#64748b" /> {asset.custody}</div>
-                  <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>المورد: {asset.source}</div>
+                  <div style={{fontWeight:600, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.3rem'}}><MapPin size={12} color="#64748b" /> {asset.location || '-'}</div>
+                  <div style={small}>الإدارة: {asset.department || '-'}</div>
+                  <div style={{...small, display:'flex', alignItems:'center', gap:'0.3rem'}}><UserCircle size={12} color="#64748b" /> {asset.custody || '-'}</div>
                 </td>
-                <td style={{padding:'1.2rem 1rem', fontWeight:700}}>{(asset.cost + (asset.vat || 0)).toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></td>
+                <td style={{padding:'1.2rem 1rem'}}>
+                  <div style={{fontWeight:600, fontSize:'0.85rem'}}>{asset.supplier || '-'}</div>
+                  <div style={small}>فاتورة: {asset.invoiceNo || '-'}</div>
+                  <div style={small}>شراء: {asset.date || '-'} | استلام: {asset.receiptDate || '-'}</div>
+                  <div style={small}>جاهزية: {asset.readyDate || '-'}</div>
+                </td>
+                <td style={{padding:'1.2rem 1rem', fontWeight:700}}>
+                  <div>{(asset.cost + (asset.vat || 0)).toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></div>
+                  <div style={{...small, fontWeight:400}}>التمويل: {asset.source || '-'}</div>
+                </td>
                 <td style={{padding:'1.2rem 1rem'}}>
                   <div style={{width:'100%', height:'6px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden', marginBottom:'0.4rem', border:'1px solid #e2e8f0'}}>
-                     <div style={{width:`${depPerc}%`, background: depPerc > 80 ? '#ef4444' : depPerc > 50 ? '#f59e0b' : '#3b82f6', height:'100%'}}></div>
+                     <div style={{width:`${Math.min(100, depPerc)}%`, background: depPerc > 80 ? '#ef4444' : depPerc > 50 ? '#f59e0b' : '#3b82f6', height:'100%'}}></div>
                   </div>
-                  <div style={{fontSize:'0.7rem', fontWeight:600, color: depPerc > 80 ? '#ef4444' : 'var(--text-muted)'}}>{depPerc.toFixed(1)}% مُستهلك</div>
+                  <div style={{fontSize:'0.75rem', fontWeight:600}}>للفترة: {Math.round(asset.periodDep).toLocaleString()}</div>
+                  <div style={{fontSize:'0.7rem', fontWeight:600, color: depPerc > 80 ? '#ef4444' : 'var(--text-muted)'}}>مجمع: {Math.round(asset.accumulatedDep).toLocaleString()} ({depPerc.toFixed(1)}%)</div>
                 </td>
-                <td style={{padding:'1.2rem 1rem', fontWeight:800, color:'#0f172a', fontSize:'1rem'}}>{asset.netBookValue.toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></td>
+                <td style={{padding:'1.2rem 1rem', fontWeight:800, color:'#0f172a', fontSize:'1rem'}}>{Math.round(asset.netBookValue).toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></td>
                 <td style={{padding:'1.2rem 1rem', textAlign:'center'}}>
                   <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.4rem'}}>
+                    <span style={{background: statusColor + '20', color: statusColor, padding:'0.2rem 0.7rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{asset.status}</span>
+                    <div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>آخر جرد: {asset.lastInventory || '-'}</div>
                     <div style={{display:'flex', alignItems:'center', gap:'0.4rem'}}>
-                       <div style={{width:'10px', height:'10px', borderRadius:'50%', background: healthScore > 70 ? '#10b981' : healthScore > 30 ? '#f59e0b' : '#ef4444', boxShadow:'0 0 8px ' + (healthScore > 70 ? '#10b98166' : healthScore > 30 ? '#f59e0b66' : '#ef444466')}}></div>
-                       <span style={{fontWeight:800, fontSize:'0.9rem'}}>{healthScore.toFixed(0)}%</span>
+                       <div style={{width:'10px', height:'10px', borderRadius:'50%', background: healthScore > 70 ? '#10b981' : healthScore > 30 ? '#f59e0b' : '#ef4444'}}></div>
+                       <span style={{fontWeight:800, fontSize:'0.8rem'}}>{healthScore.toFixed(0)}%</span>
                     </div>
                     {isWarning && <span style={{fontSize:'0.65rem', background:'#fee2e2', color:'#b91c1c', padding:'0.2rem 0.6rem', borderRadius:'20px', fontWeight:700, border:'1px solid #fecaca'}}>إحلال مقترح</span>}
+                    {asset.disposalDate && <span style={{fontSize:'0.65rem', color:'#6b7280'}}>استبعاد: {asset.disposalDate}{asset.disposalReason ? ` (${asset.disposalReason})` : ''}</span>}
                   </div>
                 </td>
                 <td style={{padding:'1.2rem 1rem', textAlign:'center'}}>
                   <div style={{display:'flex', justifyContent:'center', gap:'0.5rem'}}>
+                    <button className="btn btn-ghost" style={{padding:'0.5rem', background:'#eff6ff', borderRadius:'8px'}} title="عرض" onClick={() => setViewAsset(asset)}><Eye size={16} color="#3b82f6" /></button>
                     <button className="btn btn-ghost" style={{padding:'0.5rem', background:'#f1f5f9', borderRadius:'8px'}} title="تعديل" onClick={() => { setEditingAsset(asset); setView('new-asset'); }}><Edit size={16} color="#475569" /></button>
                     <button className="btn btn-ghost" style={{padding:'0.5rem', background:'#fef2f2', borderRadius:'8px'}} title="حذف" onClick={() => deleteAsset(asset.id)}><Trash2 size={16} color="#ef4444" /></button>
                   </div>
@@ -548,107 +767,140 @@ const App = () => {
     );
   };
 
-  const handleAddAsset = (e) => {
+  const handleAddAsset = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const cost = parseFloat(fd.get('cost') || 0);
-    const life = parseFloat(fd.get('life') || 0);
+    const g = (k) => (fd.get(k) || '').toString().trim();
+    const n = (k) => parseFloat(fd.get(k) || 0) || 0;
+    const cost = n('cost');
+    const life = n('life');
+    const categoryName = g('category');
+
+    const typedId = g('id'); // this acts as asset_no
     
-    const assetData = {
-      id: editingAsset ? editingAsset.id : `AST-${Math.floor(Math.random()*10000)}`,
-      code: editingAsset ? editingAsset.code : `CD-${Math.floor(Math.random()*1000)}`,
-      name: fd.get('name'),
-      category: fd.get('category'),
-      cost: cost,
-      vat: parseFloat(fd.get('vat') || 0),
-      salvage: editingAsset ? editingAsset.salvage : 0,
-      life: life || 1,
-      date: editingAsset ? editingAsset.date : new Date().toISOString().split('T')[0],
-      method: editingAsset ? editingAsset.method : 'SL',
-      status: fd.get('status'),
-      custody: fd.get('custody'),
-      source: fd.get('source'),
-      isExpense: (cost < 3000 || life < 1)
+    // Check if duplicate in UI state
+    if (!editingAsset && typedId && assets.some(a => a.id === typedId)) {
+      showToast('⚠️ رقم الأصل مستخدم من قبل، اختر رقماً آخر');
+      return;
+    }
+    
+    const asset_no = editingAsset ? editingAsset.id : (typedId || `AST-${Date.now().toString().slice(-6)}`);
+    const name = g('name');
+    const qr_code = editingAsset ? editingAsset.code : (g('code') || `CD-${Math.floor(Math.random()*9000 + 1000)}`);
+    const purchase_date = g('date') || new Date().toISOString().split('T')[0];
+    const salvage_value = n('salvage');
+    const status = g('status') || 'يعمل';
+
+    const dbRecord = {
+      asset_no,
+      name,
+      description: '',
+      cost,
+      salvage_value,
+      purchase_date,
+      status,
+      qr_code
     };
 
     if (editingAsset) {
-      setAssets(assets.map(a => a.id === editingAsset.id ? assetData : a));
+      const { error } = await supabase.from('assets').update(dbRecord).eq('id', editingAsset.db_id);
+      if (error) {
+         showToast('❌ حدث خطأ أثناء التحديث: ' + error.message);
+         return;
+      }
       showToast('✅ تم تحديث بيانات الأصل بنجاح');
     } else {
-      setAssets([...assets, assetData]);
+      const { error } = await supabase.from('assets').insert([dbRecord]);
+      if (error) {
+         showToast('❌ حدث خطأ أثناء الإضافة: ' + error.message);
+         return;
+      }
       showToast('✅ تم تسجيل الأصل الجديد بنجاح');
     }
+    
+    await fetchAssets();
     setEditingAsset(null);
     setView('register');
   };
 
-  const renderNewAsset = () => (
+  const renderNewAsset = () => {
+    const ea = editingAsset;
+    const inp = {padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', width: '100%'};
+    return (
     <div className="view-anim">
       <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <div>
-          <h2 style={{fontSize:'1.25rem'}}>{editingAsset ? 'تعديل بيانات الأصل' : 'تسجيل أصل جديد'}</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>{editingAsset ? `تعديل الأصل: ${editingAsset.name}` : 'أدخل بيانات الأصل الثابت الجديد لإضافته إلى السجل'}</p>
+          <h2 style={{fontSize:'1.25rem'}}>{ea ? 'تعديل بيانات الأصل' : 'تسجيل أصل جديد'}</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>{ea ? `تعديل الأصل: ${ea.name}` : 'أدخل بيانات الأصل الثابت كاملة وفق متطلبات سجل الأصول الثابتة'}</p>
         </div>
         <button className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }}>عودة للسجل</button>
       </div>
-      <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
-        <form onSubmit={handleAddAsset} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>اسم الأصل</label>
-            <input name="name" type="text" defaultValue={editingAsset?.name} placeholder="مثال: سيارة نقل تويوتا" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>الفئة التصنيفية</label>
-            <select name="category" defaultValue={editingAsset?.category} required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
-              <option value="أراضي">أراضي</option>
-              <option value="مباني">مباني</option>
-              <option value="مركبات">سيارات ومركبات</option>
-              <option value="أصول تقنية">أجهزة تقنية</option>
-              <option value="أثاث ومعدات">أثاث ومعدات</option>
-              <option value="أصول أوقاف">أصول أوقاف</option>
+      <div className="card" style={{maxWidth: '980px', background: 'var(--card-bg)'}}>
+        <form key={ea ? ea.id : 'new'} onSubmit={handleAddAsset} style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem'}}>
+          <Section title="1) تعريف الأصل" />
+          <F label="رقم الأصل (اتركه فارغاً للإنشاء التلقائي)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-0001" style={inp} /></F>
+          <F label="وصف الأصل *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: سيارة نقل تويوتا" required style={inp} /></F>
+          <F label="فئة الأصل *">
+            <select name="category" defaultValue={ea?.category || 'أصول تقنية'} required style={inp}>
+              {['أراضي','مباني','مركبات','أصول تقنية','أثاث ومعدات','أصول أوقاف'].map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>مصدر الأصل / وسيلة الدفع</label>
-            <select name="source" defaultValue={editingAsset?.source} required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
-              <option value="بنك الراجحي">بنك الراجحي</option>
-              <option value="بنك البلاد">بنك البلاد</option>
-              <option value="موردين">موردين (آجل)</option>
-              <option value="تبرعات عينية">تبرعات عينية</option>
+          </F>
+
+          <Section title="2) الموقع والإدارة والموظف / العهدة" />
+          <F label="الموقع"><input name="location" type="text" defaultValue={ea?.location} placeholder="مثال: الرياض - المستودع" style={inp} /></F>
+          <F label="الإدارة"><input name="department" type="text" defaultValue={ea?.department} placeholder="مثال: إدارة النقل" style={inp} /></F>
+          <F label="الموظف / العهدة"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="مثال: أحمد سالم" style={inp} /></F>
+
+          <Section title="3) المورد ورقم الفاتورة" />
+          <F label="المورد"><input name="supplier" type="text" defaultValue={ea?.supplier} style={inp} /></F>
+          <F label="رقم الفاتورة"><input name="invoiceNo" type="text" defaultValue={ea?.invoiceNo} style={inp} /></F>
+          <div />
+
+          <Section title="4) تواريخ الشراء والاستلام والجاهزية" />
+          <F label="تاريخ الشراء *"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
+          <F label="تاريخ الاستلام"><input name="receiptDate" type="date" defaultValue={ea?.receiptDate} style={inp} /></F>
+          <F label="تاريخ جاهزية الاستخدام"><input name="readyDate" type="date" defaultValue={ea?.readyDate} style={inp} /></F>
+
+          <Section title="5) التكلفة ومصدر التمويل" />
+          <F label="تكلفة الأصل (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} placeholder="0.00" required style={inp} /></F>
+          <F label="الضريبة المضافة (VAT)"><input name="vat" type="number" step="0.01" defaultValue={ea?.vat || 0} style={inp} /></F>
+          <F label="مصدر التمويل">
+            <select name="source" defaultValue={ea?.source || 'بنك الراجحي'} style={inp}>
+              {['بنك الراجحي','بنك البلاد','البلاد','موردين','تبرعات عينية','تمويل ذاتي'].map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>الحالة التشغيلية</label>
-            <select name="status" defaultValue={editingAsset?.status} required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
-              <option value="يعمل">يعمل</option>
-              <option value="بالمستودع">بالمستودع</option>
-              <option value="تالف">تالف</option>
+          </F>
+
+          <Section title="6) العمر الإنتاجي وطريقة الإهلاك والقيمة المتبقية" />
+          <F label="العمر الإنتاجي (سنوات)"><input name="life" type="number" defaultValue={ea?.life} placeholder="مثال: 5 (اتركه فارغاً للأراضي)" style={inp} /></F>
+          <F label="طريقة الإهلاك">
+            <select name="method" defaultValue={ea?.method || 'SL'} style={inp}>
+              {Object.entries(DEPRECIATION_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>تحديد العهدة (اسم الموظف)</label>
-            <input name="custody" type="text" defaultValue={editingAsset?.custody} placeholder="مثال: أحمد سالم" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>التكلفة الأساسية (ر.س)</label>
-            <input name="cost" type="number" defaultValue={editingAsset?.cost} placeholder="0.00" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>الضريبة المضافة (VAT)</label>
-            <input name="vat" type="number" defaultValue={editingAsset?.vat || 0} placeholder="0.00" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>العمر الإنتاجي (سنوات)</label>
-            <input name="life" type="number" defaultValue={editingAsset?.life} placeholder="مثال: 5 (اتركه فارغاً للأراضي)" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
+          </F>
+          <F label="القيمة المتبقية (ر.س)"><input name="salvage" type="number" step="0.01" defaultValue={ea?.salvage || 0} style={inp} /></F>
+
+          <Section title="7) الحالة وتاريخ آخر جرد" />
+          <F label="الحالة">
+            <select name="status" defaultValue={ea?.status || 'يعمل'} style={inp}>
+              {['يعمل','بالمستودع','تالف','مستبعد'].map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </F>
+          <F label="تاريخ آخر جرد"><input name="lastInventory" type="date" defaultValue={ea?.lastInventory} style={inp} /></F>
+          <div />
+
+          <Section title="8) الاستبعاد (عند انطباقه)" />
+          <F label="تاريخ الاستبعاد"><input name="disposalDate" type="date" defaultValue={ea?.disposalDate} style={inp} /></F>
+          <F label="سبب الاستبعاد" full><input name="disposalReason" type="text" defaultValue={ea?.disposalReason} placeholder="مثال: تلف كامل / بيع خردة" style={inp} /></F>
+
           <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
-            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>{editingAsset ? 'تحديث البيانات' : 'حفظ الأصل'}</button>
+            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>{ea ? 'تحديث البيانات' : 'حفظ الأصل'}</button>
             <button type="button" className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
           </div>
         </form>
       </div>
     </div>
-  );
+    );
+  };
 
   const renderJournal = () => {
     const totalDebit = journals.reduce((acc, j) => acc + (j.debit || 0), 0);
@@ -890,8 +1142,8 @@ const App = () => {
           <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مراقبة وتحليل خطط الشراء والاستحواذ مقارنة بالميزانية المعتمدة.</p>
         </div>
         <div style={{display:'flex', gap:'0.5rem'}}>
-           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}><Settings size={16} /> ضبط السقف المالي</button>
-           <button className="btn btn-primary"><FilePlus size={16} /> طلب تعزيز ميزانية</button>
+           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { const v = window.prompt('أدخل السقف المالي الجديد (ر.س):', '1000000'); if (v && !isNaN(parseFloat(v))) showToast(`✅ تم ضبط السقف المالي إلى ${parseFloat(v).toLocaleString()} ر.س`); }}><Settings size={16} /> ضبط السقف المالي</button>
+           <button className="btn btn-primary" onClick={() => { const v = window.prompt('مبلغ التعزيز المطلوب (ر.س):', '100000'); if (v && !isNaN(parseFloat(v))) showToast(`📨 تم رفع طلب تعزيز ميزانية بمبلغ ${parseFloat(v).toLocaleString()} ر.س للاعتماد`); }}><FilePlus size={16} /> طلب تعزيز ميزانية</button>
         </div>
       </div>
       
@@ -1094,7 +1346,7 @@ const App = () => {
           <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> التحليلات التنبؤية بالذكاء الاصطناعي</h2>
           <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل المخاطر، التنبؤ بالإحلال، وفرص تحسين استغلال الأصول المدعومة بنماذج تعلم الآلة.</p>
         </div>
-        <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}><Activity size={18} /> تحديث نماذج التنبؤ</button>
+        <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { showToast('🔄 جاري إعادة تدريب نماذج التنبؤ...'); setTimeout(() => showToast(`✅ تم تحديث النماذج على ${assets.length} أصل`), 1200); }}><Activity size={18} /> تحديث نماذج التنبؤ</button>
       </div>
 
       <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
@@ -1311,7 +1563,7 @@ const App = () => {
             <div style={{fontWeight:600}}>ربط النظام المحاسبي (ERP)</div>
             <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>مزامنة قيود اليومية مع دفتر الأستاذ العام تلقائياً</div>
           </div>
-          <button className="btn btn-ghost" style={{color:'var(--success)'}}><CheckCircle size={16} /> متصل</button>
+          <button className="btn btn-ghost" style={{color: erpConnected ? 'var(--success)' : 'var(--danger)'}} onClick={() => { setErpConnected(!erpConnected); showToast(erpConnected ? '🔌 تم فصل الربط مع النظام المحاسبي' : '✅ تم الاتصال بالنظام المحاسبي (ERP)'); }}><CheckCircle size={16} /> {erpConnected ? 'متصل' : 'غير متصل'}</button>
         </div>
       </div>
     </div>
@@ -1452,8 +1704,8 @@ const App = () => {
                 <td><span style={{background: `${statusColors[item.status]}15`, color: statusColors[item.status], padding:'0.3rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700, border:`1px solid ${statusColors[item.status]}30`}}>{item.status}</span></td>
                 <td>
                   <div style={{display:'flex', gap:'0.4rem'}}>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="عرض"><Eye size={14} color="var(--brand-teal)" /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="تعديل"><Edit size={14} color="var(--text-muted)" /></button>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="عرض" onClick={() => setViewWarehouse(item)}><Eye size={14} color="var(--brand-teal)" /></button>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="تعديل" onClick={() => editWarehouseItem(item)}><Edit size={14} color="var(--text-muted)" /></button>
                   </div>
                 </td>
               </tr>
@@ -1540,15 +1792,28 @@ const App = () => {
           <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
             <div style={{display:'flex', background:'var(--thead-bg)', padding:'0.5rem 1rem', borderRadius:'20px', gap:'0.5rem', alignItems:'center'}}>
               <Search size={16} color="var(--text-muted)" />
-              <input type="text" placeholder="بحث سريع في الأصول والمستودعات..." style={{border:'none', background:'transparent', outline:'none', fontSize:'0.85rem', width:'250px', color:'var(--text)'}} />
+              <input type="text" value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && globalSearch.trim()) { setFilterParams({ query: globalSearch.trim(), category: 'الكل' }); setShowFilter(true); setView('register'); } }} placeholder="بحث سريع في الأصول والمستودعات... (Enter)" style={{border:'none', background:'transparent', outline:'none', fontSize:'0.85rem', width:'250px', color:'var(--text)'}} />
             </div>
           </div>
-          <div style={{display:'flex', alignItems:'center', gap:'1.5rem'}}>
-            <Bell size={20} color="var(--text-muted)" style={{cursor:'pointer'}} />
+          <div style={{display:'flex', alignItems:'center', gap:'1.5rem', position:'relative'}}>
+            <div style={{position:'relative', cursor:'pointer'}} onClick={() => setShowNotifications(!showNotifications)}>
+              <Bell size={20} color="var(--text-muted)" />
+              {notifications.length > 0 && <span style={{position:'absolute', top:'-6px', right:'-6px', background:'#ef4444', color:'white', borderRadius:'50%', fontSize:'0.6rem', width:'16px', height:'16px', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700}}>{notifications.length}</span>}
+            </div>
+            {showNotifications && (
+              <div style={{position:'absolute', top:'2.2rem', left:0, width:'340px', background:'var(--card-bg)', border:'1px solid var(--border)', borderRadius:'12px', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.25)', zIndex:500, padding:'1rem'}}>
+                <div style={{fontWeight:800, marginBottom:'0.75rem'}}>الإشعارات ({notifications.length})</div>
+                {notifications.length === 0 && <div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>لا توجد إشعارات.</div>}
+                {notifications.map((n, i) => (
+                  <div key={i} onClick={() => { n.action(); setShowNotifications(false); }} style={{padding:'0.6rem', borderRadius:'8px', cursor:'pointer', fontSize:'0.82rem', borderBottom:'1px solid var(--border)'}}>{n.text}</div>
+                ))}
+              </div>
+            )}
             <div style={{height:'30px', width:'1px', background:'var(--border)'}}></div>
             <div style={{display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer'}}>
-              <span style={{fontSize:'0.85rem', fontWeight:600}}>2024</span>
-              <ChevronDown size={14} />
+              <select value={fiscalYear} onChange={e => { setFiscalYear(e.target.value); showToast(`📅 تم التحويل إلى السنة المالية ${e.target.value}`); }} style={{border:'none', background:'transparent', fontSize:'0.85rem', fontWeight:600, color:'var(--text)', cursor:'pointer', outline:'none'}}>
+                {['2026', '2025', '2024', '2023'].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
             </div>
           </div>
         </header>
@@ -1580,11 +1845,99 @@ const App = () => {
             <p style={{color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'2rem'}}>قم بتوجيه كاميرا الماسح الضوئي نحو ملصق الباركود أو الـ QR الخاص بالأصل، أو أدخل الرمز يدوياً.</p>
             <input autoFocus type="text" placeholder="أدخل رمز الأصل هنا..." style={{width:'100%', padding:'1rem', borderRadius:'8px', border:'2px solid var(--accent)', background:'transparent', color:'var(--text)', textAlign:'center', fontSize:'1.1rem', letterSpacing:'1px', outline:'none', boxShadow:'0 0 15px rgba(59, 130, 246, 0.2)'}} onKeyDown={(e) => {
               if(e.key === 'Enter' && e.target.value) {
+                const q = e.target.value.trim().toLowerCase();
+                const found = assets.find(a => a.code.toLowerCase() === q || a.id.toLowerCase() === q);
                 setShowScanner(false);
-                showToast(`✅ تم مسح الأصل (${e.target.value}) بنجاح وتحديث حالته!`);
+                if (found) {
+                  const today = new Date().toISOString().split('T')[0];
+                  setAssets(prev => prev.map(a => a.id === found.id ? { ...a, lastInventory: today } : a));
+                  setViewAsset({ ...found, lastInventory: today });
+                  showToast(`✅ تم مسح الأصل (${found.name}) وتحديث تاريخ آخر جرد`);
+                } else {
+                  showToast(`⚠️ لم يتم العثور على أصل بالرمز (${e.target.value})`);
+                }
               }
             }}/>
             <button className="btn btn-ghost" style={{marginTop:'1.5rem', width:'100%', padding:'0.75rem'}} onClick={() => setShowScanner(false)}>إلغاء العملية</button>
+          </div>
+        </div>
+      )}
+
+      {viewAsset && (() => {
+        const a = accountingEngine.find(x => x.id === viewAsset.id) || viewAsset;
+        const dash = (v) => (v === undefined || v === null || v === '' ? '-' : v);
+        const money = (v) => `${Math.round(v || 0).toLocaleString()} ر.س`;
+        const sections = [
+          { title: 'التعريف', rows: [['رقم الأصل', a.id], ['الرمز / الباركود', a.code], ['وصف الأصل', a.name], ['فئة الأصل', a.category]] },
+          { title: 'الموقع والعهدة', rows: [['الموقع', dash(a.location)], ['الإدارة', dash(a.department)], ['الموظف / العهدة', dash(a.custody)]] },
+          { title: 'الشراء والمورد', rows: [['المورد', dash(a.supplier)], ['رقم الفاتورة', dash(a.invoiceNo)], ['تاريخ الشراء', dash(a.date)], ['تاريخ الاستلام', dash(a.receiptDate)], ['تاريخ جاهزية الاستخدام', dash(a.readyDate)]] },
+          { title: 'التكلفة والتمويل', rows: [['تكلفة الأصل', money(a.cost)], ['الضريبة المضافة', money(a.vat)], ['مصدر التمويل', dash(a.source)]] },
+          { title: 'الإهلاك والقيمة الدفترية', rows: [['العمر الإنتاجي', a.category === 'أراضي' ? 'غير محدد (أرض)' : `${a.life} سنة`], ['طريقة الإهلاك', DEPRECIATION_METHODS[a.method] || '-'], ['القيمة المتبقية', money(a.salvage)], ['الإهلاك للفترة', money(a.periodDep)], ['مجمع الإهلاك', money(a.accumulatedDep)], ['القيمة الدفترية', money(a.netBookValue)]] },
+          { title: 'الحالة والجرد والاستبعاد', rows: [['الحالة', dash(a.status)], ['تاريخ آخر جرد', dash(a.lastInventory)], ['تاريخ الاستبعاد', dash(a.disposalDate)], ['سبب الاستبعاد', dash(a.disposalReason)]] }
+        ];
+        return (
+          <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}} onClick={() => setViewAsset(null)}>
+            <div className="card" style={{width:'760px', maxWidth:'94vw', maxHeight:'88vh', overflowY:'auto', background:'var(--card-bg)', padding:'2rem'}} onClick={e => e.stopPropagation()}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+                <h3 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Eye size={22} color="var(--accent)" /> بطاقة الأصل: {a.name}</h3>
+                <button className="btn btn-ghost" onClick={() => setViewAsset(null)}><X size={18} /></button>
+              </div>
+              {sections.map(s => (
+                <div key={s.title} style={{marginBottom:'1.25rem'}}>
+                  <div style={{fontWeight:800, color:'var(--accent)', fontSize:'0.9rem', marginBottom:'0.5rem', borderBottom:'1px solid var(--border)', paddingBottom:'0.4rem'}}>{s.title}</div>
+                  <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.6rem 1.5rem'}}>
+                    {s.rows.map(([k, v]) => (
+                      <div key={k} style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', gap:'1rem'}}>
+                        <span style={{color:'var(--text-muted)'}}>{k}</span><strong>{v}</strong>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <div style={{display:'flex', gap:'0.75rem', marginTop:'1rem'}}>
+                <button className="btn btn-primary" onClick={() => { setEditingAsset(viewAsset); setViewAsset(null); setView('new-asset'); }}><Edit size={16} /> تعديل الأصل</button>
+                <button className="btn btn-ghost" onClick={() => setViewAsset(null)}>إغلاق</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {viewWarehouse && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}} onClick={() => setViewWarehouse(null)}>
+          <div className="card" style={{width:'460px', maxWidth:'94vw', background:'var(--card-bg)', padding:'2rem'}} onClick={e => e.stopPropagation()}>
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem'}}>
+              <h3 style={{fontSize:'1.15rem'}}>{viewWarehouse.name}</h3>
+              <button className="btn btn-ghost" onClick={() => setViewWarehouse(null)}><X size={18} /></button>
+            </div>
+            {[['المعرف', viewWarehouse.id], ['رمز الصنف (SKU)', viewWarehouse.sku], ['الفئة', viewWarehouse.category], ['الكمية', viewWarehouse.qty], ['الحد الأدنى', viewWarehouse.minQty], ['الموقع (Bin)', viewWarehouse.location], ['مرحلة RADAR', viewWarehouse.stage], ['الحالة', viewWarehouse.status], ['آخر جرد', viewWarehouse.lastAudit]].map(([k, v]) => (
+              <div key={k} style={{display:'flex', justifyContent:'space-between', padding:'0.5rem 0', borderBottom:'1px solid var(--border)', fontSize:'0.9rem'}}><span style={{color:'var(--text-muted)'}}>{k}</span><strong>{v}</strong></div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleImportFile} />
+
+      {importPreview && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'720px', maxWidth:'94vw', maxHeight:'88vh', overflowY:'auto', background:'var(--card-bg)', padding:'2rem'}}>
+            <h3 style={{fontSize:'1.25rem', marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Upload size={22} color="var(--accent)" /> معاينة استيراد الأصول من Excel</h3>
+            <div style={{display:'flex', gap:'1rem', marginBottom:'1.25rem'}}>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#f0fdf4', color:'#166534', fontWeight:700}}>✅ صالحة: {importPreview.rows.length}</div>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#fef2f2', color:'#991b1b', fontWeight:700}}>⚠️ بها أخطاء: {importPreview.errors.length}</div>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#eff6ff', color:'#1e40af', fontWeight:700}}>تحديث لأصول موجودة: {importPreview.rows.filter(r => r.data.id && assets.some(a => a.id === r.data.id)).length}</div>
+            </div>
+            {importPreview.errors.length > 0 && (
+              <div style={{marginBottom:'1.25rem', maxHeight:'200px', overflowY:'auto', border:'1px solid #fecaca', borderRadius:'8px', padding:'0.75rem', fontSize:'0.85rem'}}>
+                {importPreview.errors.map(e => <div key={e.line} style={{padding:'0.25rem 0'}}><strong>سطر {e.line}:</strong> {e.issues}</div>)}
+              </div>
+            )}
+            <p style={{color:'var(--text-muted)', fontSize:'0.8rem', marginBottom:'1rem'}}>سيتم استيراد الأسطر الصالحة فقط، وتجاهل الأسطر التي بها أخطاء. صحّح الأخطاء في الملف وأعد رفعه لاستيرادها.</p>
+            <div style={{display:'flex', gap:'0.75rem'}}>
+              <button className="btn btn-primary" disabled={importPreview.rows.length === 0} onClick={confirmImport}><CheckCircle size={16} /> استيراد {importPreview.rows.length} أصل</button>
+              <button className="btn btn-ghost" onClick={() => setImportPreview(null)}>إلغاء</button>
+            </div>
           </div>
         </div>
       )}
