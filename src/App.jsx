@@ -269,12 +269,6 @@ const App = () => {
     }
   };
 
-  if (!session) {
-    return <Login onLogin={setSession} />;
-  }
-
-
-
   const [journals, setJournals] = useState([
     { id: 'JV-2024-001', date: '2024-01-31', desc: 'إثبات إهلاك شهر يناير', debit: 45200, credit: null, status: 'مرحل' },
     { id: 'JV-2024-001', date: '2024-01-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45200, status: 'مرحل' },
@@ -1716,6 +1710,10 @@ const App = () => {
     </div>
     );
   };
+
+  if (!session) {
+    return <Login onLogin={setSession} />;
+  }
 
   return (
     <div className="app-container">
