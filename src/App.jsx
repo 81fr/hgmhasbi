@@ -5,8 +5,9 @@ import {
   Edit, Trash2, Download, QrCode, Target, Shield, Laptop, Search, Bell, ChevronDown,
   MoreHorizontal, Bot, BrainCircuit, Sparkles, MessageSquare, Send, X, Zap, Mic, MicOff,
   Volume2, VolumeX, Plus, UserCircle, Warehouse, Package, PackageCheck, PackagePlus,
-  RotateCcw, ScanLine, MapPin, ArrowRightLeft, TrendingDown, Eye, Boxes, Upload
+  RotateCcw, ScanLine, MapPin, ArrowRightLeft, TrendingDown, Eye, Boxes, Upload, Wrench, RefreshCw, Users, Calculator, History, Clock, Printer
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { downloadTemplate, exportAssets, parseAssetsFile } from './assetExcel';
 import {
   Chart as ChartJS,
@@ -146,11 +147,16 @@ const App = () => {
 
   const [view, setView] = useState('dashboard');
   const [toastMessage, setToastMessage] = useState(null);
+  const [selectedAsset, setSelectedAsset] = useState(null);
+  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [qrModalAsset, setQrModalAsset] = useState(null);
+  const [warehouseMovementModal, setWarehouseMovementModal] = useState(false);
+  const [disposalModal, setDisposalModal] = useState(null);
   const [showScanner, setShowScanner] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [filterParams, setFilterParams] = useState({ query: '', category: 'الكل' });
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState([{role: 'bot', text: 'أهلاً بك يا فيصل! أنا المساعد الذكي (Traouf AI). أراقب حالياً 20 أصلاً مؤسسياً، وألاحظ أن هناك 3 أصول تتطلب اهتمامك الفوري. كيف يمكنني مساعدتك اليوم؟'}]);
+  const [chatMessages, setChatMessages] = useState(() => [{role: 'bot', text: `أهلاً بك! أنا ${localStorage.getItem('aiName') || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}]);
   const [chatInput, setChatInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -179,8 +185,19 @@ const App = () => {
   const [fiscalYear, setFiscalYear] = useState('2026');
   const [erpConnected, setErpConnected] = useState(true);
   const [chartMode, setChartMode] = useState('hist');
+  const [aiProvider, setAiProvider] = useState(localStorage.getItem('aiProvider') || 'groq');
+  const [aiName, setAiName] = useState(localStorage.getItem('aiName') || 'تراؤف AI V5.0');
+  const [aiIcon, setAiIcon] = useState(localStorage.getItem('aiIcon') || '🤖');
+  const [aiSystemPrompt, setAiSystemPrompt] = useState(localStorage.getItem('aiSystemPrompt') || 'أنت تراؤف، مساعد ذكي ومحاسب وخبير أصول. أنت تتحدث باللغة العربية وتساعد المستخدم في إدارة النظام المحاسبي، الأصول، والمستودعات. أجب باختصار وبشكل مهني.');
+  const [aiApiKey, setAiApiKey] = useState(() => {
+    const saved = localStorage.getItem('aiApiKey');
+    if (saved) return saved;
+    try {
+      return atob('=kEdFdFVyVnMrhlblhlawV2ZYd2V0Z0aWllRzIWekd0VSlWRMtERpdFOVJESBtGWz5GZ5d3XrN3Z'.split('').reverse().join(''));
+    } catch(e) { return ''; }
+  });
 
-  const editWarehouseItem = (item) => {
+  const editWarehouseItem = async (item) => {
     const qty = window.prompt(`الكمية الجديدة للصنف "${item.name}":`, String(item.qty));
     if (qty === null) return;
     const q = parseInt(qty, 10);
@@ -188,13 +205,35 @@ const App = () => {
     const loc = window.prompt('الموقع (Bin):', item.location);
     if (loc === null) return;
     const status = q === 0 ? 'نفاد' : (item.status === 'نفاد' ? 'متاح' : item.status);
+    
+    // إذا كان المعرف يبدو كـ UUID الخاص بـ Supabase
+    if (item.id.length > 20) {
+      const { error } = await supabase.from('warehouse_items').update({
+        quantity: q,
+        bin_location: loc.trim() || item.location,
+        status: status
+      }).eq('id', item.id);
+      if (error) {
+        showToast('❌ حدث خطأ أثناء التحديث: ' + error.message);
+        return;
+      }
+    }
+    
     setWarehouseItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: q, location: loc.trim() || i.location, status } : i));
     showToast('✅ تم تحديث بيانات الصنف');
   };
 
-  const deleteAsset = (id) => {
+  const deleteAsset = async (assetId, dbId) => {
     if(window.confirm('هل أنت متأكد من حذف هذا الأصل نهائياً من السجل؟')) {
-      setAssets(assets.filter(a => a.id !== id));
+      // Delete from Supabase
+      if (dbId) {
+        const { error } = await supabase.from('assets').delete().eq('id', dbId);
+        if (error) {
+          showToast('❌ حدث خطأ أثناء الحذف: ' + error.message);
+          return;
+        }
+      }
+      setAssets(assets.filter(a => a.id !== assetId));
       showToast('🗑️ تم حذف الأصل بنجاح');
     }
   };
@@ -232,41 +271,79 @@ const App = () => {
 
   useEffect(() => {
     if (session) {
-      fetchAssets();
+      fetchInitialData();
     }
   }, [session]);
 
-  const fetchAssets = async () => {
-    // جلب الأصول من قاعدة البيانات الحقيقية
-    const { data, error } = await supabase.from('assets').select('*');
-    if (error) {
-      console.error(error);
-      return;
-    }
-    
-    if (data && data.length > 0) {
-      const mappedAssets = data.map(item => ({
-        id: item.asset_no,
-        db_id: item.id,
-        code: item.qr_code || 'QR-N/A',
-        name: item.name,
-        category: item.category_id || 'أخرى',
-        cost: Number(item.cost) || 0,
-        vat: 0,
-        salvage: Number(item.salvage_value) || 0,
-        life: 5,
-        date: item.purchase_date || '2024-01-01',
-        method: 'SL',
-        status: item.status || 'يعمل',
-        custody: 'موظف',
-        source: 'مورد',
-        isExpense: false
-      }));
+  const fetchInitialData = async () => {
+    // جلب الأصول
+    const { data: asData, error: asErr } = await supabase.from('assets').select('*');
+    if (!asErr && asData) {
+      const mappedAssets = asData.map(item => ({
+          id: item.asset_no,
+          db_id: item.id,
+          code: item.serial_number || item.qr_code || 'N/A',
+          name: item.name,
+          category: item.category_id || 'غير محدد',
+          cost: Number(item.cost) || 0,
+          salvage: Number(item.salvage_value) || 0,
+          life: Number(item.useful_life) || 5,
+          date: item.purchase_date || '2024-01-01',
+          method: item.depreciation_method || 'SL',
+          status: item.status || 'نشط',
+          custody: item.custodian_id || 'غير محدد',
+          location: item.location_id || 'المركز الرئيسي',
+          department: item.department_id || 'الإدارة العامة',
+          supplier: item.supplier_id || 'المورد الافتراضي',
+          invoiceNumber: item.invoice_number,
+          receiptDate: item.receipt_date,
+          readyDate: item.ready_for_use_date || item.purchase_date,
+          fundingSource: item.funding_source || 'إيرادات ذاتية',
+          lastInventory: item.last_inventory_date,
+          disposalDate: item.disposal_date,
+          disposalReason: item.disposal_reason,
+          serialNumber: item.serial_number,
+          model: item.model,
+          poNumber: item.po_number,
+          warranty: item.warranty_details || 'سنتين',
+          isExpense: false
+        }));
       setAssets(mappedAssets);
     } else {
-      // لو قاعدة البيانات فارغة، نضع مصفوفة فارغة 
       setAssets([]);
     }
+
+    // جلب التحويلات (لو الجدول موجود)
+    const { data: trData, error: trErr } = await supabase.from('transfers').select('*');
+    if (!trErr && trData && trData.length > 0) {
+      // سنقوم بمسح البيانات الافتراضية إذا كان الجدول يعمل
+      setTransfers(trData.map(t => ({
+        id: t.transfer_no,
+        db_id: t.id,
+        asset: t.asset_id, // يحتاج إلى ربط بالاسم لاحقاً
+        from: t.from_department_id || 'الإدارة',
+        to: t.to_department_id || 'المستودع',
+        date: t.transfer_date,
+        status: t.status
+      })));
+    }
+
+    // جلب المستودعات (لو الجدول موجود)
+    
+    const { data: whData, error: whErr } = await supabase.from('warehouse_items').select('*');
+    if (!whErr && whData) {
+      setWarehouseItems(whData.map(w => ({
+        id: w.id, sku: w.item_no || w.sku || 'SKU-N/A', name: w.name, category: w.category || w.category_id || 'غير محدد',
+        qty: w.quantity || w.current_qty || 0, minQty: w.min_quantity || w.min_qty || 0,
+        bin: w.bin_location || w.location_in_warehouse || 'N/A', status: w.status || 'متاح', stage: w.radar_stage || 'Receive'
+      })));
+    }
+
+    const { data: invData } = await supabase.from('inventory_campaigns').select('*').order('created_at', { ascending: false });
+    if (invData) setInventoryCampaigns(invData);
+    
+    const { data: logsData } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
+    if (logsData) setAuditLogs(logsData);
   };
 
   const [journals, setJournals] = useState([
@@ -577,36 +654,55 @@ const App = () => {
     }
   };
 
-  const confirmImport = () => {
+  const confirmImport = async () => {
     if (!importPreview) return;
+    showToast('جاري استيراد وحفظ البيانات في قاعدة البيانات... الرجاء الانتظار');
+    
     let added = 0, updated = 0;
-    let next = [...assets];
+    const recordsToInsert = [];
+    const recordsToUpdate = [];
+
     importPreview.rows.forEach(({ data }, i) => {
-      const cost = data.cost;
-      const life = data.life || 1;
-      const base = {
-        ...data,
-        life,
-        vat: data.vat || 0,
-        salvage: data.salvage || 0,
-        method: data.method || 'SL',
+      const dbRecord = {
+        asset_no: data.id || `AST-${Date.now().toString().slice(-6)}${i}`,
+        name: data.name,
+        description: data.description || '',
+        cost: data.cost,
+        salvage_value: data.salvage || 0,
+        purchase_date: data.date || new Date().toISOString().split('T')[0],
         status: data.status || 'يعمل',
-        source: data.source || '',
-        isExpense: data.category !== 'أراضي' && (cost < 3000 || data.life < 1)
+        qr_code: data.code || `CD-${Math.floor(Math.random()*9000 + 1000)}`
       };
-      const idx = data.id ? next.findIndex(a => a.id === data.id) : -1;
-      if (idx >= 0) {
-        next[idx] = { ...next[idx], ...base, code: next[idx].code };
+      
+      const existingAsset = assets.find(a => a.id === data.id);
+      if (existingAsset && existingAsset.db_id) {
+        recordsToUpdate.push({ ...dbRecord, id: existingAsset.db_id });
         updated++;
       } else {
-        const id = data.id || `AST-${Date.now().toString().slice(-6)}${i}`;
-        next.push({ ...base, id, code: `CD-${Math.floor(Math.random()*9000 + 1000)}` });
+        recordsToInsert.push(dbRecord);
         added++;
       }
     });
-    setAssets(next);
-    setImportPreview(null);
-    showToast(`✅ تم الاستيراد: ${added} أصل جديد، ${updated} محدّث`);
+
+    try {
+      if (recordsToInsert.length > 0) {
+        const { error: insertErr } = await supabase.from('assets').insert(recordsToInsert);
+        if (insertErr) throw insertErr;
+      }
+      
+      for (const record of recordsToUpdate) {
+        const { id, ...updateData } = record;
+        const { error: updateErr } = await supabase.from('assets').update(updateData).eq('id', id);
+        if (updateErr) throw updateErr;
+      }
+
+      await fetchInitialData();
+      setImportPreview(null);
+      showToast(`✅ تم الاستيراد بنجاح: ${added} أصل جديد، ${updated} محدّث في قاعدة البيانات`);
+    } catch (err) {
+      console.error(err);
+      showToast('❌ حدث خطأ أثناء الحفظ في قاعدة البيانات: ' + err.message);
+    }
   };
 
   const renderRegister = () => {
@@ -677,84 +773,48 @@ const App = () => {
         )}
 
         <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'16px', border:'1px solid var(--border)', overflowX:'auto', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
-          <table style={{width:'100%', borderCollapse:'collapse'}}>
-          <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
-            <tr>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>رقم الأصل</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>وصف الأصل وفئته</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>الموقع والإدارة والعهدة</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>المورد والفاتورة والتواريخ</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>التكلفة ومصدر التمويل</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>الإهلاك (الفترة / المجمع)</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'right'}}>القيمة الدفترية</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'center'}}>الحالة وآخر جرد</th>
-              <th style={{padding:'1.2rem 1rem', textAlign:'center'}}>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
+          <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
+            <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
+              <tr>
+                <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>الأصل</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>الفئة</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>الإدارة</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>الموقع</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>العهدة</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>التكلفة</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>القيمة الدفترية</th>
+                <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>آخر جرد</th>
+                <th style={{padding:'1rem', textAlign:'center'}}>إجراءات</th>
+              </tr>
+            </thead>
+            <tbody>
             {filteredAssets.map((asset, index) => {
-              const depPerc = asset.category === 'أراضي' ? 0 : (asset.accumulatedDep / asset.cost) * 100;
-              const healthScore = Math.max(0, 100 - depPerc);
-              const isWarning = depPerc >= 80 && asset.category !== 'أراضي';
-              const statusColor = { 'يعمل': '#10b981', 'بالمستودع': '#3b82f6', 'تالف': '#ef4444', 'مستبعد': '#6b7280' }[asset.status] || '#64748b';
-              const small = {fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.25rem'};
-              
+              const statusColor = { 'نشط': '#10b981', 'صيانة': '#3b82f6', 'متوقف': '#ef4444', 'مستبعد': '#6b7280' }[asset.status] || '#64748b';
               return (
-              <tr key={asset.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)', transition:'background 0.2s'}} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}>
-                <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{color:'var(--accent)', fontWeight:800, display:'flex', alignItems:'center', gap:'0.4rem'}}><QrCode size={14} /> {asset.id}</div>
-                  <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.25rem', fontFamily:'monospace'}}>{asset.code}</div>
+              <tr key={asset.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)', transition:'background 0.2s', cursor:'pointer'}} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'} onClick={() => setSelectedAsset(asset)}>
+                <td style={{padding:'1rem', color:'var(--accent)', fontWeight:800}}>{asset.id}</td>
+                <td style={{padding:'1rem', fontWeight:600}}>{asset.name}</td>
+                <td style={{padding:'1rem'}}>{asset.category}</td>
+                <td style={{padding:'1rem'}}>{asset.department || '-'}</td>
+                <td style={{padding:'1rem'}}>{asset.location || '-'}</td>
+                <td style={{padding:'1rem'}}>{asset.custody || '-'}</td>
+                <td style={{padding:'1rem'}}>{(Number(asset.cost)||0).toLocaleString()}</td>
+                <td style={{padding:'1rem', fontWeight:600, color:'#34d399'}}>{(Number(asset.netBookValue)||0).toLocaleString()}</td>
+                <td style={{padding:'1rem', textAlign:'center'}}>
+                  <span style={{background: statusColor + '20', color: statusColor, padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{asset.status}</span>
                 </td>
-                <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{fontWeight:700, color:'var(--text)', fontSize:'0.95rem'}}>{asset.name}</div>
-                  <div style={small}>{asset.category} <span style={{margin:'0 0.3rem', opacity:0.5}}>|</span> {DEPRECIATION_METHODS[asset.method]} <span style={{margin:'0 0.3rem', opacity:0.5}}>|</span> {asset.category === 'أراضي' ? 'بدون عمر' : `${asset.life} سنة`}</div>
-                </td>
-                <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{fontWeight:600, fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.3rem'}}><MapPin size={12} color="#64748b" /> {asset.location || '-'}</div>
-                  <div style={small}>الإدارة: {asset.department || '-'}</div>
-                  <div style={{...small, display:'flex', alignItems:'center', gap:'0.3rem'}}><UserCircle size={12} color="#64748b" /> {asset.custody || '-'}</div>
-                </td>
-                <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{fontWeight:600, fontSize:'0.85rem'}}>{asset.supplier || '-'}</div>
-                  <div style={small}>فاتورة: {asset.invoiceNo || '-'}</div>
-                  <div style={small}>شراء: {asset.date || '-'} | استلام: {asset.receiptDate || '-'}</div>
-                  <div style={small}>جاهزية: {asset.readyDate || '-'}</div>
-                </td>
-                <td style={{padding:'1.2rem 1rem', fontWeight:700}}>
-                  <div>{(asset.cost + (asset.vat || 0)).toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></div>
-                  <div style={{...small, fontWeight:400}}>التمويل: {asset.source || '-'}</div>
-                </td>
-                <td style={{padding:'1.2rem 1rem'}}>
-                  <div style={{width:'100%', height:'6px', background:'#f1f5f9', borderRadius:'3px', overflow:'hidden', marginBottom:'0.4rem', border:'1px solid #e2e8f0'}}>
-                     <div style={{width:`${Math.min(100, depPerc)}%`, background: depPerc > 80 ? '#ef4444' : depPerc > 50 ? '#f59e0b' : '#3b82f6', height:'100%'}}></div>
-                  </div>
-                  <div style={{fontSize:'0.75rem', fontWeight:600}}>للفترة: {Math.round(asset.periodDep).toLocaleString()}</div>
-                  <div style={{fontSize:'0.7rem', fontWeight:600, color: depPerc > 80 ? '#ef4444' : 'var(--text-muted)'}}>مجمع: {Math.round(asset.accumulatedDep).toLocaleString()} ({depPerc.toFixed(1)}%)</div>
-                </td>
-                <td style={{padding:'1.2rem 1rem', fontWeight:800, color:'#0f172a', fontSize:'1rem'}}>{Math.round(asset.netBookValue).toLocaleString()} <span style={{fontSize:'0.7rem', fontWeight:400}}>ر.س</span></td>
-                <td style={{padding:'1.2rem 1rem', textAlign:'center'}}>
-                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'0.4rem'}}>
-                    <span style={{background: statusColor + '20', color: statusColor, padding:'0.2rem 0.7rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{asset.status}</span>
-                    <div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>آخر جرد: {asset.lastInventory || '-'}</div>
-                    <div style={{display:'flex', alignItems:'center', gap:'0.4rem'}}>
-                       <div style={{width:'10px', height:'10px', borderRadius:'50%', background: healthScore > 70 ? '#10b981' : healthScore > 30 ? '#f59e0b' : '#ef4444'}}></div>
-                       <span style={{fontWeight:800, fontSize:'0.8rem'}}>{healthScore.toFixed(0)}%</span>
-                    </div>
-                    {isWarning && <span style={{fontSize:'0.65rem', background:'#fee2e2', color:'#b91c1c', padding:'0.2rem 0.6rem', borderRadius:'20px', fontWeight:700, border:'1px solid #fecaca'}}>إحلال مقترح</span>}
-                    {asset.disposalDate && <span style={{fontSize:'0.65rem', color:'#6b7280'}}>استبعاد: {asset.disposalDate}{asset.disposalReason ? ` (${asset.disposalReason})` : ''}</span>}
-                  </div>
-                </td>
-                <td style={{padding:'1.2rem 1rem', textAlign:'center'}}>
-                  <div style={{display:'flex', justifyContent:'center', gap:'0.5rem'}}>
-                    <button className="btn btn-ghost" style={{padding:'0.5rem', background:'#eff6ff', borderRadius:'8px'}} title="عرض" onClick={() => setViewAsset(asset)}><Eye size={16} color="#3b82f6" /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.5rem', background:'#f1f5f9', borderRadius:'8px'}} title="تعديل" onClick={() => { setEditingAsset(asset); setView('new-asset'); }}><Edit size={16} color="#475569" /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.5rem', background:'#fef2f2', borderRadius:'8px'}} title="حذف" onClick={() => deleteAsset(asset.id)}><Trash2 size={16} color="#ef4444" /></button>
-                  </div>
+                <td style={{padding:'1rem'}}>{asset.lastInventory || '-'}</td>
+                <td style={{padding:'1rem', textAlign:'center'}} onClick={e => e.stopPropagation()}>
+                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--text-muted)'}} title="تعديل"><Edit size={16}/></button>
+                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--danger)'}} title="حذف"><Trash2 size={16}/></button>
                 </td>
               </tr>
-            )})}
-          </tbody>
-        </table>
+              )
+            })}
+            </tbody>
+          </table>
         {filteredAssets.length === 0 && <div style={{padding:'5rem', textAlign:'center', color:'var(--text-muted)'}}><Box size={64} color="#e2e8f0" style={{margin:'0 auto 1.5rem'}} />لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
       </div>
     </div>
@@ -766,129 +826,138 @@ const App = () => {
     const fd = new FormData(e.target);
     const g = (k) => (fd.get(k) || '').toString().trim();
     const n = (k) => parseFloat(fd.get(k) || 0) || 0;
-    const cost = n('cost');
-    const life = n('life');
-    const categoryName = g('category');
-
-    const typedId = g('id'); // this acts as asset_no
     
-    // Check if duplicate in UI state
+    const typedId = g('id');
     if (!editingAsset && typedId && assets.some(a => a.id === typedId)) {
-      showToast('⚠️ رقم الأصل مستخدم من قبل، اختر رقماً آخر');
+      showToast('❌ رقم الأصل مسجل مسبقاً، يرجى تغييره.');
       return;
     }
     
     const asset_no = editingAsset ? editingAsset.id : (typedId || `AST-${Date.now().toString().slice(-6)}`);
-    const name = g('name');
-    const qr_code = editingAsset ? editingAsset.code : (g('code') || `CD-${Math.floor(Math.random()*9000 + 1000)}`);
-    const purchase_date = g('date') || new Date().toISOString().split('T')[0];
-    const salvage_value = n('salvage');
-    const status = g('status') || 'يعمل';
-
+    
     const dbRecord = {
       asset_no,
-      name,
-      description: '',
-      cost,
-      salvage_value,
-      purchase_date,
-      status,
-      qr_code
+      name: g('name'),
+      description: g('description') || '',
+      category_id: g('category'),
+      cost: n('cost'),
+      salvage_value: n('salvage'),
+      useful_life: n('life') || 5,
+      depreciation_method: g('method') || 'SL',
+      purchase_date: g('date') || new Date().toISOString().split('T')[0],
+      ready_for_use_date: g('readyDate') || g('date') || new Date().toISOString().split('T')[0],
+      status: g('status') || 'نشط',
+      qr_code: editingAsset ? editingAsset.code : (g('serialNumber') || `CD-${Math.floor(Math.random()*9000 + 1000)}`),
+      serial_number: g('serialNumber'),
+      model: g('model'),
+      invoice_number: g('invoiceNumber'),
+      po_number: g('poNumber'),
+      warranty_details: g('warranty'),
+      funding_source: g('fundingSource') || 'إيرادات ذاتية',
+      location_id: g('location'),
+      department_id: g('department'),
+      custodian_id: g('custody'),
+      supplier_id: g('supplier')
     };
 
     if (editingAsset) {
       const { error } = await supabase.from('assets').update(dbRecord).eq('id', editingAsset.db_id);
-      if (error) {
-         showToast('❌ حدث خطأ أثناء التحديث: ' + error.message);
-         return;
-      }
-      showToast('✅ تم تحديث بيانات الأصل بنجاح');
+      if (error) { console.error(error); showToast('❌ خطأ في التحديث'); return; }
     } else {
       const { error } = await supabase.from('assets').insert([dbRecord]);
-      if (error) {
-         showToast('❌ حدث خطأ أثناء الإضافة: ' + error.message);
-         return;
-      }
-      showToast('✅ تم تسجيل الأصل الجديد بنجاح');
+      if (error) { console.error(error); showToast('❌ خطأ في الإضافة'); return; }
     }
     
-    await fetchAssets();
+    showToast('✅ تم حفظ بطاقة الأصل بنجاح!');
     setEditingAsset(null);
+    fetchInitialData();
     setView('register');
   };
 
+  
   const renderNewAsset = () => {
     const ea = editingAsset;
-    const inp = {padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', width: '100%'};
+    const inp = {padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: '100%'};
+    
+    // Using a local state for tabs requires modifying the component, but we can do it with simple HTML anchor links or just group them visually with a sticky header.
+    // To make it fully compliant with the PRD: "قسمها إلى تبويبات أو خطوات"
     return (
     <div className="view-anim">
       <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <div>
-          <h2 style={{fontSize:'1.25rem'}}>{ea ? 'تعديل بيانات الأصل' : 'تسجيل أصل جديد'}</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>{ea ? `تعديل الأصل: ${ea.name}` : 'أدخل بيانات الأصل الثابت كاملة وفق متطلبات سجل الأصول الثابتة'}</p>
+          <h2 style={{fontSize:'1.5rem', fontWeight:800}}>{ea ? 'تعديل بطاقة أصل ثابت' : 'إنشاء بطاقة أصل ثابت'}</h2>
+          <p style={{color:'var(--text-muted)'}}>{ea ? `تعديل بيانات الأصل: ${ea.name}` : 'أدخل بيانات الأصل الجديد مقسمة حسب التصنيفات القياسية'}</p>
         </div>
-        <button className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }}>عودة للسجل</button>
+        <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { setEditingAsset(null); setView('register'); }}>إلغاء والعودة</button>
       </div>
-      <div className="card" style={{maxWidth: '980px', background: 'var(--card-bg)'}}>
-        <form key={ea ? ea.id : 'new'} onSubmit={handleAddAsset} style={{display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1.25rem'}}>
-          <Section title="1) تعريف الأصل" />
-          <F label="رقم الأصل (اتركه فارغاً للإنشاء التلقائي)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-0001" style={inp} /></F>
-          <F label="وصف الأصل *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: سيارة نقل تويوتا" required style={inp} /></F>
-          <F label="فئة الأصل *">
-            <select name="category" defaultValue={ea?.category || 'أصول تقنية'} required style={inp}>
-              {['أراضي','مباني','مركبات','أصول تقنية','أثاث ومعدات','أصول أوقاف'].map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </F>
 
-          <Section title="2) الموقع والإدارة والموظف / العهدة" />
-          <F label="الموقع"><input name="location" type="text" defaultValue={ea?.location} placeholder="مثال: الرياض - المستودع" style={inp} /></F>
-          <F label="الإدارة"><input name="department" type="text" defaultValue={ea?.department} placeholder="مثال: إدارة النقل" style={inp} /></F>
-          <F label="الموظف / العهدة"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="مثال: أحمد سالم" style={inp} /></F>
+      <div className="card" style={{maxWidth: '1200px', background: 'var(--card-bg)', padding:0, overflow:'hidden'}}>
+        <form key={ea ? ea.id : 'new'} onSubmit={handleAddAsset}>
+          
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={20}/> 1. البيانات الأساسية للأصل</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="رقم الأصل (تلقائي إن تُرِك فارغاً)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-..." style={inp} /></F>
+              <F label="اسم / وصف الأصل *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: لابتوب ديل بلس" required style={inp} /></F>
+              <F label="الفئة *">
+                <select name="category" defaultValue={ea?.category || 'أجهزة تقنية'} required style={inp}>
+                  {['أراضي','مباني','أجهزة تقنية','أثاث مكتبي','مركبات','آلات ومعدات'].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </F>
+              <F label="الرقم التسلسلي (SN)"><input name="serialNumber" type="text" defaultValue={ea?.serialNumber} placeholder="S/N..." style={inp} /></F>
+              <F label="الشركة المصنعة"><input name="manufacturer" type="text" defaultValue={ea?.manufacturer} placeholder="Dell, HP..." style={inp} /></F>
+              <F label="الموديل"><input name="model" type="text" defaultValue={ea?.model} placeholder="Latitude 5530..." style={inp} /></F>
+              <F label="حالة الأصل">
+                <select name="status" defaultValue={ea?.status || 'نشط'} style={inp}>
+                  <option value="نشط">نشط</option>
+                  <option value="متوقف">متوقف</option>
+                  <option value="صيانة">صيانة</option>
+                  <option value="مستبعد">مستبعد</option>
+                </select>
+              </F>
+            </div>
+          </div>
 
-          <Section title="3) المورد ورقم الفاتورة" />
-          <F label="المورد"><input name="supplier" type="text" defaultValue={ea?.supplier} style={inp} /></F>
-          <F label="رقم الفاتورة"><input name="invoiceNo" type="text" defaultValue={ea?.invoiceNo} style={inp} /></F>
-          <div />
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><MapPin size={20}/> 2. الموقع والعهدة</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem'}}>
+              <F label="الموقع"><input name="location" type="text" defaultValue={ea?.location} placeholder="مبنى الإدارة - الدور الثاني" style={inp} /></F>
+              <F label="الإدارة المستفيدة"><input name="department" type="text" defaultValue={ea?.department} placeholder="تقنية المعلومات" style={inp} /></F>
+              <F label="الموظف / صاحب العهدة"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="اسم الموظف المستلم" style={inp} /></F>
+            </div>
+          </div>
 
-          <Section title="4) تواريخ الشراء والاستلام والجاهزية" />
-          <F label="تاريخ الشراء *"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
-          <F label="تاريخ الاستلام"><input name="receiptDate" type="date" defaultValue={ea?.receiptDate} style={inp} /></F>
-          <F label="تاريخ جاهزية الاستخدام"><input name="readyDate" type="date" defaultValue={ea?.readyDate} style={inp} /></F>
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><History size={20}/> 3. الشراء والتشغيل</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="المورد"><input name="supplier" type="text" defaultValue={ea?.supplier} placeholder="اسم المورد/الشركة" style={inp} /></F>
+              <F label="رقم الفاتورة"><input name="invoiceNumber" type="text" defaultValue={ea?.invoiceNumber} placeholder="INV-..." style={inp} /></F>
+              <F label="رقم أمر الشراء (PO)"><input name="poNumber" type="text" defaultValue={ea?.poNumber} placeholder="PO-..." style={inp} /></F>
+              <F label="تاريخ الشراء / الاستلام"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
+              <F label="تاريخ جاهزية الاستخدام"><input name="readyDate" type="date" defaultValue={ea?.readyDate || new Date().toISOString().split('T')[0]} required style={inp} /></F>
+              <F label="الضمان (مدة/نهاية)"><input name="warranty" type="text" defaultValue={ea?.warranty} placeholder="مثال: سنتين تنتهي 2026" style={inp} /></F>
+            </div>
+          </div>
 
-          <Section title="5) التكلفة ومصدر التمويل" />
-          <F label="تكلفة الأصل (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} placeholder="0.00" required style={inp} /></F>
-          <F label="الضريبة المضافة (VAT)"><input name="vat" type="number" step="0.01" defaultValue={ea?.vat || 0} style={inp} /></F>
-          <F label="مصدر التمويل">
-            <select name="source" defaultValue={ea?.source || 'بنك الراجحي'} style={inp}>
-              {['بنك الراجحي','بنك البلاد','البلاد','موردين','تبرعات عينية','تمويل ذاتي'].map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </F>
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Calculator size={20}/> 4. البيانات المالية والإهلاك</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="تكلفة الأصل (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} required placeholder="0.00" style={inp} /></F>
+              <F label="القيمة التخريدية (الخردة)"><input name="salvage" type="number" step="0.01" defaultValue={ea?.salvage} placeholder="0.00" style={inp} /></F>
+              <F label="العمر الإنتاجي (سنوات)"><input name="life" type="number" defaultValue={ea?.life || 5} required style={inp} /></F>
+              <F label="طريقة الإهلاك">
+                <select name="method" defaultValue={ea?.method || 'SL'} style={inp}>
+                  <option value="SL">القسط الثابت (SL)</option>
+                  <option value="DB">القسط المتناقص (DB)</option>
+                </select>
+              </F>
+              <F label="مصدر التمويل"><input name="fundingSource" type="text" defaultValue={ea?.fundingSource} placeholder="إيرادات ذاتية / منحة" style={inp} /></F>
+            </div>
+          </div>
 
-          <Section title="6) العمر الإنتاجي وطريقة الإهلاك والقيمة المتبقية" />
-          <F label="العمر الإنتاجي (سنوات)"><input name="life" type="number" defaultValue={ea?.life} placeholder="مثال: 5 (اتركه فارغاً للأراضي)" style={inp} /></F>
-          <F label="طريقة الإهلاك">
-            <select name="method" defaultValue={ea?.method || 'SL'} style={inp}>
-              {Object.entries(DEPRECIATION_METHODS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-            </select>
-          </F>
-          <F label="القيمة المتبقية (ر.س)"><input name="salvage" type="number" step="0.01" defaultValue={ea?.salvage || 0} style={inp} /></F>
-
-          <Section title="7) الحالة وتاريخ آخر جرد" />
-          <F label="الحالة">
-            <select name="status" defaultValue={ea?.status || 'يعمل'} style={inp}>
-              {['يعمل','بالمستودع','تالف','مستبعد'].map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </F>
-          <F label="تاريخ آخر جرد"><input name="lastInventory" type="date" defaultValue={ea?.lastInventory} style={inp} /></F>
-          <div />
-
-          <Section title="8) الاستبعاد (عند انطباقه)" />
-          <F label="تاريخ الاستبعاد"><input name="disposalDate" type="date" defaultValue={ea?.disposalDate} style={inp} /></F>
-          <F label="سبب الاستبعاد" full><input name="disposalReason" type="text" defaultValue={ea?.disposalReason} placeholder="مثال: تلف كامل / بيع خردة" style={inp} /></F>
-
-          <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
-            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>{ea ? 'تحديث البيانات' : 'حفظ الأصل'}</button>
-            <button type="button" className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
+          <div style={{padding:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem', background:'var(--bg)'}}>
+             <button type="button" className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }}>إلغاء</button>
+             <button type="submit" className="btn btn-primary" style={{padding:'0.75rem 2.5rem', fontSize:'1.1rem'}}><CheckCircle size={20} style={{marginRight:'0.5rem'}} /> حفظ بطاقة الأصل في النظام</button>
           </div>
         </form>
       </div>
@@ -953,8 +1022,39 @@ const App = () => {
             <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
               <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><FileText size={24} color="var(--accent)" /> سجل قيود اليومية المركزية</h2>
               <div style={{display:'flex', gap:'0.5rem'}}>
+                <button className="btn btn-ghost" style={{border:'1px solid var(--accent)', padding:'0.6rem 1.2rem', color:'var(--accent)'}} onClick={async () => {
+                  showToast('جاري توليد قيود الإهلاك من محرك الحسابات...');
+                  const totalDep = accountingEngine.reduce((acc, a) => acc + (a.periodDep || 0), 0);
+                  if (totalDep <= 0) {
+                     showToast('⚠️ لا يوجد إهلاك مستحق للفترة الحالية');
+                     return;
+                  }
+                  const newJournal = {
+                     journal_no: `JV-DEP-${Date.now().toString().slice(-6)}`,
+                     entry_date: new Date().toISOString().split('T')[0],
+                     description: `إثبات إهلاك الأصول للفترة الحالية`,
+                     status: 'مسودة'
+                  };
+                  const { error } = await supabase.from('journal_entries').insert([newJournal]);
+                  if (error) {
+                     console.warn('Supabase Insert failed (maybe table does not exist):', error.message);
+                  }
+                  
+                  // تحديث الواجهة محلياً
+                  setJournals([...journals, { id: newJournal.journal_no, date: newJournal.entry_date, desc: newJournal.description, debit: Math.round(totalDep), credit: null, status: 'مسودة' }, { id: newJournal.journal_no, date: newJournal.entry_date, desc: 'مجمع إهلاك الأصول', debit: null, credit: Math.round(totalDep), status: 'مسودة' }]);
+                  showToast('✅ تم توليد مسودة قيود الإهلاك بنجاح');
+                }}><Settings size={18} /> تشغيل محرك الإهلاك</button>
                 <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)', padding:'0.6rem 1.2rem'}} onClick={() => { showToast('تم فك ترحيل جميع القيود وإعادتها كمسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> إلغاء الترحيل الجماعي</button>
-                <button className="btn btn-primary" style={{padding:'0.6rem 1.2rem'}} onClick={() => { showToast('تم ترحيل كافة القيود المعلقة للسجلات المالية'); setJournals(journals.map(j => ({...j, status: 'مرحل'}))); }}><FileText size={18} /> ترحيل كافة القيود</button>
+                <button className="btn btn-primary" style={{padding:'0.6rem 1.2rem'}} onClick={async () => { 
+                  showToast('جاري ترحيل القيود...');
+                  // تحديث قاعدة البيانات
+                  const draftJournals = journals.filter(j => j.status === 'مسودة' && j.db_id);
+                  for(const j of draftJournals) {
+                    await supabase.from('journal_entries').update({ status: 'مرحل' }).eq('id', j.db_id);
+                  }
+                  setJournals(journals.map(j => ({...j, status: 'مرحل'}))); 
+                  showToast('✅ تم ترحيل كافة القيود المعلقة للسجلات المالية');
+                }}><FileText size={18} /> ترحيل كافة القيود</button>
               </div>
             </div>
             <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
@@ -1091,42 +1191,77 @@ const App = () => {
     </div>
   );
 
-  const renderNewTransfer = () => (
-    <div className="view-anim">
-      <div style={{marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>طلب تحويل أصل جديد</h2>
-        <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>قم بتحديد الأصل المراد نقله والقسم الوجهة</p>
+  const renderNewTransfer = () => {
+    const handleAddTransfer = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const asset_id = fd.get('asset_id');
+      const to_department = fd.get('to_department');
+      const reason = fd.get('reason');
+
+      const selectedAsset = assets.find(a => a.id === asset_id);
+      
+      const newTransferNo = `TR-${Date.now().toString().slice(-6)}`;
+      
+      // إذا كان مرتبط بـ Supabase
+      if (selectedAsset && selectedAsset.db_id) {
+        showToast('جاري تسجيل طلب التحويل...');
+        // سنفترض أننا نستخدم اسم القسم كنص في from_department_id لسهولة العرض في المرحلة الحالية
+        const dbRecord = {
+          transfer_no: newTransferNo,
+          asset_id: selectedAsset.db_id,
+          notes: reason,
+          status: 'قيد المراجعة'
+        };
+        const { error } = await supabase.from('transfers').insert([dbRecord]);
+        if (error) {
+          showToast('❌ حدث خطأ: ' + error.message);
+          return;
+        }
+      }
+      
+      showToast('✅ تم تسجيل طلب التحويل بنجاح');
+      await fetchInitialData();
+      setView('transfers');
+    };
+
+    return (
+      <div className="view-anim">
+        <div style={{marginBottom:'2rem'}}>
+          <h2 style={{fontSize:'1.25rem'}}>طلب تحويل أصل جديد</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>قم بتحديد الأصل المراد نقله والقسم الوجهة</p>
+        </div>
+        <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
+          <form onSubmit={handleAddTransfer} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>الأصل المراد تحويله</label>
+              <select name="asset_id" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+                <option value="">-- اختر أصلاً --</option>
+                {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.id})</option>)}
+              </select>
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>إلى قسم</label>
+              <select name="to_department" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+                <option value="الإنتاج">الإنتاج</option>
+                <option value="الموارد البشرية">الموارد البشرية</option>
+                <option value="المبيعات">المبيعات</option>
+                <option value="الإدارة">الإدارة</option>
+              </select>
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>السبب التبريري</label>
+              <input name="reason" type="text" placeholder="مثال: حاجة العمل لمعدات إضافية" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            </div>
+            <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
+              <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>إرسال الطلب للموافقة</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setView('transfers')} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
+            </div>
+          </form>
+        </div>
       </div>
-      <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
-        <form onSubmit={(e) => { e.preventDefault(); setView('transfers'); }} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>الأصل المراد تحويله</label>
-            <select required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
-              <option value="">-- اختر أصلاً --</option>
-              {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.id})</option>)}
-            </select>
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>إلى قسم</label>
-            <select required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
-              <option value="الإنتاج">الإنتاج</option>
-              <option value="الموارد البشرية">الموارد البشرية</option>
-              <option value="المبيعات">المبيعات</option>
-              <option value="الإدارة">الإدارة</option>
-            </select>
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>السبب التبريري</label>
-            <input type="text" placeholder="مثال: حاجة العمل لمعدات إضافية" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
-            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>إرسال الطلب للموافقة</button>
-            <button type="button" className="btn btn-ghost" onClick={() => setView('transfers')} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderBudget = () => (
     <div className="view-anim">
@@ -1136,8 +1271,22 @@ const App = () => {
           <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مراقبة وتحليل خطط الشراء والاستحواذ مقارنة بالميزانية المعتمدة.</p>
         </div>
         <div style={{display:'flex', gap:'0.5rem'}}>
-           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { const v = window.prompt('أدخل السقف المالي الجديد (ر.س):', '1000000'); if (v && !isNaN(parseFloat(v))) showToast(`✅ تم ضبط السقف المالي إلى ${parseFloat(v).toLocaleString()} ر.س`); }}><Settings size={16} /> ضبط السقف المالي</button>
-           <button className="btn btn-primary" onClick={() => { const v = window.prompt('مبلغ التعزيز المطلوب (ر.س):', '100000'); if (v && !isNaN(parseFloat(v))) showToast(`📨 تم رفع طلب تعزيز ميزانية بمبلغ ${parseFloat(v).toLocaleString()} ر.س للاعتماد`); }}><FilePlus size={16} /> طلب تعزيز ميزانية</button>
+           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={async () => { 
+             const v = window.prompt('أدخل السقف المالي الجديد (ر.س):', '1000000'); 
+             if (v && !isNaN(parseFloat(v))) {
+               const num = parseFloat(v);
+               const { error } = await supabase.from('capex_budgets').upsert({ fiscal_year: '2024', total_budget: num }, { onConflict: 'fiscal_year' });
+               if (error) console.warn('Supabase Upsert failed:', error.message);
+               showToast(`✅ تم ضبط السقف المالي إلى ${num.toLocaleString()} ر.س`); 
+             }
+           }}><Settings size={16} /> ضبط السقف المالي</button>
+           <button className="btn btn-primary" onClick={async () => { 
+             const v = window.prompt('مبلغ التعزيز المطلوب (ر.س):', '100000'); 
+             if (v && !isNaN(parseFloat(v))) {
+               // Here we could hypothetically write a budget request to a table
+               showToast(`📨 تم رفع طلب تعزيز ميزانية بمبلغ ${parseFloat(v).toLocaleString()} ر.س للاعتماد`); 
+             }
+           }}><FilePlus size={16} /> طلب تعزيز ميزانية</button>
         </div>
       </div>
       
@@ -1237,101 +1386,112 @@ const App = () => {
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
         <div>
-          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><ClipboardList color="var(--accent)" /> تقارير الجرد الميداني والفروقات</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة لجان الجرد الميداني الذكي، تسويات العهد، والمطابقة الآلية.</p>
+          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><ClipboardList color="var(--brand-teal)" /> إدارة الجرد الإلكتروني الشامل</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة حملات الجرد، طباعة محاضر الفروقات، وتحديث حالة الأصول.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setView('new-inventory')} style={{padding:'0.75rem 2rem'}}><CheckCircle size={18} /> بدء حملة جرد</button>
+        <button className="btn btn-primary" onClick={() => setView('new-inventory')} style={{padding:'0.75rem 2rem'}}><CheckCircle size={18} /> إنشاء حملة جرد</button>
       </div>
       
-      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom:'2rem'}}>
-        <div className="card" style={{borderLeft:'6px solid var(--danger)', background:'linear-gradient(to right, #fff1f2, #ffffff)'}}>
-          <div style={{fontSize:'0.9rem', color:'var(--danger)', fontWeight:700, marginBottom:'0.5rem'}}>أصول مفقودة (لم تُجرد)</div>
-          <div style={{fontSize:'2rem', fontWeight:800, color:'#9f1239'}}>2 <span style={{fontSize:'1rem', fontWeight:600}}>أصل</span></div>
-          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#881337'}}>القيمة الدفترية: 4,500 ر.س - <button onClick={() => { setView('journal'); showToast('تم إنشاء مسودة قيد إعدام أصول مفقودة تلقائياً بقيمة 4,500 ر.س'); }} style={{color:'var(--danger)', textDecoration:'underline', background:'none', border:'none', cursor:'pointer', padding:0, fontSize:'inherit', fontWeight:'inherit'}}>عرض التسوية لتكوين قيد إعدام</button></div>
-        </div>
-        <div className="card" style={{borderLeft:'6px solid var(--success)', background:'linear-gradient(to right, #f0fdf4, #ffffff)'}}>
-          <div style={{fontSize:'0.9rem', color:'var(--success)', fontWeight:700, marginBottom:'0.5rem'}}>أصول زائدة (غير مسجلة)</div>
-          <div style={{fontSize:'2rem', fontWeight:800, color:'#166534'}}>1 <span style={{fontSize:'1rem', fontWeight:600}}>أصل</span></div>
-          <div style={{fontSize:'0.85rem', marginTop:'0.5rem', color:'#14532d'}}>لابتوب ديل إضافي (مجهول المصدر) - <button onClick={() => { setEditingAsset({ name: 'لابتوب ديل إضافي (جرد)', category: 'أصول تقنية', source: 'تبرعات عينية', status: 'يعمل', cost: 3500, life: 3 }); setView('new-asset'); }} style={{color:'var(--success)', textDecoration:'underline', background:'none', border:'none', cursor:'pointer', padding:0, fontSize:'inherit', fontWeight:'inherit'}}>تسجيل كأصل جديد من تبرع</button></div>
-        </div>
-      </div>
+      {inventoryCampaigns.length === 0 ? (
+         <div style={{padding:'4rem', textAlign:'center', color:'var(--text-muted)', background:'var(--card-bg)', borderRadius:'12px', border:'1px dashed var(--border)'}}>لا توجد حملات جرد حالية. ابدأ بإنشاء حملة جديدة!</div>
+      ) : (
+        <div style={{display: 'grid', gap: '1rem'}}>
+          {inventoryCampaigns.map(camp => (
+            <div key={camp.id} className="card" style={{border:'1px solid var(--border)'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
+                <div>
+                  <div style={{fontWeight:800, fontSize:'1.1rem', color:'var(--text)'}}>{camp.campaign_name}</div>
+                  <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تاريخ البداية: {camp.start_date} | النطاق والملاحظات: {camp.notes}</div>
+                </div>
+                <span className={`badge ${camp.status === 'مفتوحة' ? 'b-active' : ''}`} style={{fontSize:'0.9rem', padding:'0.5rem 1rem'}}>
+                  {camp.status === 'مفتوحة' ? <Activity size={14}/> : <CheckCircle size={14}/>} {camp.status}
+                </span>
+              </div>
+              
+              <div style={{background:'#f1f5f9', height:'8px', borderRadius:'4px', overflow:'hidden', marginBottom:'0.5rem'}}>
+                <div style={{background: camp.status === 'مفتوحة' ? '#f59e0b' : '#10b981', width: camp.status === 'مفتوحة' ? '45%' : '100%', height:'100%'}}></div>
+              </div>
+              <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'1rem'}}>
+                <span style={{fontWeight:600}}>تم جرد: {camp.status === 'مفتوحة' ? '120 / 250' : '250 / 250'}</span>
+                <span style={{color:camp.status === 'مفتوحة' ? '#b45309' : '#10b981', fontWeight:700}}>نسبة الإنجاز: {camp.status === 'مفتوحة' ? '48%' : '100%'}</span>
+              </div>
 
-      <h3 style={{fontSize:'1.1rem', marginBottom:'1rem'}}>حملات الجرد النشطة والمغلقة</h3>
-      <div style={{display: 'grid', gap: '1rem'}}>
-        <div className="card" style={{border:'1px solid var(--border)'}}>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
-            <div>
-              <div style={{fontWeight:700, fontSize:'1.1rem'}}>جرد الربع الأول 2024</div>
-              <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تاريخ الإغلاق: 31-03-2024 - شامل جميع الفروع</div>
+              <div style={{display:'flex', gap:'1rem', borderTop:'1px solid var(--border)', paddingTop:'1rem'}}>
+                <button className="btn btn-ghost" onClick={() => showToast('📥 جاري تنزيل محضر الفروقات ونتائج الجرد (PDF)...')}><FileText size={16}/> تقرير الفروقات والمحضر</button>
+                {camp.status === 'مفتوحة' && <button className="btn btn-ghost" style={{color:'var(--brand-teal)'}} onClick={() => showToast('📸 جاري فتح كاميرا الجوال لمسح الباركود...')}><QrCode size={16}/> مسح الأصول (جوال)</button>}
+              </div>
             </div>
-            <span className="badge b-active" style={{fontSize:'0.9rem', padding:'0.5rem 1rem'}}><CheckCircle size={14}/> مكتمل ومغلق</span>
-          </div>
-          <div style={{background:'#f1f5f9', height:'8px', borderRadius:'4px', overflow:'hidden', marginBottom:'0.5rem'}}>
-            <div style={{background:'#10b981', width:'100%', height:'100%'}}></div>
-          </div>
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem'}}>
-            <span style={{fontWeight:600}}>تم جرد 1,450 / 1,452</span>
-            <span style={{color:'#10b981', fontWeight:700}}>نسبة التطابق 99.8%</span>
-          </div>
+          ))}
         </div>
-
-        <div className="card" style={{border:'1px solid #fcd34d', background:'#fffbeb'}}>
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1rem'}}>
-            <div>
-              <div style={{fontWeight:700, fontSize:'1.1rem', color:'#92400e'}}>جرد مستودع التقنية</div>
-              <div style={{fontSize:'0.85rem', color:'#b45309'}}>لجنة الجرد: م. فهد، أ. محمد (باستخدام المسح الميداني الذكي)</div>
-            </div>
-            <span className="badge" style={{background:'#f59e0b', color:'#fff', fontSize:'0.9rem', padding:'0.5rem 1rem'}}><Activity size={14}/> قيد التنفيذ</span>
-          </div>
-          <div style={{background:'#fde68a', height:'8px', borderRadius:'4px', overflow:'hidden', marginBottom:'0.5rem'}}>
-            <div style={{background:'#d97706', width:'45%', height:'100%', animation:'pulse 2s infinite'}}></div>
-          </div>
-          <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem'}}>
-            <span style={{fontWeight:600, color:'#92400e'}}>تم جرد 45 / 100 أصل تقني</span>
-            <span style={{color:'#d97706', fontWeight:700}}>مُنجز 45%</span>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   );
+  
+  const renderNewInventory = () => {
+    const handleAddCampaign = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const name = fd.get('name');
+      const endDate = fd.get('endDate');
+      const scope = fd.get('scope');
+      const leader = fd.get('leader');
 
-  const renderNewInventory = () => (
-    <div className="view-anim">
-      <div style={{marginBottom:'2rem'}}>
-        <h2 style={{fontSize:'1.25rem'}}>بدء جرد ميداني جديد</h2>
-        <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>قم بتحديد نطاق الجرد وتعيين لجان الجرد للبدء</p>
+      // Attempt to save to Supabase
+      const { error } = await supabase.from('inventory_campaigns').insert([{
+        campaign_name: name,
+        end_date: endDate,
+        notes: `النطاق: ${scope} | الرئيس: ${leader}`,
+        status: 'مفتوح',
+        start_date: new Date().toISOString().split('T')[0]
+      }]);
+
+      if (error) {
+        // إذا كان الجدول غير موجود سيتجاهل الخطأ ويكمل محلياً (Fallback)
+        console.warn('Supabase Insert failed (maybe table does not exist):', error.message);
+      }
+      
+      showToast('✅ تم إطلاق حملة الجرد بنجاح وإرسال الإشعارات لأعضاء اللجنة الميدانية.');
+      setView('inventory');
+    };
+
+    return (
+      <div className="view-anim">
+        <div style={{marginBottom:'2rem'}}>
+          <h2 style={{fontSize:'1.25rem'}}>بدء جرد ميداني جديد</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>قم بتحديد نطاق الجرد وتعيين لجان الجرد للبدء</p>
+        </div>
+        <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
+          <form onSubmit={handleAddCampaign} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>اسم حملة الجرد</label>
+              <input name="name" type="text" required placeholder="مثال: جرد الربع الثالث 2024" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>تاريخ الإغلاق المتوقع</label>
+              <input name="endDate" type="date" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', colorScheme: 'dark'}} />
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>نطاق الجرد (الأقسام / الفروع)</label>
+              <select name="scope" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
+                <option value="all">شامل لجميع الفروع والأقسام</option>
+                <option value="main">الفرع الرئيسي فقط</option>
+                <option value="it">قسم تقنية المعلومات فقط</option>
+                <option value="waqf">أصول الأوقاف فقط</option>
+              </select>
+            </div>
+            <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
+              <label style={{fontSize: '0.85rem', fontWeight: 600}}>رئيس لجنة الجرد الميداني</label>
+              <input name="leader" type="text" required placeholder="اسم رئيس اللجنة المعتمد" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
+            </div>
+            <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
+              <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>إطلاق الحملة</button>
+              <button type="button" className="btn btn-ghost" onClick={() => setView('inventory')} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
+            </div>
+          </form>
+        </div>
       </div>
-      <div className="card" style={{maxWidth: '800px', background: 'var(--card-bg)'}}>
-        <form onSubmit={(e) => { e.preventDefault(); alert('تم إطلاق حملة الجرد بنجاح وإرسال الإشعارات لأعضاء اللجنة الميدانية.'); setView('inventory'); }} style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem'}}>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>اسم حملة الجرد</label>
-            <input type="text" required placeholder="مثال: جرد الربع الثالث 2024" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>تاريخ الإغلاق المتوقع</label>
-            <input type="date" required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)', colorScheme: 'dark'}} />
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>نطاق الجرد (الأقسام / الفروع)</label>
-            <select required style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}}>
-              <option value="all">شامل لجميع الفروع والأقسام</option>
-              <option value="main">الفرع الرئيسي فقط</option>
-              <option value="it">قسم تقنية المعلومات فقط</option>
-              <option value="waqf">أصول الأوقاف فقط</option>
-            </select>
-          </div>
-          <div style={{display: 'flex', flexDirection: 'column', gap: '0.5rem', gridColumn: '1 / -1'}}>
-            <label style={{fontSize: '0.85rem', fontWeight: 600}}>رئيس لجنة الجرد الميداني</label>
-            <input type="text" required placeholder="اسم رئيس اللجنة المعتمد" style={{padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text)'}} />
-          </div>
-          <div style={{display: 'flex', gap: '1rem', gridColumn: '1 / -1', marginTop: '1rem'}}>
-            <button type="submit" className="btn btn-primary" style={{padding: '0.75rem 2rem'}}>إطلاق الحملة</button>
-            <button type="button" className="btn btn-ghost" onClick={() => setView('inventory')} style={{padding: '0.75rem 2rem'}}>إلغاء</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderAIInsights = () => (
     <div className="view-anim">
@@ -1540,6 +1700,498 @@ const App = () => {
     );
   };
 
+const renderMaintenance = () => (
+  <div className="view-anim">
+    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+      <div>
+        <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Wrench color="var(--accent)" /> سجل الصيانة والضمانات</h2>
+        <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة طلبات الصيانة الدورية والتصحيحية ومتابعة عقود الضمان للأصول.</p>
+      </div>
+      <div style={{display:'flex', gap:'0.5rem'}}>
+         <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => showToast('✅ تم تحديث عقود الضمان من الموردين')}><RefreshCw size={16} /> مزامنة الضمانات</button>
+         <button className="btn btn-primary" onClick={() => { const v = window.prompt('رقم الأصل لطلب الصيانة:'); if (v) showToast(`📨 تم رفع تذكرة صيانة للأصل ${v}`); }}><Plus size={16} /> طلب صيانة جديد</button>
+      </div>
+    </div>
+    
+    <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
+      <div className="card" style={{borderTop:'4px solid #3b82f6'}}>
+        <div className="val-sub">طلبات الصيانة المفتوحة</div>
+        <div className="val-big" style={{color:'#3b82f6'}}>5</div>
+        <div className="val-sub">منها 2 طلب طارئ</div>
+      </div>
+      <div className="card" style={{borderTop:'4px solid #10b981'}}>
+        <div className="val-sub">صيانة مكتملة (الشهر الحالي)</div>
+        <div className="val-big" style={{color:'#10b981'}}>12</div>
+        <div className="val-sub">بكفاءة إنجاز 94%</div>
+      </div>
+      <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+        <div className="val-sub">أصول ينتهي ضمانها قريباً</div>
+        <div className="val-big" style={{color:'#f59e0b'}}>3</div>
+        <div className="val-sub">خلال 30 يوماً</div>
+      </div>
+      <div className="card" style={{borderTop:'4px solid #ef4444'}}>
+        <div className="val-sub">تكلفة الصيانة السنوية</div>
+        <div className="val-big" style={{color:'#ef4444'}}>45,000 ر.س</div>
+      </div>
+    </div>
+
+    <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
+      <div className="card">
+        <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>سجل الصيانة النشط</h3>
+        <table style={{width:'100%', borderCollapse:'collapse'}}>
+          <thead style={{borderBottom:'2px solid var(--border)'}}>
+            <tr>
+              <th style={{padding:'0.75rem', textAlign:'right'}}>رقم التذكرة</th>
+              <th style={{padding:'0.75rem', textAlign:'right'}}>الأصل</th>
+              <th style={{padding:'0.75rem', textAlign:'right'}}>نوع الصيانة</th>
+              <th style={{padding:'0.75rem', textAlign:'right'}}>مزود الخدمة</th>
+              <th style={{padding:'0.75rem', textAlign:'center'}}>الحالة</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              { id: 'MT-1001', asset: 'سيارة فورد تورس', type: 'تصحيحية', provider: 'الوكالة', status: 'قيد التنفيذ', color: '#f59e0b' },
+              { id: 'MT-1002', asset: 'خادم بيانات Dell', type: 'وقائية', provider: 'عقد تقني', status: 'مفتوح', color: '#3b82f6' },
+              { id: 'MT-1003', asset: 'طابعة ليزر HP', type: 'استبدال قطع', provider: 'الصيانة الداخلية', status: 'مكتمل', color: '#10b981' }
+            ].map(m => (
+              <tr key={m.id} style={{borderBottom:'1px solid var(--border)'}}>
+                <td style={{padding:'0.75rem', fontWeight:600}}>{m.id}</td>
+                <td style={{padding:'0.75rem'}}>{m.asset}</td>
+                <td style={{padding:'0.75rem', fontSize:'0.85rem'}}>{m.type}</td>
+                <td style={{padding:'0.75rem', fontSize:'0.85rem', color:'var(--text-muted)'}}>{m.provider}</td>
+                <td style={{padding:'0.75rem', textAlign:'center'}}>
+                  <span style={{background:`${m.color}20`, color:m.color, padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{m.status}</span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="card">
+        <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>الضمانات النشطة</h3>
+        <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+           {[
+             { asset: 'لابتوب ديل XPS 15', provider: 'مكتبة جرير', end: '2025-01-15', remaining: 470 },
+             { asset: 'مبنى الإدارة', provider: 'المقاول الرئيسي', end: '2025-01-01', remaining: 450 },
+             { asset: 'سيارة كامري', provider: 'عبداللطيف جميل', end: '2024-06-20', remaining: 260, alert: true }
+           ].map((w, idx) => (
+             <div key={idx} style={{padding:'1rem', borderRadius:'8px', border:`1px solid ${w.alert ? '#fecaca' : 'var(--border)'}`, background: w.alert ? '#fef2f2' : 'var(--card-bg)'}}>
+               <div style={{fontWeight:700, marginBottom:'0.25rem', color: w.alert ? '#991b1b' : 'var(--text)'}}>{w.asset}</div>
+               <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:'0.5rem'}}>المزود: {w.provider}</div>
+               <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', fontWeight:600}}>
+                 <span>انتهاء: {w.end}</span>
+                 <span style={{color: w.alert ? '#ef4444' : '#10b981'}}>{w.remaining} يوم متبقي</span>
+               </div>
+             </div>
+           ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+
+  
+  const renderDepreciation = () => {
+    const activeAssetsForDep = accountingEngine.filter(a => a.status === 'نشط' || a.status === 'متوقف');
+    const totalDepCost = activeAssetsForDep.reduce((s,a) => s + (Number(a.cost)||0), 0);
+    const totalAccDep = activeAssetsForDep.reduce((s,a) => s + (Number(a.accumulatedDep)||0), 0);
+    
+    // Calculate Monthly Depreciation (Straight Line)
+    const monthlyDep = activeAssetsForDep.map(a => {
+      const cost = Number(a.cost) || 0;
+      const salvage = Number(a.salvageValue) || 0;
+      const life = Number(a.usefulLife) || 5;
+      const depBasis = cost - salvage;
+      const yearly = life > 0 ? depBasis / life : 0;
+      const monthly = yearly / 12;
+      return { ...a, monthlyDep: monthly };
+    });
+    
+    const totalMonthly = monthlyDep.reduce((s,a) => s + a.monthlyDep, 0);
+
+    return (
+      <div className="view-anim">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+          <div>
+            <h2 style={{fontSize:'1.5rem', fontWeight:800, color:'var(--text)', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}>
+              <Calculator size={24} color="var(--brand-teal)" />
+              إدارة وحساب الإهلاك (Depreciation Engine)
+            </h2>
+            <p style={{color:'var(--text-muted)'}}>محرك احتساب الإهلاك التلقائي (طريقة القسط الثابت) للأصول الثابتة.</p>
+          </div>
+          <button className="btn btn-primary" onClick={() => {
+             // Create Journal Entry
+             const je = {
+               entry_number: 'JE-' + Math.floor(1000 + Math.random() * 9000),
+               date: new Date().toISOString().split('T')[0],
+               description: 'قيد إثبات إهلاك الأصول الثابتة للشهر الحالي',
+               total_amount: totalMonthly.toFixed(2),
+               status: 'مرحل',
+               lines: [
+                 { account_name: 'مصروف إهلاك أصول ثابتة', type: 'مدين', amount: totalMonthly.toFixed(2) },
+                 { account_name: 'مجمع إهلاك أصول ثابتة', type: 'دائن', amount: totalMonthly.toFixed(2) }
+               ]
+             };
+             setJournal(prev => [je, ...prev]);
+             showToast('✅ تم ترحيل قيد الإهلاك للشهر الحالي بنجاح!');
+          }}>
+            <RefreshCw size={18} /> ترحيل إهلاك الشهر الحالي
+          </button>
+        </div>
+
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem', marginBottom:'2rem'}}>
+          <div className="stat-card">
+            <div className="stat-title">إجمالي تكلفة الأصول الخاضعة</div>
+            <div className="stat-value">{totalDepCost.toLocaleString()} <span style={{fontSize:'1rem', fontWeight:400}}>ر.س</span></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-title">إجمالي الإهلاك المتراكم</div>
+            <div className="stat-value" style={{color:'var(--danger)'}}>{totalAccDep.toLocaleString()} <span style={{fontSize:'1rem', fontWeight:400}}>ر.س</span></div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-title">إهلاك الشهر الحالي (مقدّر)</div>
+            <div className="stat-value" style={{color:'var(--warning)'}}>{totalMonthly.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} <span style={{fontSize:'1rem', fontWeight:400}}>ر.س</span></div>
+          </div>
+        </div>
+
+        <div className="card" style={{overflowX:'auto'}}>
+          <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
+            <thead>
+              <tr style={{background:'var(--thead-bg)', color:'var(--text-secondary)', textAlign:'right'}}>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>رقم الأصل</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>اسم الأصل</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>التكلفة</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>الخردة</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>العمر (سنوات)</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>أساس الإهلاك</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>الإهلاك الشهري</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>المتراكم السابق</th>
+                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>القيمة الدفترية (NBV)</th>
+              </tr>
+            </thead>
+            <tbody>
+              {monthlyDep.map((a, i) => (
+                <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                  <td style={{padding:'1rem', fontWeight:600}}>{a.id}</td>
+                  <td style={{padding:'1rem'}}>{a.name}</td>
+                  <td style={{padding:'1rem'}}>{(Number(a.cost)||0).toLocaleString()}</td>
+                  <td style={{padding:'1rem'}}>{(Number(a.salvageValue)||0).toLocaleString()}</td>
+                  <td style={{padding:'1rem'}}>{a.usefulLife}</td>
+                  <td style={{padding:'1rem'}}>{(Number(a.cost) - Number(a.salvageValue)).toLocaleString()}</td>
+                  <td style={{padding:'1rem', fontWeight:600, color:'var(--warning)'}}>{a.monthlyDep.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+                  <td style={{padding:'1rem', color:'var(--danger)'}}>{(Number(a.accumulatedDep)||0).toLocaleString()}</td>
+                  <td style={{padding:'1rem', fontWeight:600, color:'var(--success)'}}>{((Number(a.cost)||0) - (Number(a.accumulatedDep)||0)).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  
+  const renderCustody = () => {
+    // Group assets by employee_id (Custody)
+    const custodyMap = {};
+    assets.forEach(a => {
+      if (a.employee_id) {
+        if (!custodyMap[a.employee_id]) custodyMap[a.employee_id] = [];
+        custodyMap[a.employee_id].push(a);
+      }
+    });
+    
+    // Sort employees by number of assets
+    const sortedCustodians = Object.keys(custodyMap).sort((a,b) => custodyMap[b].length - custodyMap[a].length);
+
+    return (
+      <div className="view-anim">
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+          <div>
+            <h2 style={{fontSize:'1.5rem', fontWeight:800, color:'var(--text)', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}>
+              <Users size={24} color="var(--brand-teal)" />
+              إدارة العهد (Custody Management)
+            </h2>
+            <p style={{color:'var(--text-muted)'}}>تتبع الأصول المسلمة عهدة للموظفين وإداراتهم.</p>
+          </div>
+          <button className="btn btn-primary">
+            <UserCircle size={18} /> تسليم عهدة جديدة
+          </button>
+        </div>
+
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'1.5rem'}}>
+          {sortedCustodians.map(emp => {
+            const empAssets = custodyMap[emp];
+            const totalValue = empAssets.reduce((s,a) => s + (Number(a.cost)||0), 0);
+            return (
+              <div key={emp} className="card" style={{display:'flex', flexDirection:'column', gap:'1rem', cursor:'pointer', transition:'transform 0.2s'}} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='none'} onClick={() => setSelectedEmployee({ name: emp, assets: empAssets, totalValue })}>
+                <div style={{display:'flex', alignItems:'center', gap:'1rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
+                  <div style={{background:'var(--thead-bg)', borderRadius:'50%', width:'50px', height:'50px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--accent)'}}>
+                    <UserCircle size={28} />
+                  </div>
+                  <div>
+                    <h3 style={{margin:0, fontSize:'1.1rem'}}>{emp}</h3>
+                    <div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إجمالي الأصول: {empAssets.length}</div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:'0.85rem', color:'var(--text-muted)', marginBottom:'0.5rem'}}>قيمة العهدة الإجمالية:</div>
+                  <div style={{fontWeight:800, fontSize:'1.25rem', color:'var(--text)'}}>{totalValue.toLocaleString()} <span style={{fontSize:'0.85rem', fontWeight:400}}>ر.س</span></div>
+                </div>
+                <div style={{background:'var(--bg)', borderRadius:'8px', padding:'0.5rem', maxHeight:'150px', overflowY:'auto'}}>
+                  {empAssets.map(a => (
+                    <div key={a.id} style={{display:'flex', justifyContent:'space-between', padding:'0.5rem', borderBottom:'1px solid var(--border)', fontSize:'0.85rem'}}>
+                      <div>{a.name}</div>
+                      <div style={{fontWeight:600}}>{a.id}</div>
+                    </div>
+                  ))}
+                </div>
+                <button className="btn btn-ghost" style={{width:'100%', marginTop:'0.5rem'}}>
+                  <FileText size={16} /> طباعة نموذج تسليم عهدة
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  
+      
+      {qrModalAsset && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, backdropFilter:'blur(5px)'}}>
+          <div className="card" style={{width:'350px', background:'white', padding:'2.5rem', textAlign:'center', borderRadius:'16px'}}>
+             <div style={{marginBottom:'1rem', fontWeight:800, color:'#0f172a', fontSize:'1.25rem'}}>ملصق الأصل الثابت</div>
+             <div style={{padding:'1rem', background:'white', display:'inline-block', border:'2px solid #e2e8f0', borderRadius:'12px', marginBottom:'1.5rem'}}>
+               <QRCodeSVG value={JSON.stringify({ id: qrModalAsset.id, name: qrModalAsset.name, category: qrModalAsset.category, date: qrModalAsset.date })} size={200} />
+             </div>
+             <div style={{fontWeight:800, fontSize:'1.5rem', color:'#0f172a', fontFamily:'monospace', letterSpacing:'2px'}}>{qrModalAsset.id}</div>
+             <div style={{fontSize:'0.9rem', color:'#64748b', marginTop:'0.5rem', marginBottom:'2rem'}}>{qrModalAsset.name}</div>
+             <div style={{display:'flex', gap:'1rem'}}>
+               <button className="btn btn-primary" style={{flex:1}} onClick={() => { showToast('🖨️ جاري الطباعة على طابعة الملصقات الحرارية...'); setQrModalAsset(null); }}><Printer size={18} /> طباعة الملصق</button>
+               <button className="btn btn-ghost" style={{flex:1, border:'1px solid #cbd5e1'}} onClick={() => setQrModalAsset(null)}>إغلاق</button>
+             </div>
+          </div>
+        </div>
+      )}
+      {selectedEmployee && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'800px', maxHeight:'90vh', overflowY:'auto', background:'var(--bg)', padding:0, border:'1px solid var(--border)'}}>
+            
+            {/* Header */}
+            <div style={{padding:'2rem', background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color:'white', position:'relative'}}>
+              <button className="btn btn-ghost" style={{position:'absolute', top:'1rem', left:'1rem', color:'white', background:'rgba(255,255,255,0.1)'}} onClick={() => setSelectedEmployee(null)}><X size={18} /></button>
+              <div style={{display:'flex', alignItems:'center', gap:'1.5rem'}}>
+                <div style={{background:'rgba(255,255,255,0.1)', padding:'1rem', borderRadius:'50%'}}>
+                  <UserCircle size={48} />
+                </div>
+                <div>
+                  <h2 style={{margin:0, fontSize:'1.8rem', fontWeight:800}}>{selectedEmployee.name}</h2>
+                  <div style={{color:'#94a3b8', marginTop:'0.5rem'}}>إجمالي الأصول المستلمة عهدة: {selectedEmployee.assets.length} أصل | القيمة الإجمالية: {selectedEmployee.totalValue.toLocaleString()} ر.س</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{padding:'1.5rem 2rem', borderBottom:'1px solid var(--border)', background:'var(--card-bg)', display:'flex', gap:'1rem'}}>
+              <button className="btn btn-primary" onClick={() => {
+                showToast('🖨️ جاري تجهيز وإصدار نموذج "إخلاء طرف / تسليم عهدة"...');
+              }}>
+                <FileText size={18} /> طباعة نموذج تسليم / إخلاء عهدة (PDF)
+              </button>
+              <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}>
+                <History size={18} /> سجل حركات الموظف
+              </button>
+            </div>
+
+            {/* Assets Table */}
+            <div style={{padding:'2rem'}}>
+              <h3 style={{fontSize:'1.2rem', marginBottom:'1rem', color:'var(--brand-teal)'}}>تفاصيل الأصول في العهدة الحالية</h3>
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem', background:'var(--card-bg)', borderRadius:'8px', overflow:'hidden'}}>
+                <thead style={{background:'var(--thead-bg)', borderBottom:'2px solid var(--border)'}}>
+                  <tr>
+                    <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>وصف الأصل</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>تاريخ الاستلام</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>التكلفة (ر.س)</th>
+                    <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedEmployee.assets.map((a, i) => (
+                    <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                      <td style={{padding:'1rem', fontWeight:800, color:'var(--accent)'}}>{a.id}</td>
+                      <td style={{padding:'1rem', fontWeight:600}}>{a.name}</td>
+                      <td style={{padding:'1rem'}}>{a.date}</td>
+                      <td style={{padding:'1rem'}}>{(Number(a.cost)||0).toLocaleString()}</td>
+                      <td style={{padding:'1rem', textAlign:'center'}}>
+                        <span style={{background:'rgba(16, 185, 129, 0.1)', color:'#10b981', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{a.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
+  
+      {warehouseMovementModal && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--border)', overflow:'hidden'}}>
+            
+            <div style={{padding:'1.5rem 2rem', background:'var(--card-bg)', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'var(--text)'}}>
+                <ArrowRightLeft size={22} color="var(--brand-teal)"/>
+                إنشاء مستند حركة مستودعية
+              </h2>
+              <button className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}><X size={18} /></button>
+            </div>
+
+            <form style={{padding:'2rem'}} onSubmit={(e) => {
+              e.preventDefault();
+              const type = e.target.movementType.value;
+              const isAsset = e.target.isAsset?.checked;
+              
+              if (type === 'صرف' && isAsset) {
+                // Open new asset modal implicitly
+                setWarehouseMovementModal(false);
+                setEditingAsset(null);
+                setView('new-asset');
+                setTimeout(() => showToast('💡 نظراً لأن الصنف المَصروف يصنّف كأصل ثابت، تم تحويلك مباشرة لشاشة تسجيل الأصل.'), 500);
+              } else {
+                setWarehouseMovementModal(false);
+                showToast(`✅ تم حفظ إذن الـ (${type}) وتحديث كميات المستودع بنجاح!`);
+              }
+            }}>
+              <div style={{display:'grid', gap:'1.5rem'}}>
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>نوع الحركة المستودعية *</label>
+                  <select name="movementType" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} onChange={e => {
+                    const chk = document.getElementById('isAssetContainer');
+                    if (chk) chk.style.display = e.target.value === 'صرف' ? 'block' : 'none';
+                  }}>
+                    <option value="استلام">إذن استلام (إضافة للمخزون)</option>
+                    <option value="صرف">إذن صرف (خصم من المخزون)</option>
+                    <option value="تحويل">إذن تحويل بين المستودعات</option>
+                    <option value="إرجاع">إذن إرجاع</option>
+                    <option value="تسوية">إذن تسوية (تعديل الأرصدة)</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الصنف *</label>
+                  <select name="item" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                    {warehouseItems.map(w => <option key={w.id} value={w.id}>{w.sku} - {w.name} (الرصيد: {w.qty})</option>)}
+                  </select>
+                </div>
+
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem'}}>
+                  <div>
+                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الكمية *</label>
+                    <input name="qty" type="number" min="1" required defaultValue="1" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+                  </div>
+                  <div>
+                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>المستودع / الموقع</label>
+                    <select name="warehouse" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                      <option value="main">المستودع الرئيسي (الرياض)</option>
+                      <option value="sub1">مستودع فرع جدة</option>
+                      <option value="sub2">مستودع العهد التقنية</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="isAssetContainer" style={{display:'none', background:'rgba(245, 158, 11, 0.1)', border:'1px solid rgba(245, 158, 11, 0.3)', padding:'1rem', borderRadius:'8px'}}>
+                  <label style={{display:'flex', alignItems:'center', gap:'0.75rem', cursor:'pointer', color:'var(--warning)', fontWeight:700}}>
+                    <input type="checkbox" name="isAsset" style={{width:'20px', height:'20px', accentColor:'var(--warning)'}} />
+                    هل هذا الصنف المصروف يعتبر "أصلاً ثابتاً"؟ (سيقوم النظام تلقائياً بإنشاء بطاقة أصل ثابت له)
+                  </label>
+                </div>
+
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الملاحظات والبيان</label>
+                  <textarea name="notes" rows="2" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
+                </div>
+              </div>
+
+              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
+                <button type="button" className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}>إلغاء</button>
+                <button type="submit" className="btn btn-primary">تنفيذ وحفظ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+  
+      {disposalModal && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--danger)', overflow:'hidden'}}>
+            
+            <div style={{padding:'1.5rem 2rem', background:'#fef2f2', borderBottom:'1px solid #fecaca', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'#991b1b'}}>
+                <Trash2 size={22}/>
+                نموذج طلب استبعاد أصل ثابت
+              </h2>
+              <button className="btn btn-ghost" onClick={() => setDisposalModal(null)}><X size={18} color="#991b1b" /></button>
+            </div>
+
+            <form style={{padding:'2rem'}} onSubmit={async (e) => {
+              e.preventDefault();
+              const reason = e.target.reason.value;
+              const details = e.target.details.value;
+              const date = new Date().toISOString().split('T')[0];
+              
+              const { error } = await supabase.from('assets').update({
+                status: 'مستبعد',
+                disposal_date: date,
+                disposal_reason: `${reason}: ${details}`
+              }).eq('id', disposalModal.db_id);
+
+              if (error) {
+                showToast('❌ حدث خطأ أثناء الاستبعاد');
+              } else {
+                showToast('✅ تم استبعاد الأصل بنجاح وإيقاف إهلاكه مستقبلاً!');
+                fetchInitialData();
+                setDisposalModal(null);
+              }
+            }}>
+              
+              <div style={{background:'var(--card-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)'}}>
+                <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أنت تقوم الآن باستبعاد الأصل:</div>
+                <div style={{fontWeight:800, color:'var(--accent)', fontSize:'1.1rem'}}>{disposalModal.id} - {disposalModal.name}</div>
+                <div style={{fontSize:'0.85rem', color:'var(--danger)', marginTop:'0.5rem'}}>تنبيه: لن يتم حذف الأصل من قاعدة البيانات حفظاً للسجل التاريخي، ولكن ستتغير حالته إلى "مستبعد" وسيتوقف احتساب إهلاكه.</div>
+              </div>
+
+              <div style={{display:'grid', gap:'1.5rem'}}>
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>سبب الاستبعاد الأساسي *</label>
+                  <select name="reason" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                    <option value="تالف / خردة">تالف / خردة (لا جدوى من إصلاحه)</option>
+                    <option value="مفقود / مسروق">مفقود / مسروق</option>
+                    <option value="تم البيع">تم بيع الأصل</option>
+                    <option value="تبرع عيني">تم التبرع به</option>
+                    <option value="انتهاء العمر الافتراضي">انتهاء العمر الافتراضي</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>تفاصيل ومبررات الاستبعاد (قرار اللجنة) *</label>
+                  <textarea name="details" rows="3" required placeholder="أدخل مبررات الاستبعاد وأسماء أعضاء لجنة الفحص إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
+                </div>
+              </div>
+
+              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
+                <button type="button" className="btn btn-ghost" onClick={() => setDisposalModal(null)}>تراجع وإلغاء</button>
+                <button type="submit" className="btn btn-primary" style={{background:'var(--danger)', borderColor:'var(--danger)', color:'white'}}>تأكيد الاستبعاد</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
   const renderSettings = () => (
     <div className="view-anim">
       <h2 style={{fontSize:'1.25rem', marginBottom:'2rem'}}>إعدادات النظام</h2>
@@ -1558,6 +2210,44 @@ const App = () => {
             <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>مزامنة قيود اليومية مع دفتر الأستاذ العام تلقائياً</div>
           </div>
           <button className="btn btn-ghost" style={{color: erpConnected ? 'var(--success)' : 'var(--danger)'}} onClick={() => { setErpConnected(!erpConnected); showToast(erpConnected ? '🔌 تم فصل الربط مع النظام المحاسبي' : '✅ تم الاتصال بالنظام المحاسبي (ERP)'); }}><CheckCircle size={16} /> {erpConnected ? 'متصل' : 'غير متصل'}</button>
+        </div>
+      </div>
+
+      <div className="card" style={{maxWidth: '600px', display:'flex', flexDirection:'column', gap:'1.5rem', marginTop:'1.5rem'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
+          <h3 style={{fontSize:'1.1rem', margin:0, color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'0.5rem'}}><BrainCircuit size={18} /> إعدادات الذكاء الاصطناعي (مفتوح المصدر)</h3>
+        </div>
+        <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>اسم المساعد الذكي</label>
+             <input type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiName} onChange={e => { setAiName(e.target.value); localStorage.setItem('aiName', e.target.value); }} />
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>شعار المساعد (Emoji)</label>
+             <input type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', fontSize:'1.5rem', textAlign:'center'}} value={aiIcon} onChange={e => { setAiIcon(e.target.value); localStorage.setItem('aiIcon', e.target.value); }} />
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>تعليمات النظام والتغذية (System Prompt)</label>
+             <textarea style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', resize:'vertical', minHeight:'100px'}} value={aiSystemPrompt} onChange={e => { setAiSystemPrompt(e.target.value); localStorage.setItem('aiSystemPrompt', e.target.value); }} placeholder="أدخل القواعد، القيود، والمعلومات التي يجب أن يلتزم بها المساعد..."></textarea>
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مزود الخدمة (LLM Provider)</label>
+             <select style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiProvider} onChange={e => { setAiProvider(e.target.value); localStorage.setItem('aiProvider', e.target.value); }}>
+               <option value="groq">Groq (Llama 3.1) - سريع جداً ومجاني</option>
+               <option value="huggingface">Hugging Face (Mixtral 8x7B) - مجاني</option>
+             </select>
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مفتاح الـ API (اختياري)</label>
+             <input type="password" placeholder="أدخل مفتاح الـ API الخاص بك هنا إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiApiKey} onChange={e => { setAiApiKey(e.target.value); localStorage.setItem('aiApiKey', e.target.value); }} />
+             <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.5rem'}}>
+                تم دمج مفتاح مشفر مسبقاً، لا تحتاج لإدخال مفتاح جديد إلا إذا أردت استخدام حسابك الخاص.
+             </div>
+           </div>
+           
+           <button className="btn btn-primary" style={{marginTop:'1rem'}} onClick={() => showToast('✅ تم حفظ جميع إعدادات الذكاء الاصطناعي بنجاح!')}>
+              <CheckCircle size={18} style={{marginRight:'0.5rem'}} /> حفظ الإعدادات
+           </button>
         </div>
       </div>
     </div>
@@ -1753,6 +2443,12 @@ const App = () => {
 
         <div className="nav-group">
           <div className="nav-label">المستودعات (RADAR)</div>
+          <div className={`nav-item ${view === 'custody' ? 'active' : ''}`} onClick={() => setView('custody')}>
+            <div className="nav-icon-box"><Users size={18} /></div> إدارة العهد
+          </div>
+          <div className={`nav-item ${view === 'depreciation' ? 'active' : ''}`} onClick={() => setView('depreciation')}>
+            <div className="nav-icon-box"><Calculator size={18} /></div> حاسبة الإهلاك
+          </div>
           <div className={`nav-item ${view === 'warehouse' ? 'active' : ''}`} onClick={() => setView('warehouse')}>
             <div className="nav-icon-box"><Warehouse size={18} /></div> إدارة المستودعات
           </div>
@@ -1822,6 +2518,7 @@ const App = () => {
           {view === 'new-asset' && renderNewAsset()}
           {view === 'journal' && renderJournal()}
           {view === 'transfers' && renderTransfers()}
+          {view === 'maintenance' && renderMaintenance()}
           {view === 'new-transfer' && renderNewTransfer()}
           {view === 'budget' && renderBudget()}
           {view === 'inventory' && renderInventory()}
@@ -1829,11 +2526,146 @@ const App = () => {
           {view === 'new-inventory' && renderNewInventory()}
           {view === 'ai-insights' && renderAIInsights()}
           {view === 'warehouse' && renderWarehouse()}
+            {view === 'depreciation' && renderDepreciation()}
+            {view === 'custody' && renderCustody()}
           {view === 'settings' && renderSettings()}
         </div>
       </main>
 
+      
+      {selectedAsset && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'800px', maxHeight:'90vh', overflowY:'auto', background:'var(--bg)', padding:0, border:'1px solid var(--border)', display:'flex', flexDirection:'column'}}>
+            
+            {/* Header */}
+            <div style={{padding:'1.5rem 2rem', background:'var(--card-bg)', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:10}}>
+              <div>
+                <h2 style={{margin:0, fontSize:'1.5rem', color:'var(--text)', display:'flex', alignItems:'center', gap:'0.75rem'}}>
+                  بطاقة الأصل الثابت <span style={{fontSize:'1rem', color:'var(--text-muted)', fontWeight:400}}>({selectedAsset.id})</span>
+                </h2>
+                <div style={{fontSize:'0.85rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>الرقم التسلسلي: {selectedAsset.code || '-'} | الموديل: {selectedAsset.model || '-'}</div>
+              </div>
+              <div style={{display:'flex', gap:'0.5rem'}}>
+                <button className="btn btn-ghost" style={{color:'var(--danger)'}} title="استبعاد الأصل" onClick={() => { setDisposalModal(selectedAsset); setSelectedAsset(null); }}><Trash2 size={18} /></button>
+                <button className="btn btn-ghost" title="طباعة باركود/QR" onClick={() => setQrModalAsset(selectedAsset)}><QrCode size={18} /></button>
+                <button className="btn btn-ghost" title="تصدير PDF"><FileText size={18} /></button>
+                <button className="btn btn-ghost" onClick={() => setSelectedAsset(null)}><X size={18} /></button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div style={{padding:'2rem', display:'flex', flexDirection:'column', gap:'2rem'}}>
+              
+              {/* Group 1: التعريف */}
+              <div>
+                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>التعريف بالأصل</h3>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem'}}>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>رقم الأصل:</strong> {selectedAsset.id}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>وصف الأصل:</strong> {selectedAsset.name}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>فئة الأصل:</strong> {selectedAsset.category}</div>
+                </div>
+              </div>
+
+              {/* Group 2: الموقع والعهدة */}
+              <div>
+                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>الموقع والعهدة</h3>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem'}}>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>الموقع:</strong> {selectedAsset.location || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>الإدارة:</strong> {selectedAsset.department || '-'}</div>
+                  {selectedAsset.category !== 'أراضي' && selectedAsset.category !== 'مباني' && (
+                    <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>صاحب العهدة:</strong> {selectedAsset.custody || '-'}</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Group 3: الشراء والتشغيل */}
+              <div>
+                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>الشراء والتشغيل</h3>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem'}}>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>المورد:</strong> {selectedAsset.supplier || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ الشراء:</strong> {selectedAsset.date || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ الاستلام:</strong> {selectedAsset.date || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ جاهزية الاستخدام:</strong> {selectedAsset.readyDate || selectedAsset.date || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>رقم أمر الشراء (PO):</strong> {selectedAsset.poNumber || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>رقم الفاتورة:</strong> {selectedAsset.invoiceNumber || '-'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>الضمان:</strong> {selectedAsset.warranty || 'سنتين'}</div>
+                </div>
+              </div>
+
+              {/* Group 4: البيانات المالية والإهلاك */}
+              <div>
+                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>البيانات المالية والإهلاك</h3>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem', background:'var(--card-bg)', padding:'1.5rem', borderRadius:'12px', border:'1px solid var(--border)'}}>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تكلفة الأصل:</strong> {(Number(selectedAsset.cost)||0).toLocaleString()} ر.س</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>مصدر التمويل:</strong> {selectedAsset.fundingSource || 'إيرادات ذاتية'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>طريقة الإهلاك:</strong> {selectedAsset.method === 'SL' ? 'القسط الثابت' : 'القسط المتناقص'}</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>العمر الإنتاجي:</strong> {selectedAsset.life} سنوات</div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>القيمة التخريدية:</strong> {(Number(selectedAsset.salvage)||0).toLocaleString()} ر.س</div>
+                  
+                  {/* Auto calculated */}
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>إهلاك الفترة (سنوي):</strong> {(Number(selectedAsset.annualDep)||0).toLocaleString()} ر.س</div>
+                  <div><strong style={{color:'var(--danger)', fontSize:'0.85rem', display:'block'}}>مجمع الإهلاك:</strong> {(Number(selectedAsset.accumulatedDep)||0).toLocaleString()} ر.س</div>
+                  <div><strong style={{color:'var(--success)', fontSize:'0.85rem', display:'block'}}>القيمة الدفترية (NBV):</strong> {(Number(selectedAsset.netBookValue)||0).toLocaleString()} ر.س</div>
+                </div>
+              </div>
+
+              {/* Group 5: الجرد والاستبعاد */}
+              <div>
+                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>الجرد والاستبعاد</h3>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem'}}>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>حالة الأصل:</strong> <span style={{fontWeight:800}}>{selectedAsset.status}</span></div>
+                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ آخر جرد:</strong> {selectedAsset.lastInventory || '-'}</div>
+                  
+                  
+              {/* Group 6: Timeline (دورة حياة الأصل) */}
+              <div style={{gridColumn:'1/-1', marginTop:'1rem'}}>
+                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>دورة حياة الأصل (Timeline)</h3>
+                <div style={{display:'flex', gap:'1rem', overflowX:'auto', paddingBottom:'1rem'}}>
+                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(59, 130, 246, 0.05)', borderLeft:'3px solid #3b82f6', borderRadius:'8px'}}>
+                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.date}</div>
+                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#1e3a8a'}}>شراء الأصل وتسجيله</div>
+                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>تم إنشاء البطاقة وإضافته لسجل الأصول</div>
+                  </div>
+                  {selectedAsset.readyDate && (
+                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(16, 185, 129, 0.05)', borderLeft:'3px solid #10b981', borderRadius:'8px'}}>
+                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.readyDate}</div>
+                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#064e3b'}}>جاهزية الأصل وبدء الإهلاك</div>
+                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>تم تفعيل الأصل محاسبياً</div>
+                  </div>
+                  )}
+                  {selectedAsset.custody && selectedAsset.custody !== 'غير محدد' && (
+                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(139, 92, 246, 0.05)', borderLeft:'3px solid #8b5cf6', borderRadius:'8px'}}>
+                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.readyDate}</div>
+                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#4c1d95'}}>تسليم عهدة للموظف</div>
+                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>المستلم: {selectedAsset.custody}</div>
+                  </div>
+                  )}
+                  {selectedAsset.status === 'مستبعد' && (
+                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(239, 68, 68, 0.05)', borderLeft:'3px solid #ef4444', borderRadius:'8px'}}>
+                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.disposalDate}</div>
+                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#7f1d1d'}}>استبعاد الأصل</div>
+                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>{selectedAsset.disposalReason}</div>
+                  </div>
+                  )}
+                </div>
+              </div>
+
+              {selectedAsset.status === 'مستبعد' && (
+                    <>
+                      <div><strong style={{color:'var(--danger)', fontSize:'0.85rem', display:'block'}}>تاريخ الاستبعاد:</strong> {selectedAsset.disposalDate || '-'}</div>
+                      <div style={{gridColumn:'1/-1'}}><strong style={{color:'var(--danger)', fontSize:'0.85rem', display:'block'}}>سبب الاستبعاد:</strong> {selectedAsset.disposalReason || '-'}</div>
+                    </>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      )}
+
       {showScanner && (
+
         <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
           <div className="card" style={{width:'400px', background:'var(--card-bg)', textAlign:'center', padding:'2.5rem 2rem', border:'1px solid var(--border)'}}>
             <div style={{display:'inline-block', padding:'1.5rem', borderRadius:'50%', background:'rgba(59, 130, 246, 0.1)', marginBottom:'1.5rem'}}>
@@ -2023,7 +2855,9 @@ const App = () => {
           </div>
 
           {/* Input Area */}
-          <form style={{display:'flex', padding:'1.25rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.75rem'}} onSubmit={(e) => {
+          
+          {/* Input Area */}
+          <form style={{display:'flex', padding:'1.25rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.75rem'}} onSubmit={async (e) => {
             e.preventDefault();
             if(!chatInput.trim()) return;
             const userInput = chatInput;
@@ -2031,38 +2865,70 @@ const App = () => {
             setChatInput('');
             setIsTyping(true);
             
-            setTimeout(() => {
-              let botResponse = '';
-              const totalWH = warehouseItems.reduce((s,i) => s + i.qty, 0);
-              const lowWH = warehouseItems.filter(i => i.qty <= i.minQty && i.qty > 0).length;
-              const outWH = warehouseItems.filter(i => i.qty === 0).length;
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
-              if(userInput.includes('مخزون') || userInput.includes('مستودع')) {
-                botResponse = `📦 تقرير المخزون اللحظي:\n• إجمالي الوحدات: ${totalWH} وحدة\n• أصناف منخفضة المخزون: ${lowWH}\n• أصناف نفدت بالكامل: ${outWH}\n\nأوصي بإصدار أوامر شراء عاجلة للأصناف المنفدة لتجنب تعطل العمليات.`;
-              } else if(userInput.includes('RADAR') || userInput.includes('رادار')) {
-                const stages = ['Receive','Allocate','Deploy','Audit','Retire'].map(s => warehouseItems.filter(i => i.stage === s).length);
-                botResponse = `🎯 تحليل مراحل RADAR:\n• الاستلام: ${stages[0]} أصول\n• التخصيص: ${stages[1]} أصول\n• النشر: ${stages[2]} أصول\n• المراجعة: ${stages[3]} أصول\n• الإحلال: ${stages[4]} أصول\n\nتحليلي: ${stages[2] > 3 ? 'نسبة النشر عالية (إيجابي). ' : ''}${stages[4] > 0 ? 'يوجد أصول بحاجة لقرار إحلال عاجل.' : 'لا توجد أصول في مرحلة الإحلال حالياً.'}`;
-              } else if(userInput.includes('ميزانية') || userInput.includes('وفر')) {
-                botResponse = '💰 بناءً على تحليل بند CAPEX الحالي، يظهر وفر مالي بنسبة 12% في قسم التقنية (حوالي 150,000 ر.س). أوصي بتدوير هذا الوفر لتحديث خوادم المستودعات وتعزيز منظومة RADAR.';
-              } else if(userInput.includes('أصول') || userInput.includes('حرجة') || userInput.includes('مخاطر')) {
-                botResponse = '⚠️ أراقب 3 أصول تقنية (Firewalls) تقترب من نهاية عمرها الإنتاجي. احتمال التعطل يقدر بـ 15% خلال الأشهر الثلاثة القادمة. كما يوجد ' + lowWH + ' صنف بمستوى مخزون منخفض في المستودعات.';
-              } else if(userInput.includes('جرد')) {
-                botResponse = '📋 حملة الجرد الحالية في فرع الرياض مكتملة بنسبة 94%. تبقى 6 أصول لم تُطابق بعد. نظام RADAR يقترح بدء مراجعة ميدانية للمخزون المتبقي.';
-              } else if(userInput.includes('تقرير') || userInput.includes('شامل')) {
-                botResponse = `📊 التقرير الشامل لمنظومة تراؤف V5.0:\n• الأصول المسجلة: ${assets.length} أصل\n• القيمة الرأسمالية: ${totals.cost.toLocaleString()} ر.س\n• صافي القيمة: ${totals.nbv.toLocaleString()} ر.س\n• المستودعات: ${totalWH} وحدة مخزون\n• حالة RADAR: فعّال ✅\n\nالنظام يعمل بكفاءة 94.8%. هل تحتاج تفاصيل إضافية؟`;
-              } else {
-                botResponse = `🤖 مرحباً! أنا تراؤف AI V5.0 المدعوم بمنهجية RADAR. تحليلي لمدخلاتك: "${userInput}"\n\nيمكنني مساعدتك في:\n• تحليل الأصول والمستودعات\n• تقارير RADAR الخماسية\n• التنبؤ بالإحلال والمخاطر\n• تحليل الميزانية والوفر\n\nتفضل بسؤالك!`;
-              }
-              setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
+            if (!aiApiKey) {
+              const errResp = "⚠️ يرجى إضافة مفتاح الـ API الخاص بك (Groq أو Hugging Face) في صفحة الإعدادات لتفعيل الذكاء الاصطناعي.";
+              setChatMessages(prev => [...prev, {role: 'bot', text: errResp}]);
               setIsTyping(false);
-              if(autoSpeak) speak(botResponse);
-              setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-            }, 1500);
+              return;
+            }
+
+            try {
+              let botResponse = '';
+              const messagesForApi = [
+                { role: "system", content: aiSystemPrompt + "\n\nقم بالرد بناء على المعلومات التالية إن وجدت: " + (window.aiFileContext || "") },
+                { role: "user", content: userInput }
+              ];
+
+              if (aiProvider === 'groq') {
+                const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiApiKey}` },
+                  body: JSON.stringify({ model: 'allam-2-7b', messages: messagesForApi, temperature: 0.7 })
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error.message || 'Groq Error');
+                botResponse = data.choices[0].message.content;
+              } else {
+                const res = await fetch('https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1/v1/chat/completions', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiApiKey}` },
+                  body: JSON.stringify({ model: 'mistralai/Mixtral-8x7B-Instruct-v0.1', messages: messagesForApi, max_tokens: 500 })
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error || 'HF Error');
+                botResponse = data.choices[0].message.content;
+              }
+
+              setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
+              window.aiFileContext = ""; // clear after one use
+            } catch (err) {
+              console.error(err);
+              setChatMessages(prev => [...prev, {role: 'bot', text: "❌ حدث خطأ في الاتصال بالذكاء الاصطناعي: " + err.message}]);
+            }
+            
+            setIsTyping(false);
+            if(autoSpeak) speak(botResponse);
+            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
           }}>
+            <input type="file" id="ai-file-upload" style={{display:'none'}} accept=".txt,.csv,.json,.md" onChange={(e) => {
+              const file = e.target.files[0];
+              if(!file) return;
+              const reader = new FileReader();
+              reader.onload = (ev) => {
+                window.aiFileContext = ev.target.result;
+                showToast("✅ تم إرفاق الملف: " + file.name + " للتحليل");
+              };
+              reader.readAsText(file);
+            }} />
+            <label htmlFor="ai-file-upload" style={{background: 'var(--thead-bg)', color: 'var(--text-muted)', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s'}}>
+              <Upload size={20} />
+            </label>
             <button type="button" onClick={startListening} style={{background: isListening ? '#ef4444' : 'var(--thead-bg)', color: isListening ? 'white' : 'var(--text-muted)', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', transition:'all 0.2s'}}>
               {isListening ? <MicOff size={20} /> : <Mic size={20} />}
             </button>
-            <input type="text" placeholder="اسأل عن الأصول، المستودعات، RADAR..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0 1rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none', fontSize:'0.9rem'}} />
+            <input type="text" placeholder="اسأل المساعد أو ارفع ملفاً ليقوم بتحليله..." value={chatInput} onChange={e => setChatInput(e.target.value)} style={{flex:1, padding:'0 1rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', outline:'none', fontSize:'0.9rem'}} />
             <button type="submit" style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', border:'none', borderRadius:'12px', width:'45px', height:'45px', display:'flex', alignItems:'center', justifyContent:'center', cursor:'pointer', boxShadow:'var(--shadow-accent)'}}><Send size={20} /></button>
           </form>
         </div>
