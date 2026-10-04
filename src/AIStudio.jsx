@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { 
   Bot, Settings, BookOpen, Database, Link, BarChart3, ShieldCheck, PlayCircle, UploadCloud,
-  CheckCircle, Save, ChevronRight, ChevronLeft, Mic, Search, MessageSquare, Zap, Upload, FileText, Globe
+  CheckCircle, Save, ChevronLeft, Mic, Search, MessageSquare, Zap, Upload, FileText, Globe
 } from 'lucide-react';
 
 const STEPS = [
@@ -103,8 +103,8 @@ export default function AIStudio() {
             <h4 style={{marginBottom:'0.5rem'}}>صلاحيات القراءة من النظام</h4>
             {['سجل الأصول الثابتة', 'المستودعات والمخزون', 'حملات الجرد', 'الصيانة والأعطال', 'التقارير المالية'].map((item, i) => (
               <div key={i} style={{display:'flex', gap:'1rem', alignItems:'center', background:'var(--bg)', padding:'1rem', borderRadius:'8px', border:'1px solid var(--border)'}}>
-                <input type="checkbox" defaultChecked id={\`data_\${i}\`} style={{width:'20px', height:'20px'}}/>
-                <label htmlFor={\`data_\${i}\`} style={{fontWeight:600}}>{item}</label>
+                <input type="checkbox" defaultChecked id={'data_' + i} style={{width:'20px', height:'20px'}}/>
+                <label htmlFor={'data_' + i} style={{fontWeight:600}}>{item}</label>
               </div>
             ))}
           </div>
