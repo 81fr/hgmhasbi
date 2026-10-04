@@ -344,6 +344,12 @@ const App = () => {
     
     const { data: logsData } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
     if (logsData) setAuditLogs(logsData);
+    
+    const { data: setts } = await supabase.from('system_settings').select('*').limit(1).single();
+    if (setts) setSystemSettings(setts);
+    
+    const { data: notifs } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
+    if (notifs) setNotifications(notifs);
   };
 
   const [journals, setJournals] = useState([
