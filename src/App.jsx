@@ -1,3 +1,4 @@
+import { AIService } from './aiService.js';
 import ErrorBoundary from './ErrorBoundary';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
@@ -251,21 +252,38 @@ const App = () => {
     window.speechSynthesis.speak(utterance);
   };
 
-  const startListening = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      showToast('⚠️ متصفحك لا يدعم التعرف على الكلام');
+  const [mediaRecorder, setMediaRecorder] = useState(null);
+  const startListening = async () => {
+    if (isListening && mediaRecorder) {
+      mediaRecorder.stop();
+      setIsListening(false);
       return;
     }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'ar-SA';
-    recognition.onstart = () => setIsListening(true);
-    recognition.onend = () => setIsListening(false);
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setChatInput(transcript);
-    };
-    recognition.start();
+    if (!aiApiKey) { showToast('⚠️ يرجى إضافة مفتاح Groq API في الإعدادات لتفعيل التحليل الصوتي.'); return; }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      const chunks = [];
+      recorder.ondataavailable = e => chunks.push(e.data);
+      recorder.onstop = async () => {
+        showToast('⏳ جاري تحليل الصوت...');
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        const ai = new AIService(aiApiKey);
+        try {
+          const text = await ai.transcribeAudio(blob);
+          setChatInput(text);
+          showToast('✅ اكتمل التفريغ');
+        } catch(err) {
+          showToast('❌ خطأ في تحليل الصوت: ' + err.message);
+        }
+        stream.getTracks().forEach(t => t.stop());
+      };
+      recorder.start();
+      setMediaRecorder(recorder);
+      setIsListening(true);
+    } catch(err) {
+      showToast('❌ تعذر الوصول للميكروفون');
+    }
   };
 
   const showToast = (msg) => {
@@ -1505,128 +1523,105 @@ const App = () => {
     );
   };
 
-  const renderAIInsights = () => (
+  
+  const [aiReport, setAiReport] = useState(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+
+  const generateSmartReport = async () => {
+    setIsGeneratingReport(true);
+    showToast('جاري قراءة البيانات وتحليلها بالذكاء الاصطناعي...');
+    try {
+      // 1. Gather real data context
+      const totalAssetsValue = assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
+      const activeAssets = assets.filter(a => a.status === 'نشط').length;
+      const lowStock = warehouseItems.filter(w => w.qty <= w.minQty).length;
+      
+      const prompt = `
+أنت محلل مالي ذكي ومستشار للعمليات. 
+قم بتحليل البيانات التالية للنظام وكتابة تقرير تنفيذي قصير (3 فقرات) يوضح:
+1. ماذا تعني النتائج؟
+2. ما أبرز الملاحظات أو الشذوذ (Anomalies)؟
+3. ما فرص التحسين أو المخاطر المستقبلية؟
+
+البيانات الحالية:
+- إجمالي قيمة الأصول: ${totalAssetsValue} ريال
+- عدد الأصول النشطة: ${activeAssets} من أصل ${assets.length}
+- عدد الأصناف في المستودع التي وصلت لحد الخطر (نواقص): ${lowStock} من أصل ${warehouseItems.length}
+      `;
+
+      const ai = new AIService(aiApiKey);
+      const msg = await ai.sendChat([{ role: 'user', content: prompt }], false); // disable tools for raw summary
+      setAiReport(msg.content);
+      showToast('✅ اكتمل التقرير الذكي');
+    } catch(err) {
+      showToast('❌ تعذر توليد التقرير: ' + err.message);
+    }
+    setIsGeneratingReport(false);
+  };
+
+  const renderAIInsights = () => {
+    // 1. Calculations for Predictive & Anomalies
+    const totalAssetsValue = assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
+    const lowStockItems = warehouseItems.filter(w => w.qty <= w.minQty);
+    const anomalyDepreciation = assets.filter(a => a.status === 'نشط' && (Number(a.cost) || 0) > 0 && (Number(a.useful_life) || 0) < 1);
+    
+    return (
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
         <div>
-          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> التحليلات التنبؤية بالذكاء الاصطناعي</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل المخاطر، التنبؤ بالإحلال، وفرص تحسين استغلال الأصول المدعومة بنماذج تعلم الآلة.</p>
+          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> مركز التحليلات الذكية (AI Analytics)</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل تلقائي للبيانات، كشف الشذوذ، والتنبؤ بالمخاطر المستقبلية.</p>
         </div>
-        <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { showToast('🔄 جاري إعادة تدريب نماذج التنبؤ...'); setTimeout(() => showToast(`✅ تم تحديث النماذج على ${assets.length} أصل`), 1200); }}><Activity size={18} /> تحديث نماذج التنبؤ</button>
+        <button className="btn btn-primary" onClick={generateSmartReport} disabled={isGeneratingReport} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', border:'none'}}>
+          {isGeneratingReport ? <RefreshCw size={18} className="spin" /> : <Brain size={18} />} {isGeneratingReport ? 'جاري التحليل...' : 'إنشاء تقرير تنفيذي ذكي'}
+        </button>
       </div>
 
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
-        <div className="card" style={{borderTop:'4px solid #8b5cf6'}}>
-          <div className="val-sub">مؤشر مخاطر تعطل الأصول الحرجة</div>
-          <div className="val-big" style={{color:'#8b5cf6'}}>12%</div>
-          <div className="val-sub">احتمالية تعطل خوادم البيانات بناءً على أنماط الاستخدام.</div>
+      {aiReport && (
+        <div className="card" style={{marginBottom: '2rem', border: '1px solid var(--accent)', background: 'rgba(139, 92, 246, 0.05)'}}>
+          <h3 style={{display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--accent)', marginBottom:'1rem'}}><MessageSquare size={18}/> التقرير التنفيذي (AI)</h3>
+          <div style={{lineHeight:'1.8', color:'var(--text)', whiteSpace: 'pre-wrap', fontSize:'0.95rem'}}>{aiReport}</div>
         </div>
-        <div className="card" style={{borderTop:'4px solid #10b981'}}>
-          <div className="val-sub">وفر مالي استراتيجي (Forecast)</div>
-          <div className="val-big" style={{color:'#10b981'}}>150,000 ر.س</div>
-          <div className="val-sub">عن طريق تحسين دورة الصيانة الوقائية للأصول.</div>
+      )}
+
+      <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات التنبؤ وكشف الشذوذ (Anomaly Detection)</h3>
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+        <div className="card" style={{borderTop:'4px solid #ef4444'}}>
+          <div className="val-sub">أصناف متوقع نفادها قريباً</div>
+          <div className="val-big" style={{color:'#ef4444'}}>{lowStockItems.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
+          <div className="val-sub">استناداً لمتوسط الاستهلاك، هذه الأصناف ستنفد خلال 14 يوماً. ينصح بالتعميد بالشراء فوراً.</div>
         </div>
         <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
-          <div className="val-sub">دقة نماذج التنبؤ الحالية</div>
-          <div className="val-big" style={{color:'#f59e0b'}}>94.8%</div>
-          <div className="val-sub">بناءً على المطابقة التاريخية للبيانات الفعلية.</div>
+          <div className="val-sub">أصول مستهلكة دفترياً ونشطة</div>
+          <div className="val-big" style={{color:'#f59e0b'}}>{anomalyDepreciation.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
+          <div className="val-sub">أصول وصلت قيمتها الدفترية للصفر ولا زالت تعمل. يرجى إعادة تقييم أعمارها الإنتاجية.</div>
+        </div>
+        <div className="card" style={{borderTop:'4px solid #10b981'}}>
+          <div className="val-sub">توقعات ميزانية الاستبدال</div>
+          <div className="val-big" style={{color:'#10b981'}}>~ {(totalAssetsValue * 0.15).toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
+          <div className="val-sub">التكلفة التقديرية لاستبدال الأصول المتهالكة خلال العام المالي القادم بناءً على معدل الاستهلاك الحالي.</div>
         </div>
       </div>
-
-      <div style={{display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', marginTop:'1.5rem'}}>
-        <div className="card">
-          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-             <h3 style={{fontSize:'1.1rem'}}>التنبؤ بالاحتياجات الرأسمالية المستقبلية (CAPEX Forecast)</h3>
-             <Calendar size={20} color="var(--accent)" />
-          </div>
-          <div style={{height:'280px'}}>
-            <Bar data={{
-              labels: ['2024', '2025', '2026', '2027', '2028'],
-              datasets: [
-                {
-                  label: 'تكاليف الإحلال المتوقعة (ر.س)',
-                  data: [120000, 450000, 890000, 300000, 150000],
-                  backgroundColor: '#6366f1',
-                  borderRadius: 6
-                }
-              ]
-            }} options={{ responsive: true, maintainAspectRatio: false }} />
-          </div>
-          <div style={{marginTop:'1.5rem', fontSize:'0.85rem', color:'var(--text-muted)', background:'rgba(99, 102, 241, 0.05)', padding:'1rem', borderRadius:'8px', border:'1px solid rgba(99, 102, 241, 0.2)'}}>
-             <strong>رؤية استراتيجية:</strong> يتوقع الذكاء الاصطناعي "ذروة إنفاق" في عام 2026 نتيجة انتهاء العمر الافتراضي لأسطول النقل اللوجستي. نوصي بالبدء في تكوين احتياطي مالي من الآن.
-          </div>
+      
+      <div style={{marginTop: '2rem'}}>
+        <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>الأسئلة الاستكشافية الجاهزة</h3>
+        <div style={{display:'flex', gap:'1rem', flexWrap:'wrap'}}>
+          {['لماذا ارتفعت قيمة الصيانة هذا الشهر؟', 'ما الإدارات الأعلى في فروقات الجرد؟', 'ما أكثر الأصناف استهلاكاً في المستودع؟', 'ما الأصول المرشحة للاستبدال الفوري؟'].map((q, i) => (
+             <button key={i} onClick={() => {
+               setChatInput(q);
+               // We don't have chatInputRef currently mapped globally, so we just set the input and optionally open chat
+               document.querySelector('input[placeholder*="اكتب"]') && document.querySelector('input[placeholder*="اكتب"]').focus();
+             }} style={{padding:'0.75rem 1.25rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--card-bg)', color:'var(--text)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.5rem', transition:'0.2s'}}>
+               <Search size={16} color="var(--accent)" /> {q}
+             </button>
+          ))}
         </div>
-
-        <div className="card">
-          <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>خارطة مخاطر التعطل (AI Risk Map)</h3>
-          <div style={{display:'flex', flexDirection:'column', gap:'1.25rem'}}>
-             {[
-               {name: 'الخوادم المركزية', risk: 85, status: 'حرج', color: '#ef4444'},
-               {name: 'مركبات التوزيع', risk: 40, status: 'متوسط', color: '#f59e0b'},
-               {name: 'أجهزة الموظفين', risk: 15, status: 'آمن', color: '#10b981'},
-             ].map((item, idx) => (
-               <div key={idx} style={{padding:'1rem', borderRadius:'12px', background:'#f8fafc', border:'1px solid var(--border)'}}>
-                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:'0.5rem'}}>
-                     <span style={{fontWeight:700}}>{item.name}</span>
-                     <span style={{color:item.color, fontWeight:700}}>{item.status}</span>
-                  </div>
-                  <div style={{height:'6px', background:'#e2e8f0', borderRadius:'3px', overflow:'hidden'}}>
-                     <div style={{width: `${item.risk}%`, background: item.color, height:'100%'}}></div>
-                  </div>
-                  <div style={{fontSize:'0.75rem', marginTop:'0.5rem', color:'var(--text-muted)'}}>احتمالية العطل: {item.risk}%</div>
-               </div>
-             ))}
-          </div>
-        </div>
-      </div>
-
-      <div style={{display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop:'1.5rem'}}>
-        <div className="card">
-          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>التنبؤ بتآكل القيمة الدفترية (5 سنوات)</h3>
-          <div className="chart-container" style={{height:'250px'}}>
-            <Line data={{
-              labels: ['2024', '2025', '2026', '2027', '2028'],
-              datasets: [{
-                label: 'صافي القيمة الدفترية المتوقعة (NBV)',
-                data: [1850000, 1600000, 1300000, 950000, 600000],
-                borderColor: '#3b82f6',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                fill: true,
-                tension: 0.4
-              }]
-            }} options={{ responsive: true, maintainAspectRatio: false }} />
-          </div>
-        </div>
-        <div className="card">
-          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>تحليل كفاءة استخدام الأصول</h3>
-          <div className="chart-container" style={{height:'250px', display:'flex', justifyContent:'center'}}>
-            <Doughnut data={{
-              labels: ['مستغلة بالكامل', 'استغلال جزئي', 'فائضة'],
-              datasets: [{
-                data: [65, 25, 10],
-                backgroundColor: ['#10b981', '#f59e0b', '#ef4444'],
-                borderWidth: 0
-              }]
-            }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
-          </div>
-        </div>
-      </div>
-
-      <div className="card" style={{marginTop:'1.5rem', background:'linear-gradient(135deg, #4f46e5 0%, #3730a3 100%)', color:'white', border:'none'}}>
-         <div style={{display:'flex', gap:'1rem', alignItems:'center'}}>
-            <div style={{background:'rgba(255,255,255,0.2)', padding:'1rem', borderRadius:'12px'}}>
-               <BrainCircuit size={32} />
-            </div>
-            <div>
-               <h4 style={{fontSize:'1.2rem', fontWeight:700, marginBottom:'0.25rem'}}>محرك التحليل الاستراتيجي (Strategic Advisor)</h4>
-               <p style={{fontSize:'0.9rem', opacity:0.9}}>بناءً على النمذجة الرياضية، نوصي ببيع "أجهزة التدريب التفاعلية" الآن نظراً لانخفاض معدل استخدامها (8%) وارتفاع تكلفتها التشغيلية؛ البيع الآن سيحقق عائداً رأسمالياً قدره 35,000 ريال قبل تآكل قيمتها بالكامل.</p>
-            </div>
-         </div>
       </div>
     </div>
-  );
+  )};
+  
 
-  const renderGeneralReports = () => {
+const renderGeneralReports = () => {
     const totalCost = assets.reduce((acc, a) => acc + a.cost, 0);
     const totalDep = accountingEngine.reduce((acc, a) => acc + a.accumulatedDep, 0);
     const totalNBV = accountingEngine.reduce((acc, a) => acc + a.netBookValue, 0);
@@ -2323,7 +2318,7 @@ const renderMaintenance = () => (
            <div>
              <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مزود الخدمة (LLM Provider)</label>
              <select style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiProvider} onChange={e => { setAiProvider(e.target.value); localStorage.setItem('aiProvider', e.target.value); }}>
-               <option value="groq">Groq (Llama 3.1) - سريع جداً ومجاني</option>
+               <option value="groq">Groq (Llama 3.3 70B & Whisper V3) - ذكاء متقدم</option>
                <option value="huggingface">Hugging Face (Mixtral 8x7B) - مجاني</option>
              </select>
            </div>
@@ -2969,33 +2964,21 @@ const renderMaintenance = () => (
 
             let botResponse = '';
             try {
-              const messagesForApi = [
-                { role: "system", content: aiSystemPrompt + "\n\nقم بالرد بناء على المعلومات التالية إن وجدت: " + (window.aiFileContext || "") },
+              let sysPrompt = aiSystemPrompt + "\n\nالسياق الإضافي: " + (window.aiFileContext || "");
+              sysPrompt += "\nالصفحة الحالية للمستخدم هي: " + view;
+              
+              // Prepare context with system prompt + history
+              const messagesContext = [
+                { role: "system", content: sysPrompt },
+                ...chatMessages.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text })),
                 { role: "user", content: userInput }
               ];
 
-              if (aiProvider === 'groq') {
-                const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiApiKey}` },
-                  body: JSON.stringify({ model: 'allam-2-7b', messages: messagesForApi, temperature: 0.7 })
-                });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error.message || 'Groq Error');
-                botResponse = data.choices[0].message.content;
-              } else {
-                const res = await fetch('https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1/v1/chat/completions', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${aiApiKey}` },
-                  body: JSON.stringify({ model: 'mistralai/Mixtral-8x7B-Instruct-v0.1', messages: messagesForApi, max_tokens: 500 })
-                });
-                const data = await res.json();
-                if (data.error) throw new Error(data.error || 'HF Error');
-                botResponse = data.choices[0].message.content;
-              }
-
+              const ai = new AIService(aiApiKey);
+              const resultMessage = await ai.sendChat(messagesContext);
+              botResponse = resultMessage.content || "تم تنفيذ الطلب.";
               setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
-              window.aiFileContext = ""; // clear after one use
+              window.aiFileContext = "";
             } catch (err) {
               console.error(err);
               setChatMessages(prev => [...prev, {role: 'bot', text: "❌ حدث خطأ في الاتصال بالذكاء الاصطناعي: " + err.message}]);
