@@ -2492,7 +2492,7 @@ const renderMaintenance = () => (
     );
   };
 
-  if (false) {
+  if (!session) {
     return <Login onLogin={setSession} />;
   }
 
