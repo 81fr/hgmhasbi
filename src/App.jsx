@@ -349,7 +349,7 @@ const App = () => {
     if (setts) setSystemSettings(setts);
     
     const { data: notifs } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
-    if (notifs) setNotifications(notifs);
+    if (notifs) setDbNotifications(notifs);
   };
 
   const [journals, setJournals] = useState([
