@@ -1,3 +1,4 @@
+import ErrorBoundary from './ErrorBoundary';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   LayoutGrid, Box, FileText, Shuffle, PieChart, ClipboardList, Settings, BarChart3, Database,
@@ -165,6 +166,10 @@ const App = () => {
   const chatEndRef = useRef(null);
 
   // Warehouse RADAR State
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [systemSettings, setSystemSettings] = useState(null);
+  const [dbNotifications, setDbNotifications] = useState([]);
+  
   const [warehouseItems, setWarehouseItems] = useState([
     { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
     { id: 'WH-002', sku: 'OF-SKU-202', name: 'مكتب إداري فاخر', category: 'أثاث ومعدات', qty: 3, minQty: 2, location: 'B-02-01', status: 'مخصص', stage: 'Allocate', lastAudit: '2024-07-20' },
