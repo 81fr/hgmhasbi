@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { 
+import { Sparkles,
   Bot, Settings, BookOpen, Database, Link, BarChart3, ShieldCheck, PlayCircle, UploadCloud,
   CheckCircle, Save, ChevronLeft, Mic, Search, MessageSquare, Zap, Upload, FileText, Globe
 } from 'lucide-react';
