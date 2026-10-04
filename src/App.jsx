@@ -169,6 +169,7 @@ const App = () => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [systemSettings, setSystemSettings] = useState(null);
   const [dbNotifications, setDbNotifications] = useState([]);
+  const [inventoryCampaigns, setInventoryCampaigns] = useState([]);
   
   const [warehouseItems, setWarehouseItems] = useState([
     { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
@@ -1845,7 +1846,17 @@ const renderMaintenance = () => (
                  { account_name: 'مجمع إهلاك أصول ثابتة', type: 'دائن', amount: totalMonthly.toFixed(2) }
                ]
              };
-             setJournal(prev => [je, ...prev]);
+             if (!totalMonthly || totalMonthly <= 0) { showToast('⚠️ لا يوجد إهلاك مستحق لهذا الشهر'); return; }
+             const amount = Math.round(totalMonthly * 100) / 100;
+             const jeRow = { journal_no: 'JV-DEP-' + Date.now().toString().slice(-6), entry_date: je.date, description: je.description, status: 'مرحل', source_module: 'depreciation' };
+             supabase.from('journal_entries').insert([jeRow]).select().single().then(({ data: ins, error }) => {
+               if (error) { showToast('❌ تعذر حفظ القيد: ' + error.message); return; }
+               setJournals(prev => [
+                 { id: jeRow.journal_no, db_id: ins?.id, date: jeRow.entry_date, desc: 'مصروف إهلاك أصول ثابتة', debit: amount, credit: null, status: 'مرحل' },
+                 { id: jeRow.journal_no, db_id: ins?.id, date: jeRow.entry_date, desc: 'مجمع إهلاك أصول ثابتة', debit: null, credit: amount, status: 'مرحل' },
+                 ...prev
+               ]);
+             });
              showToast('✅ تم ترحيل قيد الإهلاك للشهر الحالي بنجاح!');
           }}>
             <RefreshCw size={18} /> ترحيل إهلاك الشهر الحالي
@@ -2271,6 +2282,66 @@ const renderMaintenance = () => (
         </div>
       </form>
       ) : <div style={{padding:'2rem', textAlign:'center'}}>جاري تحميل الإعدادات...</div>}
+
+      {/* LEGACY_SETTINGS_CARDS: notifications, ERP link and AI assistant settings (restored) */}
+      <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(420px, 1fr))', gap:'1.5rem', marginTop:'1.5rem'}}>
+      <div className="card" style={{maxWidth: '600px', display:'flex', flexDirection:'column', gap:'1.5rem'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:600}}>الإشعارات التلقائية</div>
+            <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تفعيل إرسال تنبيهات الجرد والإهلاك قبل الموعد</div>
+          </div>
+          <input type="checkbox" defaultChecked style={{width:'40px', height:'20px', cursor:'pointer'}} />
+        </div>
+        <div style={{height:'1px', background:'var(--border)'}}></div>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+          <div>
+            <div style={{fontWeight:600}}>ربط النظام المحاسبي (ERP)</div>
+            <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>مزامنة قيود اليومية مع دفتر الأستاذ العام تلقائياً</div>
+          </div>
+          <button className="btn btn-ghost" style={{color: erpConnected ? 'var(--success)' : 'var(--danger)'}} onClick={() => { setErpConnected(!erpConnected); showToast(erpConnected ? '🔌 تم فصل الربط مع النظام المحاسبي' : '✅ تم الاتصال بالنظام المحاسبي (ERP)'); }}><CheckCircle size={16} /> {erpConnected ? 'متصل' : 'غير متصل'}</button>
+        </div>
+      </div>
+
+      <div className="card" style={{maxWidth: '600px', display:'flex', flexDirection:'column', gap:'1.5rem', marginTop:'1.5rem'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
+          <h3 style={{fontSize:'1.1rem', margin:0, color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'0.5rem'}}><BrainCircuit size={18} /> إعدادات الذكاء الاصطناعي (مفتوح المصدر)</h3>
+        </div>
+        <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>اسم المساعد الذكي</label>
+             <input type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiName} onChange={e => { setAiName(e.target.value); localStorage.setItem('aiName', e.target.value); }} />
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>شعار المساعد (Emoji)</label>
+             <input type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', fontSize:'1.5rem', textAlign:'center'}} value={aiIcon} onChange={e => { setAiIcon(e.target.value); localStorage.setItem('aiIcon', e.target.value); }} />
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>تعليمات النظام والتغذية (System Prompt)</label>
+             <textarea style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', resize:'vertical', minHeight:'100px'}} value={aiSystemPrompt} onChange={e => { setAiSystemPrompt(e.target.value); localStorage.setItem('aiSystemPrompt', e.target.value); }} placeholder="أدخل القواعد، القيود، والمعلومات التي يجب أن يلتزم بها المساعد..."></textarea>
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مزود الخدمة (LLM Provider)</label>
+             <select style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiProvider} onChange={e => { setAiProvider(e.target.value); localStorage.setItem('aiProvider', e.target.value); }}>
+               <option value="groq">Groq (Llama 3.1) - سريع جداً ومجاني</option>
+               <option value="huggingface">Hugging Face (Mixtral 8x7B) - مجاني</option>
+             </select>
+           </div>
+           <div>
+             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مفتاح الـ API (اختياري)</label>
+             <input type="password" placeholder="أدخل مفتاح الـ API الخاص بك هنا إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiApiKey} onChange={e => { setAiApiKey(e.target.value); localStorage.setItem('aiApiKey', e.target.value); }} />
+             <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.5rem'}}>
+                تم دمج مفتاح مشفر مسبقاً، لا تحتاج لإدخال مفتاح جديد إلا إذا أردت استخدام حسابك الخاص.
+             </div>
+           </div>
+           
+           <button className="btn btn-primary" style={{marginTop:'1rem'}} onClick={() => showToast('✅ تم حفظ جميع إعدادات الذكاء الاصطناعي بنجاح!')}>
+              <CheckCircle size={18} style={{marginRight:'0.5rem'}} /> حفظ الإعدادات
+           </button>
+        </div>
+      </div>
+    
+      </div>
     </div>
   );
   };
@@ -2896,8 +2967,8 @@ const renderMaintenance = () => (
               return;
             }
 
+            let botResponse = '';
             try {
-              let botResponse = '';
               const messagesForApi = [
                 { role: "system", content: aiSystemPrompt + "\n\nقم بالرد بناء على المعلومات التالية إن وجدت: " + (window.aiFileContext || "") },
                 { role: "user", content: userInput }
