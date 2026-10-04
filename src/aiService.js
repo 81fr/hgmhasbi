@@ -1,8 +1,8 @@
 import { supabase } from './supabaseClient.js';
 
 export const GROQ_MODELS = {
-  chat: 'llama-3.1-70b-versatile', // Robust model for Tool Use
-  fallback_chat: 'llama-3.1-8b-instant',
+  chat: 'allam-2-7b', // Robust model for Tool Use
+  fallback_chat: 'openai/gpt-oss-120b',
   stt: 'whisper-large-v3-turbo',
   tts: 'canopylabs/orpheus-arabic-saudi' // Note: This might not be fully available on all Groq tiers yet, but keeping for specs
 };
