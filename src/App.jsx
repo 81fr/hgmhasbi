@@ -2548,7 +2548,10 @@ const renderMaintenance = () => (
         <div className="nav-group">
           <div className="nav-label">الذكاء الاصطناعي</div>
           <div className={`nav-item ${view === 'ai-insights' ? 'active' : ''}`} onClick={() => setView('ai-insights')}>
-            <div className="nav-icon-box"><Sparkles size={18} /></div> التحليلات التنبؤية
+            <div className="nav-icon-box"><Sparkles size={18} /></div>
+          <div className={`nav-item ${view === 'ai-studio' ? 'active' : ''}`} onClick={() => setView('ai-studio')}>
+            <div className="nav-icon-box"><BrainCircuit size={18} /></div> استوديو الذكاء الاصطناعي
+          </div> التحليلات التنبؤية
           </div>
         </div>
 
