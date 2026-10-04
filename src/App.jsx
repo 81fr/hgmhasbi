@@ -1,5 +1,6 @@
 import { AIService } from './aiService.js';
 import ErrorBoundary from './ErrorBoundary';
+import AIStudio from './AIStudio';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   LayoutGrid, Box, FileText, Shuffle, PieChart, ClipboardList, Settings, BarChart3, Database,
@@ -1559,6 +1560,8 @@ const App = () => {
     setIsGeneratingReport(false);
   };
 
+  const renderAIStudio = () => <AIStudio />;
+
   const renderAIInsights = () => {
     // 1. Calculations for Predictive & Anomalies
     const totalAssetsValue = assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
@@ -2613,6 +2616,7 @@ const renderMaintenance = () => (
           {view === 'reports' && renderGeneralReports()}
           {view === 'new-inventory' && renderNewInventory()}
           {view === 'ai-insights' && renderAIInsights()}
+          {view === 'ai-studio' && renderAIStudio()}
           {view === 'warehouse' && renderWarehouse()}
             {view === 'depreciation' && renderDepreciation()}
             {view === 'custody' && renderCustody()}
