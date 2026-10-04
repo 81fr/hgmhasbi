@@ -2198,67 +2198,78 @@ const renderMaintenance = () => (
           </div>
         </div>
       )}
-  const renderSettings = () => (
-    <div className="view-anim">
-      <h2 style={{fontSize:'1.25rem', marginBottom:'2rem'}}>إعدادات النظام</h2>
-      <div className="card" style={{maxWidth: '600px', display:'flex', flexDirection:'column', gap:'1.5rem'}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <div>
-            <div style={{fontWeight:600}}>الإشعارات التلقائية</div>
-            <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>تفعيل إرسال تنبيهات الجرد والإهلاك قبل الموعد</div>
-          </div>
-          <input type="checkbox" defaultChecked style={{width:'40px', height:'20px', cursor:'pointer'}} />
-        </div>
-        <div style={{height:'1px', background:'var(--border)'}}></div>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-          <div>
-            <div style={{fontWeight:600}}>ربط النظام المحاسبي (ERP)</div>
-            <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>مزامنة قيود اليومية مع دفتر الأستاذ العام تلقائياً</div>
-          </div>
-          <button className="btn btn-ghost" style={{color: erpConnected ? 'var(--success)' : 'var(--danger)'}} onClick={() => { setErpConnected(!erpConnected); showToast(erpConnected ? '🔌 تم فصل الربط مع النظام المحاسبي' : '✅ تم الاتصال بالنظام المحاسبي (ERP)'); }}><CheckCircle size={16} /> {erpConnected ? 'متصل' : 'غير متصل'}</button>
-        </div>
-      </div>
+  const renderSettings = () => {
+    const handleSaveSettings = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const updates = {
+        company_name: fd.get('company_name'),
+        fiscal_year: fd.get('fiscal_year'),
+        currency: fd.get('currency'),
+        prefix_asset: fd.get('prefix_asset'),
+        prefix_transfer: fd.get('prefix_transfer'),
+        prefix_inventory: fd.get('prefix_inventory')
+      };
+      
+      const { error } = await supabase.from('system_settings').update(updates).eq('id', systemSettings?.id);
+      if(error) showToast('❌ حدث خطأ أثناء حفظ الإعدادات');
+      else {
+        showToast('✅ تم حفظ إعدادات المنشأة بنجاح!');
+        fetchInitialData();
+      }
+    };
 
-      <div className="card" style={{maxWidth: '600px', display:'flex', flexDirection:'column', gap:'1.5rem', marginTop:'1.5rem'}}>
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
-          <h3 style={{fontSize:'1.1rem', margin:0, color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'0.5rem'}}><BrainCircuit size={18} /> إعدادات الذكاء الاصطناعي (مفتوح المصدر)</h3>
+    return (
+    <div className="view-anim">
+      <h2 style={{fontSize:'1.5rem', marginBottom:'2rem', fontWeight:800}}><Settings size={24} color="var(--brand-teal)" style={{marginRight:'0.5rem', verticalAlign:'middle'}}/> الإعدادات الشاملة للمنظومة</h2>
+      
+      {systemSettings ? (
+      <form onSubmit={handleSaveSettings} style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem'}}>
+        
+        <div className="card" style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
+          <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem'}}>إعدادات المنشأة العامة</h3>
+          
+          <div>
+            <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>اسم الجهة / الشركة</label>
+            <input name="company_name" type="text" defaultValue={systemSettings.company_name} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+          </div>
+          <div>
+            <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>السنة المالية</label>
+            <input name="fiscal_year" type="text" defaultValue={systemSettings.fiscal_year} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+          </div>
+          <div>
+            <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>العملة الأساسية للنظام</label>
+            <input name="currency" type="text" defaultValue={systemSettings.currency} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+          </div>
         </div>
-        <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-           <div>
-             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>اسم المساعد الذكي</label>
-             <input type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiName} onChange={e => { setAiName(e.target.value); localStorage.setItem('aiName', e.target.value); }} />
-           </div>
-           <div>
-             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>شعار المساعد (Emoji)</label>
-             <input type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', fontSize:'1.5rem', textAlign:'center'}} value={aiIcon} onChange={e => { setAiIcon(e.target.value); localStorage.setItem('aiIcon', e.target.value); }} />
-           </div>
-           <div>
-             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>تعليمات النظام والتغذية (System Prompt)</label>
-             <textarea style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', resize:'vertical', minHeight:'100px'}} value={aiSystemPrompt} onChange={e => { setAiSystemPrompt(e.target.value); localStorage.setItem('aiSystemPrompt', e.target.value); }} placeholder="أدخل القواعد، القيود، والمعلومات التي يجب أن يلتزم بها المساعد..."></textarea>
-           </div>
-           <div>
-             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مزود الخدمة (LLM Provider)</label>
-             <select style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiProvider} onChange={e => { setAiProvider(e.target.value); localStorage.setItem('aiProvider', e.target.value); }}>
-               <option value="groq">Groq (Llama 3.1) - سريع جداً ومجاني</option>
-               <option value="huggingface">Hugging Face (Mixtral 8x7B) - مجاني</option>
-             </select>
-           </div>
-           <div>
-             <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.9rem'}}>مفتاح الـ API (اختياري)</label>
-             <input type="password" placeholder="أدخل مفتاح الـ API الخاص بك هنا إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} value={aiApiKey} onChange={e => { setAiApiKey(e.target.value); localStorage.setItem('aiApiKey', e.target.value); }} />
-             <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.5rem'}}>
-                تم دمج مفتاح مشفر مسبقاً، لا تحتاج لإدخال مفتاح جديد إلا إذا أردت استخدام حسابك الخاص.
-             </div>
-           </div>
+        
+        <div className="card" style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
+           <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem'}}>أنماط الترقيم التلقائي المخصصة</h3>
+           <p style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>سيتم استخدام هذه البوادئ لإنشاء أرقام مرجعية فريدة لكل عملية في النظام.</p>
            
-           <button className="btn btn-primary" style={{marginTop:'1rem'}} onClick={() => showToast('✅ تم حفظ جميع إعدادات الذكاء الاصطناعي بنجاح!')}>
-              <CheckCircle size={18} style={{marginRight:'0.5rem'}} /> حفظ الإعدادات
-           </button>
+           <div>
+             <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>بادئة سجل الأصول الثابتة (Assets)</label>
+             <input name="prefix_asset" type="text" defaultValue={systemSettings.prefix_asset} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+           </div>
+           <div>
+             <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>بادئة حركات التحويل (Transfers)</label>
+             <input name="prefix_transfer" type="text" defaultValue={systemSettings.prefix_transfer} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+           </div>
+           <div>
+             <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>بادئة محاضر الجرد (Inventory)</label>
+             <input name="prefix_inventory" type="text" defaultValue={systemSettings.prefix_inventory} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+           </div>
         </div>
-      </div>
+
+        <div style={{gridColumn:'1/-1', display:'flex', justifyContent:'flex-end'}}>
+          <button type="submit" className="btn btn-primary" style={{padding:'1rem 2.5rem', fontSize:'1.1rem'}}>حفظ كافة التعديلات والتكوينات</button>
+        </div>
+      </form>
+      ) : <div style={{padding:'2rem', textAlign:'center'}}>جاري تحميل الإعدادات...</div>}
     </div>
   );
-
+  };
+  
   // ===== WAREHOUSE RADAR SYSTEM =====
   const renderWarehouse = () => {
     const filteredItems = warehouseItems.filter(item => 
