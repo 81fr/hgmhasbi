@@ -117,7 +117,7 @@ export class AIService {
       messages: messagesContext,
       temperature: 0.2,
     };
-    if (enableTools) {
+    if (enableTools && !GROQ_MODELS.chat.includes('allam')) {
       body.tools = SYSTEM_TOOLS;
       body.tool_choice = "auto";
     }
