@@ -17,7 +17,7 @@ const STEPS = [
   { id: 'deploy', icon: <UploadCloud size={18}/>, title: 'النشر' }
 ];
 
-export default function AIStudio() {
+export default function AIStudio({ aiName, setAiName, aiSystemPrompt, setAiSystemPrompt, aiProvider, setAiProvider }) {
   const [currentStep, setCurrentStep] = useState(0);
 
   const renderStepContent = () => {
@@ -27,11 +27,11 @@ export default function AIStudio() {
           <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
             <div>
               <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600}}>اسم المساعد الذكي</label>
-              <input type="text" className="input" defaultValue="مستشار الأصول الذكي" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}/>
+              <input type="text" className="input" value={aiName || ""} onChange={e => { if(setAiName) { setAiName(e.target.value); localStorage.setItem("aiName", e.target.value); } }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}/>
             </div>
             <div>
               <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600}}>التعليمات الأساسية (System Prompt)</label>
-              <textarea rows={6} className="input" defaultValue="أنت مساعد مالي متخصص في إدارة الأصول والمستودعات في السعودية. يجب أن تستخدم مصطلحات دقيقة مثل العهدة، الجرد، والتراؤف..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}></textarea>
+              <textarea rows={6} className="input" value={aiSystemPrompt || ""} onChange={e => { if(setAiSystemPrompt) { setAiSystemPrompt(e.target.value); localStorage.setItem("aiSystemPrompt", e.target.value); } }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}></textarea>
             </div>
             <div>
               <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600}}>نموذج الذكاء الاصطناعي (LLM)</label>
@@ -234,7 +234,7 @@ export default function AIStudio() {
         <div style={{padding:'1rem', borderTop:'1px solid var(--border)', background:'var(--card-bg)'}}>
            <div style={{display:'flex', alignItems:'center', gap:'0.5rem', background:'var(--bg)', border:'1px solid var(--border)', padding:'0.5rem', borderRadius:'20px'}}>
              <Mic size={18} color="var(--text-muted)"/>
-             <input type="text" placeholder="اكتب رسالتك..." disabled style={{flex:1, background:'transparent', border:'none', outline:'none', color:'var(--text)'}}/>
+             <input type="text" placeholder="اكتب رسالتك... (تحدث مع المساعد الذكي الخاص بك عبر الأيقونة العائمة)" disabled style={{flex:1, background:'transparent', border:'none', outline:'none', color:'var(--text)'}}/>
              <div style={{background:'var(--brand-teal)', padding:'0.4rem', borderRadius:'50%', color:'white', display:'flex', alignItems:'center', justifyContent:'center'}}><MessageSquare size={14}/></div>
            </div>
         </div>

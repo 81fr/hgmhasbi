@@ -162,6 +162,16 @@ const App = () => {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState(() => [{role: 'bot', text: `أهلاً بك! أنا ${localStorage.getItem('aiName') || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}]);
   const [chatInput, setChatInput] = useState('');
+
+  useEffect(() => {
+    setChatMessages(prev => {
+      if (prev.length === 1 && prev[0].role === 'bot' && prev[0].text.includes('مرحباً بك! أنا')) {
+        return [{role: 'bot', text: `مرحباً بك! أنا ${aiName || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}];
+      }
+      return prev;
+    });
+  }, [aiName]);
+
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
   const [autoSpeak, setAutoSpeak] = useState(false);
@@ -1549,7 +1559,7 @@ const App = () => {
     setIsGeneratingReport(false);
   };
 
-  const renderAIStudio = () => <AIStudio />;
+  const renderAIStudio = () => <AIStudio aiName={aiName} setAiName={setAiName} aiSystemPrompt={aiSystemPrompt} setAiSystemPrompt={setAiSystemPrompt} aiProvider={aiProvider} setAiProvider={setAiProvider} />;
 
   const renderAIInsights = () => {
     // Fallback to basic calculations if analyticsData not yet fetched
