@@ -2541,6 +2541,19 @@ const renderDepreciation = () => {
         prefix_inventory: fd.get('prefix_inventory')
       };
       
+
+      const parseList = (str) => str.split(',').map(s => s.trim()).filter(s => s);
+      const newLookups = {
+        categories: parseList(fd.get('lk_categories') || ''),
+        departments: parseList(fd.get('lk_departments') || ''),
+        locations: parseList(fd.get('lk_locations') || ''),
+        suppliers: parseList(fd.get('lk_suppliers') || ''),
+        status: parseList(fd.get('lk_status') || '')
+      };
+      
+      const { error: lkErr } = await supabase.from('system_settings').update({ lookups: newLookups }).eq('id', systemSettings?.id);
+      if(!lkErr) setSystemLookups(newLookups);
+
       const { error } = await supabase.from('system_settings').update(updates).eq('id', systemSettings?.id);
       if(error) showToast('❌ حدث خطأ أثناء حفظ الإعدادات');
       else {
@@ -2589,6 +2602,35 @@ const renderDepreciation = () => {
              <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>بادئة محاضر الجرد (Inventory)</label>
              <input name="prefix_inventory" type="text" defaultValue={systemSettings.prefix_inventory} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
            </div>
+        </div>
+
+
+        <div className="card" style={{gridColumn: '1 / -1', display:'flex', flexDirection:'column', gap:'1.5rem', marginTop: '1rem', borderTop: '2px solid var(--brand-teal)'}}>
+          <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem'}}>تخصيص القوائم المنسدلة (الخيارات المتعددة في شاشة الأصول)</h3>
+          <p style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أدخل الخيارات مفصولة بفاصلة (،) ليتم عرضها كقوائم منسدلة في شاشات إضافة الأصول بدلاً من الكتابة اليدوية.</p>
+          
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem'}}>
+            <div>
+              <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>فئات الأصول (Categories)</label>
+              <input name="lk_categories" type="text" defaultValue={(systemLookups?.categories || []).join(', ')} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+            </div>
+            <div>
+              <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>الأقسام الإدارية (Departments)</label>
+              <input name="lk_departments" type="text" defaultValue={(systemLookups?.departments || []).join(', ')} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+            </div>
+            <div>
+              <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>المواقع والفروع (Locations)</label>
+              <input name="lk_locations" type="text" defaultValue={(systemLookups?.locations || []).join(', ')} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+            </div>
+            <div>
+              <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>الموردين (Suppliers)</label>
+              <input name="lk_suppliers" type="text" defaultValue={(systemLookups?.suppliers || []).join(', ')} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+            </div>
+            <div style={{gridColumn: '1 / -1'}}>
+              <label style={{fontSize:'0.85rem', fontWeight:700, display:'block', marginBottom:'0.5rem'}}>حالات الأصول (Statuses)</label>
+              <input name="lk_status" type="text" defaultValue={(systemLookups?.status || []).join(', ')} required style={{padding:'0.75rem', width:'100%', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+            </div>
+          </div>
         </div>
 
         <div style={{gridColumn:'1/-1', display:'flex', justifyContent:'flex-end'}}>
