@@ -136,6 +136,24 @@ const Section = ({ title }) => (
 
 const App = () => {
   const [session, setSession] = useState({ user: { id: 'test', email: 'test@test.com' } });
+  const [userProfile, setUserProfile] = useState(null);
+  
+  useEffect(() => {
+    if (session?.user) {
+      // Determine user role
+      let role = session.user.user_metadata?.role || session.user.role || 'مسؤول نظام (Admin)';
+      setUserProfile({
+        id: session.user.id,
+        email: session.user.email,
+        name: session.user.user_metadata?.full_name || session.user.name || session.user.email?.split('@')[0],
+        role: role,
+        isAdmin: role.includes('مسؤول') || role.includes('Admin')
+      });
+    } else {
+      setUserProfile(null);
+    }
+  }, [session]);
+  
   
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
