@@ -134,6 +134,121 @@ const Section = ({ title }) => (
   <div style={{gridColumn: '1 / -1', fontWeight: 800, color: 'var(--accent)', borderBottom: '1px solid var(--border)', paddingBottom: '0.4rem', marginTop: '0.5rem'}}>{title}</div>
 );
 
+
+const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
+  const [cat, setCat] = React.useState(ea?.category || 'أجهزة تقنية');
+  const isLand = cat === 'أراضي' || cat === 'اراضي';
+  
+  const inp = {padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: '100%'};
+
+  // Safe fallback for lookups
+  const lookups = systemLookups || {};
+  const cats = lookups.categories || ['أراضي','مباني','أجهزة تقنية','أثاث مكتبي','مركبات','آلات ومعدات'];
+  const depts = lookups.departments || ['تقنية المعلومات', 'الإدارة العامة'];
+  const locs = lookups.locations || ['مبنى الإدارة', 'الفرع'];
+  const statuses = lookups.status || ['نشط', 'متوقف', 'صيانة', 'مستبعد'];
+  const suppliersList = lookups.suppliers || [];
+
+  return (
+    <div className="view-anim">
+      <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <div>
+          <h2 style={{fontSize:'1.5rem', fontWeight:800}}>{ea ? 'تعديل بطاقة أصل ثابت' : 'إنشاء بطاقة أصل ثابت'}</h2>
+          <p style={{color:'var(--text-muted)'}}>{ea ? `تعديل بيانات الأصل: ${ea.name}` : 'أدخل بيانات الأصل الجديد مقسمة حسب التصنيفات القياسية'}</p>
+        </div>
+        <button type="button" className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={onCancel}>إلغاء والعودة</button>
+      </div>
+
+      <div className="card" style={{maxWidth: '1200px', background: 'var(--card-bg)', padding:0, overflow:'hidden'}}>
+        <form key={ea ? ea.id : 'new'} onSubmit={onSubmit}>
+          
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={20}/> 1. البيانات الأساسية للأصل</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="رقم الأصل (تلقائي)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-..." style={inp} /></F>
+              <F label="اسم / وصف الأصل *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: لابتوب ديل بلس" required style={inp} /></F>
+              <F label="الفئة *">
+                <select name="category" value={cat} onChange={e => setCat(e.target.value)} required style={inp}>
+                  {cats.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </F>
+              {!isLand && <F label="الرقم التسلسلي (SN)"><input name="serialNumber" type="text" defaultValue={ea?.serialNumber} placeholder="S/N..." style={inp} /></F>}
+              {!isLand && <F label="الشركة المصنعة"><input name="manufacturer" type="text" defaultValue={ea?.manufacturer} placeholder="Dell, HP..." style={inp} /></F>}
+              {!isLand && <F label="الموديل"><input name="model" type="text" defaultValue={ea?.model} placeholder="Latitude 5530..." style={inp} /></F>}
+              <F label="حالة الأصل">
+                <select name="status" defaultValue={ea?.status || 'نشط'} style={inp}>
+                  {statuses.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </F>
+            </div>
+          </div>
+
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><MapPin size={20}/> 2. الموقع والعهدة</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem'}}>
+              <F label="الموقع">
+                <select name="location" defaultValue={ea?.location || locs[0]} style={inp}>
+                  {locs.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </F>
+              <F label="الإدارة المستفيدة">
+                <select name="department" defaultValue={ea?.department || depts[0]} style={inp}>
+                  {depts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </F>
+              <F label="الموظف / صاحب العهدة"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="اسم الموظف المستلم" style={inp} /></F>
+            </div>
+          </div>
+
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><History size={20}/> 3. الشراء والتشغيل</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="المورد">
+                {suppliersList.length > 0 ? (
+                  <select name="supplier" defaultValue={ea?.supplier || suppliersList[0]} style={inp}>
+                    <option value="">بدون مورد محدد</option>
+                    {suppliersList.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                ) : (
+                  <input name="supplier" type="text" defaultValue={ea?.supplier} placeholder="اسم المورد/الشركة" style={inp} />
+                )}
+              </F>
+              <F label="رقم الفاتورة"><input name="invoiceNumber" type="text" defaultValue={ea?.invoiceNumber} placeholder="INV-..." style={inp} /></F>
+              <F label="رقم أمر الشراء (PO)"><input name="poNumber" type="text" defaultValue={ea?.poNumber} placeholder="PO-..." style={inp} /></F>
+              <F label="تاريخ الشراء / الاستلام"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
+              {!isLand && <F label="تاريخ جاهزية الاستخدام"><input name="readyDate" type="date" defaultValue={ea?.readyDate || new Date().toISOString().split('T')[0]} required style={inp} /></F>}
+              {!isLand && <F label="الضمان (مدة/نهاية)"><input name="warranty" type="text" defaultValue={ea?.warranty} placeholder="مثال: سنتين تنتهي 2026" style={inp} /></F>}
+            </div>
+          </div>
+
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Calculator size={20}/> 4. البيانات المالية {isLand ? '' : 'والإهلاك'}</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="تكلفة الأصل (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} required placeholder="0.00" style={inp} /></F>
+              {!isLand && <F label="القيمة التخريدية (الخردة)"><input name="salvage" type="number" step="0.01" defaultValue={ea?.salvage} placeholder="0.00" style={inp} /></F>}
+              {!isLand && <F label="العمر الإنتاجي (سنوات)"><input name="life" type="number" defaultValue={ea?.life || 5} required style={inp} /></F>}
+              {!isLand && (
+                <F label="طريقة الإهلاك">
+                  <select name="method" defaultValue={ea?.method || 'SL'} style={inp}>
+                    <option value="SL">القسط الثابت (SL)</option>
+                    <option value="DB">القسط المتناقص (DB)</option>
+                  </select>
+                </F>
+              )}
+              <F label="مصدر التمويل"><input name="fundingSource" type="text" defaultValue={ea?.fundingSource} placeholder="إيرادات ذاتية / منحة" style={inp} /></F>
+            </div>
+          </div>
+
+          <div style={{padding:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem', background:'var(--bg)'}}>
+             <button type="button" className="btn btn-ghost" onClick={onCancel}>إلغاء</button>
+             <button type="submit" className="btn btn-primary" style={{padding:'0.75rem 2.5rem', fontSize:'1.1rem'}}><CheckCircle size={20} style={{marginRight:'0.5rem'}} /> حفظ بطاقة الأصل في النظام</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
 const App = () => {
   const [session, setSession] = useState({ user: { id: 'test', email: 'test@test.com' } });
   const [userProfile, setUserProfile] = useState(null);
@@ -970,93 +1085,7 @@ const App = () => {
 
   
   const renderNewAsset = () => {
-    const ea = editingAsset;
-    const inp = {padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: '100%'};
-    
-    // Using a local state for tabs requires modifying the component, but we can do it with simple HTML anchor links or just group them visually with a sticky header.
-    // To make it fully compliant with the PRD: "قسمها إلى تبويبات أو خطوات"
-    return (
-    <div className="view-anim">
-      <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-        <div>
-          <h2 style={{fontSize:'1.5rem', fontWeight:800}}>{ea ? 'تعديل بطاقة أصل ثابت' : 'إنشاء بطاقة أصل ثابت'}</h2>
-          <p style={{color:'var(--text-muted)'}}>{ea ? `تعديل بيانات الأصل: ${ea.name}` : 'أدخل بيانات الأصل الجديد مقسمة حسب التصنيفات القياسية'}</p>
-        </div>
-        <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { setEditingAsset(null); setView('register'); }}>إلغاء والعودة</button>
-      </div>
-
-      <div className="card" style={{maxWidth: '1200px', background: 'var(--card-bg)', padding:0, overflow:'hidden'}}>
-        <form key={ea ? ea.id : 'new'} onSubmit={handleAddAsset}>
-          
-          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={20}/> 1. البيانات الأساسية للأصل</h3>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
-              <F label="رقم الأصل (تلقائي إن تُرِك فارغاً)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-..." style={inp} /></F>
-              <F label="اسم / وصف الأصل *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: لابتوب ديل بلس" required style={inp} /></F>
-              <F label="الفئة *">
-                <select name="category" defaultValue={ea?.category || 'أجهزة تقنية'} required style={inp}>
-                  {['أراضي','مباني','أجهزة تقنية','أثاث مكتبي','مركبات','آلات ومعدات'].map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </F>
-              <F label="الرقم التسلسلي (SN)"><input name="serialNumber" type="text" defaultValue={ea?.serialNumber} placeholder="S/N..." style={inp} /></F>
-              <F label="الشركة المصنعة"><input name="manufacturer" type="text" defaultValue={ea?.manufacturer} placeholder="Dell, HP..." style={inp} /></F>
-              <F label="الموديل"><input name="model" type="text" defaultValue={ea?.model} placeholder="Latitude 5530..." style={inp} /></F>
-              <F label="حالة الأصل">
-                <select name="status" defaultValue={ea?.status || 'نشط'} style={inp}>
-                  <option value="نشط">نشط</option>
-                  <option value="متوقف">متوقف</option>
-                  <option value="صيانة">صيانة</option>
-                  <option value="مستبعد">مستبعد</option>
-                </select>
-              </F>
-            </div>
-          </div>
-
-          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><MapPin size={20}/> 2. الموقع والعهدة</h3>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem'}}>
-              <F label="الموقع"><input name="location" type="text" defaultValue={ea?.location} placeholder="مبنى الإدارة - الدور الثاني" style={inp} /></F>
-              <F label="الإدارة المستفيدة"><input name="department" type="text" defaultValue={ea?.department} placeholder="تقنية المعلومات" style={inp} /></F>
-              <F label="الموظف / صاحب العهدة"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="اسم الموظف المستلم" style={inp} /></F>
-            </div>
-          </div>
-
-          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><History size={20}/> 3. الشراء والتشغيل</h3>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
-              <F label="المورد"><input name="supplier" type="text" defaultValue={ea?.supplier} placeholder="اسم المورد/الشركة" style={inp} /></F>
-              <F label="رقم الفاتورة"><input name="invoiceNumber" type="text" defaultValue={ea?.invoiceNumber} placeholder="INV-..." style={inp} /></F>
-              <F label="رقم أمر الشراء (PO)"><input name="poNumber" type="text" defaultValue={ea?.poNumber} placeholder="PO-..." style={inp} /></F>
-              <F label="تاريخ الشراء / الاستلام"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
-              <F label="تاريخ جاهزية الاستخدام"><input name="readyDate" type="date" defaultValue={ea?.readyDate || new Date().toISOString().split('T')[0]} required style={inp} /></F>
-              <F label="الضمان (مدة/نهاية)"><input name="warranty" type="text" defaultValue={ea?.warranty} placeholder="مثال: سنتين تنتهي 2026" style={inp} /></F>
-            </div>
-          </div>
-
-          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Calculator size={20}/> 4. البيانات المالية والإهلاك</h3>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
-              <F label="تكلفة الأصل (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} required placeholder="0.00" style={inp} /></F>
-              <F label="القيمة التخريدية (الخردة)"><input name="salvage" type="number" step="0.01" defaultValue={ea?.salvage} placeholder="0.00" style={inp} /></F>
-              <F label="العمر الإنتاجي (سنوات)"><input name="life" type="number" defaultValue={ea?.life || 5} required style={inp} /></F>
-              <F label="طريقة الإهلاك">
-                <select name="method" defaultValue={ea?.method || 'SL'} style={inp}>
-                  <option value="SL">القسط الثابت (SL)</option>
-                  <option value="DB">القسط المتناقص (DB)</option>
-                </select>
-              </F>
-              <F label="مصدر التمويل"><input name="fundingSource" type="text" defaultValue={ea?.fundingSource} placeholder="إيرادات ذاتية / منحة" style={inp} /></F>
-            </div>
-          </div>
-
-          <div style={{padding:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem', background:'var(--bg)'}}>
-             <button type="button" className="btn btn-ghost" onClick={() => { setEditingAsset(null); setView('register'); }}>إلغاء</button>
-             <button type="submit" className="btn btn-primary" style={{padding:'0.75rem 2.5rem', fontSize:'1.1rem'}}><CheckCircle size={20} style={{marginRight:'0.5rem'}} /> حفظ بطاقة الأصل في النظام</button>
-          </div>
-        </form>
-      </div>
-    </div>
-    );
+    return <AssetForm ea={editingAsset} systemLookups={systemLookups} onSubmit={handleAddAsset} onCancel={() => { setEditingAsset(null); setView('register'); }} />;
   };
 
   const renderJournal = () => {
