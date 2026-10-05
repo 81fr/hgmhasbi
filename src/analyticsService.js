@@ -2,8 +2,9 @@ import { supabase } from './supabaseClient.js';
 import { AIService } from './aiService.js';
 
 export class AnalyticsService {
-  constructor(apiKey) {
-    this.ai = new AIService(apiKey);
+  constructor(apiKey, provider = "groq") {
+    this.provider = provider;
+    this.ai = new AIService(apiKey, provider);
   }
 
   // 1. Backend Calculations for Analytics

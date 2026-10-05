@@ -36,14 +36,20 @@ const SYSTEM_TOOLS = [
 ];
 
 export class AIService {
-  constructor(apiKey) {
+  constructor(apiKey, provider = "groq") {
+    this.provider = provider;
     const part1 = "gsk_wydnsXk";
     const part2 = "AHBU8WiDKLEiR";
     const part3 = "WGdyb3FYVkFtWgXgepj";
     const part4 = "XenXk2urTWEtI";
     this.apiKey = apiKey || (part1 + part2 + part3 + part4);
-    this.groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
-    this.sttUrl = 'https://api.groq.com/openai/v1/audio/transcriptions';
+    if (this.provider === 'huggingface') {
+      this.groqUrl = 'https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1/v1/chat/completions';
+      this.sttUrl = 'https://api-inference.huggingface.co/models/openai/whisper-large-v3';
+    } else {
+      this.groqUrl = 'https://api.groq.com/openai/v1/chat/completions';
+      this.sttUrl = 'https://api.groq.com/openai/v1/audio/transcriptions';
+    }
   }
 
   getHeaders() {
@@ -101,7 +107,7 @@ export class AIService {
     let internalMessages = [...messagesContext];
     
     // Inject Tool Calling Instructions for ALLAM model since native tools are disabled
-    if (enableTools && GROQ_MODELS.chat.includes('allam')) {
+    if (enableTools && this.provider === 'groq' && GROQ_MODELS.chat.includes('allam')) {
       const toolInstructions = `
 أنت مساعد آلي لإدارة الأصول والمستودعات. يمكنك استخدام الأدوات التالية للحصول على البيانات الحية:
 ${JSON.stringify(SYSTEM_TOOLS, null, 2)}
@@ -118,7 +124,7 @@ ${JSON.stringify(SYSTEM_TOOLS, null, 2)}
     }
 
     let body = {
-      model: GROQ_MODELS.chat,
+      model: this.provider === "huggingface" ? "mistralai/Mixtral-8x7B-Instruct-v0.1" : GROQ_MODELS.chat,
       messages: internalMessages,
       temperature: 0.1, // Low temp for tool precision
     };

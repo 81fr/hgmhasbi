@@ -270,7 +270,7 @@ const App = () => {
       recorder.onstop = async () => {
         showToast('⏳ جاري تحليل الصوت...');
         const blob = new Blob(chunks, { type: 'audio/webm' });
-        const ai = new AIService(aiApiKey);
+        const ai = new AIService(aiApiKey, aiProvider);
         try {
           const text = await ai.transcribeAudio(blob);
           setChatInput(text);
@@ -1535,7 +1535,7 @@ const App = () => {
     showToast('جاري حساب المعطيات وتوليد التقرير التنفيذي...');
     try {
       const aiApiKey = localStorage.getItem('aiApiKey') || '';
-      const analytics = new AnalyticsService(aiApiKey);
+      const analytics = new AnalyticsService(aiApiKey, localStorage.getItem('aiProvider') || 'groq');
       const result = await analytics.generateAIExecutiveSummary();
       setAiReport(result.report);
       setAnalyticsData({
@@ -2983,7 +2983,7 @@ const renderMaintenance = () => (
                 { role: "user", content: userInput }
               ];
 
-              const ai = new AIService(aiApiKey);
+              const ai = new AIService(aiApiKey, aiProvider);
               const resultMessage = await ai.sendChat(messagesContext);
               botResponse = resultMessage.content || "تم تنفيذ الطلب.";
               setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
