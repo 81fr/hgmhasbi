@@ -2749,9 +2749,12 @@ const renderMaintenance = () => (
       </div>
 
       {/* Inventory Table */}
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
         <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Warehouse size={24} color="var(--brand-teal)" /> جدول المخزون المباشر</h2>
-        <div style={{display:'flex', gap:'0.5rem'}}>
+        <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+          {userProfile?.isAdmin && (
+            <button className="btn btn-primary" onClick={() => setWarehouseModal({})} style={{padding:'0.4rem 1rem', fontSize:'0.8rem', background:'var(--brand-teal)', color:'white', border:'none', marginRight:'auto'}}>+ إضافة صنف</button>
+          )}
           {['الكل', 'متاح', 'مخصص', 'صيانة', 'نفاد', 'تالف'].map(f => (
             <button key={f} onClick={() => setWarehouseFilter(f)} className={`btn ${warehouseFilter === f ? 'btn-primary' : 'btn-ghost'}`} style={{padding:'0.4rem 1rem', fontSize:'0.8rem'}}>{f}</button>
           ))}
