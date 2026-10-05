@@ -2252,13 +2252,16 @@ const renderMaintenance = () => (
     const empData = {
       full_name: fd.get('full_name'),
       employee_id: fd.get('employee_id'),
+      email: fd.get('email'),
+      password: fd.get('password'),
+      department: fd.get('department'),
+      job_title: fd.get('job_title'),
       role: fd.get('role'),
       is_active: fd.get('is_active') === 'on'
     };
 
-    // Note: We don't save role/permissions yet because they might not exist in the DB.
-    // If the DB has them, we would save them. For now, we simulate it.
     let res;
+    // First, try saving with all new fields
     if (employeeModal.id) {
       res = await supabase.from('employees').update(empData).eq('id', employeeModal.id);
     } else {
@@ -2266,9 +2269,32 @@ const renderMaintenance = () => (
     }
 
     if (res.error) {
-      showToast('خطأ أثناء الحفظ: ' + res.error.message);
+      // If error is about missing columns, try saving only basic fields and show a specific alert
+      if (res.error.message.includes('column') && res.error.message.includes('does not exist')) {
+        const fallbackData = {
+          full_name: fd.get('full_name'),
+          employee_id: fd.get('employee_id'),
+          is_active: fd.get('is_active') === 'on'
+        };
+        let fallbackRes;
+        if (employeeModal.id) {
+          fallbackRes = await supabase.from('employees').update(fallbackData).eq('id', employeeModal.id);
+        } else {
+          fallbackRes = await supabase.from('employees').insert([fallbackData]);
+        }
+        
+        if (fallbackRes.error) {
+          showToast('❌ خطأ أثناء الحفظ: ' + fallbackRes.error.message);
+        } else {
+          showToast('⚠️ تم حفظ البيانات الأساسية فقط. (يرجى تنفيذ أمر SQL لإضافة حقول الصلاحيات وكلمة المرور)');
+          setEmployeeModal(null);
+          fetchEmployees();
+        }
+      } else {
+        showToast('❌ خطأ أثناء الحفظ: ' + res.error.message);
+      }
     } else {
-      showToast('✅ تم حفظ بيانات الموظف بنجاح');
+      showToast('✅ تم حفظ بيانات الموظف بالكامل بنجاح');
       setEmployeeModal(null);
       fetchEmployees();
     }
@@ -2335,27 +2361,51 @@ const renderMaintenance = () => (
             </button>
             <h3 style={{fontSize:'1.25rem', marginBottom:'1.5rem'}}>{employeeModal.id ? 'تعديل موظف وصلاحيات' : 'إضافة موظف جديد'}</h3>
             
-            <div style={{background:'var(--thead-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)', fontSize:'0.85rem', color:'var(--text-muted)'}}>
-              يمكنك تعيين دور للموظف. تأكد من أنك قمت بتنفيذ أوامر SQL (Phase 6) لدعم هذه الميزة.
+            <div style={{background:'rgba(234, 179, 8, 0.1)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid #eab308', fontSize:'0.85rem', color:'#ca8a04'}}>
+              <strong>تنبيه:</strong> إذا لم يتم حفظ الصلاحيات واسم المستخدم، فهذا يعني أن قاعدة البيانات لم يتم تحديثها. يرجى تمرير التحديث (SQL Phase 7) لمسؤول النظام.
             </div>
 
             <form onSubmit={handleSaveEmployee} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-              <div>
-                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الاسم الكامل</label>
-                <input name="full_name" required defaultValue={employeeModal.full_name} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الاسم الكامل *</label>
+                  <input name="full_name" required defaultValue={employeeModal.full_name} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>رقم الموظف *</label>
+                  <input name="employee_id" required defaultValue={employeeModal.employee_id} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
               </div>
-              <div>
-                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>رقم الموظف</label>
-                <input name="employee_id" required defaultValue={employeeModal.employee_id} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>البريد الإلكتروني (اسم المستخدم) *</label>
+                  <input name="email" required defaultValue={employeeModal.email} type="email" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>كلمة المرور *</label>
+                  <input name="password" required={!employeeModal.id} defaultValue={employeeModal.password} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+              </div>
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>القسم / الإدارة</label>
+                  <input name="department" defaultValue={employeeModal.department} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>المسمى الوظيفي</label>
+                  <input name="job_title" defaultValue={employeeModal.job_title} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
               </div>
               
               <div>
-                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الدور (Role)</label>
+                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الدور والصلاحية (Role)</label>
                 <select name="role" defaultValue={employeeModal.role || 'موظف (Employee)'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
-                  <option>مسؤول نظام (Admin)</option>
-                  <option>مدير أصول</option>
-                  <option>أمين مستودع</option>
-                  <option selected>موظف (Employee)</option>
+                  <option value="مسؤول نظام (Admin)">مسؤول نظام (Admin) - تحكم كامل</option>
+                  <option value="مدير أصول">مدير أصول - إدارة الأصول فقط</option>
+                  <option value="أمين مستودع">أمين مستودع - إدارة المخزون فقط</option>
+                  <option value="موظف (Employee)">موظف (Employee) - عرض فقط</option>
                 </select>
               </div>
 
