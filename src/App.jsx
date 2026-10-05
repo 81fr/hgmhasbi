@@ -2252,6 +2252,7 @@ const renderMaintenance = () => (
     const empData = {
       full_name: fd.get('full_name'),
       employee_id: fd.get('employee_id'),
+      role: fd.get('role'),
       is_active: fd.get('is_active') === 'on'
     };
 
@@ -2334,8 +2335,8 @@ const renderMaintenance = () => (
             </button>
             <h3 style={{fontSize:'1.25rem', marginBottom:'1.5rem'}}>{employeeModal.id ? 'تعديل موظف وصلاحيات' : 'إضافة موظف جديد'}</h3>
             
-            <div style={{background:'var(--thead-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)', fontSize:'0.85rem', color:'var(--warning)'}}>
-              <strong>ملاحظة:</strong> صلاحيات الوصول والأدوار (Roles) تتطلب تمرير تحديثات قاعدة البيانات لمسؤول النظام (Phase 6 SQL). سيتم حفظ البيانات الأساسية فقط حالياً.
+            <div style={{background:'var(--thead-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)', fontSize:'0.85rem', color:'var(--text-muted)'}}>
+              يمكنك تعيين دور للموظف. تأكد من أنك قمت بتنفيذ أوامر SQL (Phase 6) لدعم هذه الميزة.
             </div>
 
             <form onSubmit={handleSaveEmployee} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
@@ -2350,7 +2351,7 @@ const renderMaintenance = () => (
               
               <div>
                 <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الدور (Role)</label>
-                <select disabled style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', opacity:0.7}}>
+                <select name="role" defaultValue={employeeModal.role || 'موظف (Employee)'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
                   <option>مسؤول نظام (Admin)</option>
                   <option>مدير أصول</option>
                   <option>أمين مستودع</option>
@@ -2699,6 +2700,9 @@ const renderMaintenance = () => (
           <div className="nav-label">المستودعات (RADAR)</div>
           <div className={`nav-item ${view === 'custody' ? 'active' : ''}`} onClick={() => setView('custody')}>
             <div className="nav-icon-box"><Users size={18} /></div> إدارة العهد
+          </div>
+          <div className={`nav-item ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>
+            <div className="nav-icon-box"><Shield size={18} /></div> الموظفين والصلاحيات
           </div>
           <div className={`nav-item ${view === 'depreciation' ? 'active' : ''}`} onClick={() => setView('depreciation')}>
             <div className="nav-icon-box"><Calculator size={18} /></div> حاسبة الإهلاك
