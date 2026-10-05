@@ -136,8 +136,17 @@ const Section = ({ title }) => (
 
 
 
-const AssetForm = ({ ea, systemLookups, onSubmit, onCancel, linkedJournals }) => {
+const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
   const [cat, setCat] = React.useState(ea?.category || 'أجهزة تقنية');
+  const [linkedJournals, setLinkedJournals] = React.useState([]);
+  
+  React.useEffect(() => {
+    if (ea && ea.db_id) {
+      window.supabase.from('journal_entries').select('*').eq('linked_entity_id', ea.db_id).then(({data}) => {
+        if (data) setLinkedJournals(data);
+      });
+    }
+  }, [ea]);
   const isLand = cat === 'أراضي' || cat === 'اراضي';
   
   const inp = {padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', width: '100%'};
