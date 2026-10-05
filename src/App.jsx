@@ -1529,10 +1529,12 @@ const App = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
     const [analyticsData, setAnalyticsData] = useState(null);
+    const [analyticsData, setAnalyticsData] = useState(null);
   const generateSmartReport = async () => {
     setIsGeneratingReport(true);
     showToast('جاري حساب المعطيات وتوليد التقرير التنفيذي...');
     try {
+      const aiApiKey = localStorage.getItem('aiApiKey') || '';
       const analytics = new AnalyticsService(aiApiKey);
       const result = await analytics.generateAIExecutiveSummary();
       setAiReport(result.report);
@@ -1540,7 +1542,7 @@ const App = () => {
         stats: result.rawAnalytics,
         preds: result.rawPredictions
       });
-      showToast('تم التوليد بنجاح!');
+      showToast('تم تحديث التحليلات والتنبؤات بنجاح!');
     } catch(err) {
       showToast('فشل توليد التقرير: ' + err.message);
     }
@@ -1550,66 +1552,79 @@ const App = () => {
   const renderAIStudio = () => <AIStudio />;
 
   const renderAIInsights = () => {
-    // 1. Calculations for Predictive & Anomalies
-    const totalAssetsValue = assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
-    const lowStockItems = warehouseItems.filter(w => w.qty <= w.minQty);
-    const anomalyDepreciation = assets.filter(a => a.status === 'نشط' && (Number(a.cost) || 0) > 0 && (Number(a.useful_life) || 0) < 1);
+    // Fallback to basic calculations if analyticsData not yet fetched
+    const totalAssetsValue = analyticsData ? analyticsData.stats.totalCost : assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
+    const lowStockItems = analyticsData ? analyticsData.preds.stockRunout : warehouseItems.filter(w => w.qty <= w.minQty);
+    const anomalyDepreciation = analyticsData ? analyticsData.preds.replacementPriority : assets.filter(a => a.status === 'نشط' && (Number(a.cost) || 0) > 0 && (Number(a.useful_life) || 0) < 1);
     
     return (
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
         <div>
-          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> مركز التحليلات الذكية (AI Analytics)</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل تلقائي للبيانات، كشف الشذوذ، والتنبؤ بالمخاطر المستقبلية.</p>
+          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> التحليلات الذكية (AI Analytics)</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>ملخص تنفيذي مدعوم بالذكاء الاصطناعي لحالة الأصول والمستودعات والتنبؤ بالمخاطر.</p>
         </div>
         <button className="btn btn-primary" onClick={generateSmartReport} disabled={isGeneratingReport} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', border:'none'}}>
-          {isGeneratingReport ? <RefreshCw size={18} className="spin" /> : <Brain size={18} />} {isGeneratingReport ? 'جاري التحليل...' : 'إنشاء تقرير تنفيذي ذكي'}
+          {isGeneratingReport ? <RefreshCw size={18} className="spin" /> : <Brain size={18} />} {isGeneratingReport ? 'جاري التحليل...' : 'توليد ملخص تنفيذي ذكي'}
         </button>
       </div>
 
       {aiReport && (
         <div className="card" style={{marginBottom: '2rem', border: '1px solid var(--accent)', background: 'rgba(139, 92, 246, 0.05)'}}>
-          <h3 style={{display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--accent)', marginBottom:'1rem'}}><MessageSquare size={18}/> التقرير التنفيذي (AI)</h3>
+          <h3 style={{display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--accent)', marginBottom:'1rem'}}><MessageSquare size={18}/> الملخص التنفيذي (AI)</h3>
           <div style={{lineHeight:'1.8', color:'var(--text)', whiteSpace: 'pre-wrap', fontSize:'0.95rem'}}>{aiReport}</div>
         </div>
       )}
 
-      <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات التنبؤ وكشف الشذوذ (Anomaly Detection)</h3>
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
-        <div className="card" style={{borderTop:'4px solid #ef4444'}}>
-          <div className="val-sub">أصناف متوقع نفادها قريباً</div>
-          <div className="val-big" style={{color:'#ef4444'}}>{lowStockItems.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
-          <div className="val-sub">استناداً لمتوسط الاستهلاك، هذه الأصناف ستنفد خلال 14 يوماً. ينصح بالتعميد بالشراء فوراً.</div>
+      {analyticsData ? (
+        <div style={{display:'flex', flexDirection:'column', gap:'2rem'}}>
+          <div>
+             <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات المخاطر والتنبؤات</h3>
+             <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+                <div className="card" style={{borderTop:'4px solid #ef4444'}}>
+                  <div className="val-sub">أصناف مهددة بالنفاد</div>
+                  <div className="val-big" style={{color:'#ef4444'}}>{analyticsData.preds.stockRunout.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
+                  <div className="val-sub">استهلاك أعلى من المعدل الطبيعي. يتوقع النفاد قريباً.</div>
+                </div>
+                <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+                  <div className="val-sub">أولوية استبدال حرجة</div>
+                  <div className="val-big" style={{color:'#f59e0b'}}>{analyticsData.preds.replacementPriority.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
+                  <div className="val-sub">أصول تجاوزت العمر الافتراضي أو تكلفة صيانتها مرتفعة.</div>
+                </div>
+                <div className="card" style={{borderTop:'4px solid #10b981'}}>
+                  <div className="val-sub">الميزانية التقديرية (تنبؤ)</div>
+                  <div className="val-big" style={{color:'#10b981'}}>{analyticsData.preds.estimatedBudgetNeeded.toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
+                  <div className="val-sub">ميزانية مقترحة للربع القادم بناءً على الاحتياج والإحلال.</div>
+                </div>
+             </div>
+          </div>
         </div>
-        <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
-          <div className="val-sub">أصول مستهلكة دفترياً ونشطة</div>
-          <div className="val-big" style={{color:'#f59e0b'}}>{anomalyDepreciation.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
-          <div className="val-sub">أصول وصلت قيمتها الدفترية للصفر ولا زالت تعمل. يرجى إعادة تقييم أعمارها الإنتاجية.</div>
+      ) : (
+        <div>
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات المخاطر والتنبؤات (Anomaly Detection)</h3>
+          <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+            <div className="card" style={{borderTop:'4px solid #ef4444'}}>
+              <div className="val-sub">نواقص المستودع المتوقعة</div>
+              <div className="val-big" style={{color:'#ef4444'}}>{lowStockItems.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
+              <div className="val-sub">انخفضت دون الحد الأدنى. الرجاء توليد الملخص لحساب المتبقي.</div>
+            </div>
+            <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+              <div className="val-sub">أصول بدون نسبة إهلاك واضحة</div>
+              <div className="val-big" style={{color:'#f59e0b'}}>{anomalyDepreciation.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
+              <div className="val-sub">بيانات غير مكتملة تؤثر على حساب القيمة الدفترية.</div>
+            </div>
+            <div className="card" style={{borderTop:'4px solid #10b981'}}>
+              <div className="val-sub">إجمالي قيمة الأصول التقديرية</div>
+              <div className="val-big" style={{color:'#10b981'}}>~ {(totalAssetsValue * 0.15).toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
+              <div className="val-sub">قيمة تقريبية، اضغط توليد الملخص لحساب مجمع الإهلاك الفعلي.</div>
+            </div>
+          </div>
         </div>
-        <div className="card" style={{borderTop:'4px solid #10b981'}}>
-          <div className="val-sub">توقعات ميزانية الاستبدال</div>
-          <div className="val-big" style={{color:'#10b981'}}>~ {(totalAssetsValue * 0.15).toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
-          <div className="val-sub">التكلفة التقديرية لاستبدال الأصول المتهالكة خلال العام المالي القادم بناءً على معدل الاستهلاك الحالي.</div>
-        </div>
-      </div>
-      
-      <div style={{marginTop: '2rem'}}>
-        <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>الأسئلة الاستكشافية الجاهزة</h3>
-        <div style={{display:'flex', gap:'1rem', flexWrap:'wrap'}}>
-          {['لماذا ارتفعت قيمة الصيانة هذا الشهر؟', 'ما الإدارات الأعلى في فروقات الجرد؟', 'ما أكثر الأصناف استهلاكاً في المستودع؟', 'ما الأصول المرشحة للاستبدال الفوري؟'].map((q, i) => (
-             <button key={i} onClick={() => {
-               setChatInput(q);
-               // We don't have chatInputRef currently mapped globally, so we just set the input and optionally open chat
-               document.querySelector('input[placeholder*="اكتب"]') && document.querySelector('input[placeholder*="اكتب"]').focus();
-             }} style={{padding:'0.75rem 1.25rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--card-bg)', color:'var(--text)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.5rem', transition:'0.2s'}}>
-               <Search size={16} color="var(--accent)" /> {q}
-             </button>
-          ))}
-        </div>
-      </div>
+      )}
     </div>
-  )};
-  
+    );
+  };
+
 
 const renderGeneralReports = () => {
     const totalCost = assets.reduce((acc, a) => acc + a.cost, 0);
