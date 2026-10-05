@@ -1075,6 +1075,30 @@ const App = () => {
     } else {
       const { error } = await supabase.from('assets').insert([dbRecord]);
       if (error) { console.error(error); showToast('❌ خطأ في الإضافة'); return; }
+
+      // Auto Journal Entry
+      const { data: accountsData } = await supabase.from('accounts').select('id, account_code').in('account_code', ['1101', '1201']);
+      const acct1101 = accountsData?.find(a => a.account_code === '1101')?.id;
+      const acct1201 = accountsData?.find(a => a.account_code === '1201')?.id;
+      
+      if (acct1101 && acct1201) {
+        const { data: jEntry, error: jErr } = await supabase.from('journal_entries').insert([{
+          journal_no: 'JE-AST-' + Date.now().toString().slice(-6),
+          entry_date: dbRecord.purchase_date,
+          description: 'إثبات شراء أصل ثابت: ' + dbRecord.name,
+          source_module: 'الأصول الثابتة',
+          status: 'معتمد'
+        }]).select().single();
+        
+        if (!jErr && jEntry) {
+          await supabase.from('journal_lines').insert([
+            { journal_id: jEntry.id, account_id: acct1101, debit: dbRecord.cost, credit: 0, description: 'تكلفة الأصل الثابت' },
+            { journal_id: jEntry.id, account_id: acct1201, debit: 0, credit: dbRecord.cost, description: 'سداد قيمة الأصل الثابت' }
+          ]);
+          setTimeout(() => showToast('✅ تم إنشاء القيد المحاسبي الآلي بنجاح!'), 800);
+        }
+      }
+
     }
     
     showToast('✅ تم حفظ بطاقة الأصل بنجاح!');
