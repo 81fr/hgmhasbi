@@ -1898,7 +1898,7 @@ const renderMaintenance = () => (
   
   
 const renderDepreciation = () => {
-    const activeAssetsForDep = accountingEngine.filter(a => a.status === 'نشط' || a.status === 'متوقف');
+    const activeAssetsForDep = accountingEngine.filter(a => (a.status === 'نشط' || a.status === 'متوقف') && a.category !== 'أراضي' && a.category !== 'اراضي');
     const totalDepCost = activeAssetsForDep.reduce((s,a) => s + (Number(a.cost)||0), 0);
     const totalAccDep = activeAssetsForDep.reduce((s,a) => s + (Number(a.accumulatedDep)||0), 0);
     
