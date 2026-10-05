@@ -163,14 +163,6 @@ const App = () => {
   const [chatMessages, setChatMessages] = useState(() => [{role: 'bot', text: `أهلاً بك! أنا ${localStorage.getItem('aiName') || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}]);
   const [chatInput, setChatInput] = useState('');
 
-  useEffect(() => {
-    setChatMessages(prev => {
-      if (prev.length === 1 && prev[0].role === 'bot' && prev[0].text.includes('مرحباً بك! أنا')) {
-        return [{role: 'bot', text: `مرحباً بك! أنا ${aiName || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}];
-      }
-      return prev;
-    });
-  }, [aiName]);
 
   const [isListening, setIsListening] = useState(false);
   const [isTyping, setIsTyping] = useState(false);
@@ -208,6 +200,16 @@ const App = () => {
   const [aiName, setAiName] = useState(localStorage.getItem('aiName') || 'تراؤف AI V5.0');
   const [aiIcon, setAiIcon] = useState(localStorage.getItem('aiIcon') || '🤖');
   const [aiSystemPrompt, setAiSystemPrompt] = useState(localStorage.getItem('aiSystemPrompt') || 'أنت تراؤف، مساعد ذكي ومحاسب وخبير أصول. أنت تتحدث باللغة العربية وتساعد المستخدم في إدارة النظام المحاسبي، الأصول، والمستودعات. أجب باختصار وبشكل مهني.');
+  
+  useEffect(() => {
+    setChatMessages(prev => {
+      if (prev.length === 1 && prev[0].role === 'bot' && prev[0].text.includes('مرحباً بك! أنا')) {
+        return [{role: 'bot', text: `مرحباً بك! أنا ${aiName || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}];
+      }
+      return prev;
+    });
+  }, [aiName]);
+
   const [aiApiKey, setAiApiKey] = useState(() => {
     const saved = localStorage.getItem('aiApiKey');
     if (saved) return saved;
