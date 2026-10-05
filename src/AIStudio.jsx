@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Sparkles,
   Bot, Settings, BookOpen, Database, Link, BarChart3, ShieldCheck, PlayCircle, UploadCloud,
   CheckCircle, Save, ChevronLeft, Mic, Search, MessageSquare, Zap, Upload, FileText, Globe
-} from 'lucide-react';
+, X } from 'lucide-react';
 
 const STEPS = [
   { id: 'agent_text', icon: <MessageSquare size={18}/>, title: 'الوكيل النصي' },

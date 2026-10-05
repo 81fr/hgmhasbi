@@ -1,4 +1,5 @@
 import { AIService } from './aiService.js';
+import { AnalyticsService } from './analyticsService.js';
 import ErrorBoundary from './ErrorBoundary';
 import AIStudio from './AIStudio';
 import React, { useState, useMemo, useEffect, useRef } from 'react';
