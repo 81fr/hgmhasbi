@@ -3340,6 +3340,87 @@ const renderDepreciation = () => {
           </form>
         </div>
       )}
+
+      {warehouseModal && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div className="card view-anim" style={{width:'700px', maxWidth:'95%', padding:'2rem', position:'relative', maxHeight:'90vh', overflowY:'auto'}}>
+            <button onClick={() => setWarehouseModal(null)} style={{position:'absolute', top:'1rem', right:'1rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text)'}}>
+              <X size={20} />
+            </button>
+            <h3 style={{fontSize:'1.25rem', marginBottom:'1.5rem', color:'var(--brand-teal)'}}>{warehouseModal.id ? 'تعديل صنف' : 'إضافة صنف جديد للمستودع'}</h3>
+            
+            <form onSubmit={handleSaveWarehouseItem} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+              
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>اسم الصنف *</label>
+                  <input name="name" required defaultValue={warehouseModal.name} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>رقم الصنف / الباركود *</label>
+                  <input name="item_no" required defaultValue={warehouseModal.sku || warehouseModal.item_no} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+              </div>
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الفئة (Category)</label>
+                  <input name="category" defaultValue={warehouseModal.category} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الكمية الحالية *</label>
+                  <input name="quantity" required defaultValue={warehouseModal.qty || 0} type="number" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الحد الأدنى (للطلب) *</label>
+                  <input name="min_quantity" required defaultValue={warehouseModal.minQty || 0} type="number" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+              </div>
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الموقع في المستودع (الرف)</label>
+                  <input name="bin_location" defaultValue={warehouseModal.bin || warehouseModal.bin_location} type="text" placeholder="مثال: A-01-04" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الحالة</label>
+                  <select name="status" defaultValue={warehouseModal.status || 'متاح'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option>متاح</option>
+                    <option>محجوز</option>
+                    <option>قيد الصيانة</option>
+                    <option>تالف</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>وحدة القياس</label>
+                  <input name="unit" defaultValue={warehouseModal.unit || 'حبة'} type="text" placeholder="حبة، كرتون، كجم" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+              </div>
+
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>تكلفة الوحدة (اختياري)</label>
+                  <input name="cost" defaultValue={warehouseModal.cost || ''} type="number" step="0.01" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>المورد الرئيسي (اختياري)</label>
+                  <input name="supplier" defaultValue={warehouseModal.supplier || ''} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+              </div>
+
+              <div>
+                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>وصف الصنف / ملاحظات</label>
+                <textarea name="description" rows={3} defaultValue={warehouseModal.description || ''} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+              </div>
+
+              <div style={{display:'flex', gap:'1rem', marginTop:'1rem'}}>
+                <button type="submit" className="btn btn-primary" style={{flex:1, padding:'1rem'}}>حفظ الصنف في المستودع</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
