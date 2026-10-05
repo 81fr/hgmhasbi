@@ -1550,655 +1550,79 @@ const App = () => {
   const renderAIStudio = () => <AIStudio />;
 
   const renderAIInsights = () => {
-    // 1. Calculations for Predictive & Anomalies
-    const totalAssetsValue = assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
-    const lowStockItems = warehouseItems.filter(w => w.qty <= w.minQty);
-    const anomalyDepreciation = assets.filter(a => a.status === 'نشط' && (Number(a.cost) || 0) > 0 && (Number(a.useful_life) || 0) < 1);
+    // Fallback to basic calculations if analyticsData not yet fetched
+    const totalAssetsValue = analyticsData ? analyticsData.stats.totalCost : assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
+    const lowStockItems = analyticsData ? analyticsData.preds.stockRunout : warehouseItems.filter(w => w.qty <= w.minQty);
+    const anomalyDepreciation = analyticsData ? analyticsData.preds.replacementPriority : assets.filter(a => a.status === 'نشط' && (Number(a.cost) || 0) > 0 && (Number(a.useful_life) || 0) < 1);
     
     return (
     <div className="view-anim">
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
         <div>
-          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> مركز التحليلات الذكية (AI Analytics)</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>تحليل تلقائي للبيانات، كشف الشذوذ، والتنبؤ بالمخاطر المستقبلية.</p>
+          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Sparkles color="var(--accent)" /> التحليلات الذكية (AI Analytics)</h2>
+          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>ملخص تنفيذي مدعوم بالذكاء الاصطناعي لحالة الأصول والمستودعات والتنبؤ بالمخاطر.</p>
         </div>
         <button className="btn btn-primary" onClick={generateSmartReport} disabled={isGeneratingReport} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', border:'none'}}>
-          {isGeneratingReport ? <RefreshCw size={18} className="spin" /> : <Brain size={18} />} {isGeneratingReport ? 'جاري التحليل...' : 'إنشاء تقرير تنفيذي ذكي'}
+          {isGeneratingReport ? <RefreshCw size={18} className="spin" /> : <Brain size={18} />} {isGeneratingReport ? 'جاري التحليل...' : 'توليد ملخص تنفيذي ذكي'}
         </button>
       </div>
 
       {aiReport && (
         <div className="card" style={{marginBottom: '2rem', border: '1px solid var(--accent)', background: 'rgba(139, 92, 246, 0.05)'}}>
-          <h3 style={{display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--accent)', marginBottom:'1rem'}}><MessageSquare size={18}/> التقرير التنفيذي (AI)</h3>
+          <h3 style={{display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--accent)', marginBottom:'1rem'}}><MessageSquare size={18}/> الملخص التنفيذي (AI)</h3>
           <div style={{lineHeight:'1.8', color:'var(--text)', whiteSpace: 'pre-wrap', fontSize:'0.95rem'}}>{aiReport}</div>
         </div>
       )}
 
-      <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات التنبؤ وكشف الشذوذ (Anomaly Detection)</h3>
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
-        <div className="card" style={{borderTop:'4px solid #ef4444'}}>
-          <div className="val-sub">أصناف متوقع نفادها قريباً</div>
-          <div className="val-big" style={{color:'#ef4444'}}>{lowStockItems.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
-          <div className="val-sub">استناداً لمتوسط الاستهلاك، هذه الأصناف ستنفد خلال 14 يوماً. ينصح بالتعميد بالشراء فوراً.</div>
-        </div>
-        <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
-          <div className="val-sub">أصول مستهلكة دفترياً ونشطة</div>
-          <div className="val-big" style={{color:'#f59e0b'}}>{anomalyDepreciation.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
-          <div className="val-sub">أصول وصلت قيمتها الدفترية للصفر ولا زالت تعمل. يرجى إعادة تقييم أعمارها الإنتاجية.</div>
-        </div>
-        <div className="card" style={{borderTop:'4px solid #10b981'}}>
-          <div className="val-sub">توقعات ميزانية الاستبدال</div>
-          <div className="val-big" style={{color:'#10b981'}}>~ {(totalAssetsValue * 0.15).toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
-          <div className="val-sub">التكلفة التقديرية لاستبدال الأصول المتهالكة خلال العام المالي القادم بناءً على معدل الاستهلاك الحالي.</div>
-        </div>
-      </div>
-      
-      <div style={{marginTop: '2rem'}}>
-        <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>الأسئلة الاستكشافية الجاهزة</h3>
-        <div style={{display:'flex', gap:'1rem', flexWrap:'wrap'}}>
-          {['لماذا ارتفعت قيمة الصيانة هذا الشهر؟', 'ما الإدارات الأعلى في فروقات الجرد؟', 'ما أكثر الأصناف استهلاكاً في المستودع؟', 'ما الأصول المرشحة للاستبدال الفوري؟'].map((q, i) => (
-             <button key={i} onClick={() => {
-               setChatInput(q);
-               // We don't have chatInputRef currently mapped globally, so we just set the input and optionally open chat
-               document.querySelector('input[placeholder*="اكتب"]') && document.querySelector('input[placeholder*="اكتب"]').focus();
-             }} style={{padding:'0.75rem 1.25rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--card-bg)', color:'var(--text)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.5rem', transition:'0.2s'}}>
-               <Search size={16} color="var(--accent)" /> {q}
-             </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )};
-  
-
-const renderGeneralReports = () => {
-    const totalCost = assets.reduce((acc, a) => acc + a.cost, 0);
-    const totalDep = accountingEngine.reduce((acc, a) => acc + a.accumulatedDep, 0);
-    const totalNBV = accountingEngine.reduce((acc, a) => acc + a.netBookValue, 0);
-    
-    return (
-      <div className="view-anim">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+      {analyticsData ? (
+        <div style={{display:'flex', flexDirection:'column', gap:'2rem'}}>
           <div>
-            <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Database color="var(--accent)" /> التقارير والتحليلات المؤسسية</h2>
-            <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>عرض شامل لأداء المحفظة الرأسمالية، تحليل الإهلاك، وحالة الامتثال.</p>
-          </div>
-          <button className="btn btn-primary" onClick={() => showToast('📥 جاري تصدير التقرير المؤسسي الشامل...')}><Download size={18} /> استخراج التقرير السنوي</button>
-        </div>
-
-        <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
-          <div className="card" style={{borderRight:'4px solid var(--accent)'}}>
-            <div className="val-sub">إجمالي التكلفة التاريخية</div>
-            <div className="val-big" style={{fontSize:'1.2rem'}}>{totalCost.toLocaleString()} ر.س</div>
-          </div>
-          <div className="card" style={{borderRight:'4px solid var(--danger)'}}>
-            <div className="val-sub">مجمع الإهلاك المتراكم</div>
-            <div className="val-big" style={{fontSize:'1.2rem', color:'var(--danger)'}}>{totalDep.toLocaleString()} ر.س</div>
-          </div>
-          <div className="card" style={{borderRight:'4px solid var(--success)'}}>
-            <div className="val-sub">صافي القيمة الدفترية (NBV)</div>
-            <div className="val-big" style={{fontSize:'1.2rem', color:'var(--success)'}}>{totalNBV.toLocaleString()} ر.س</div>
-          </div>
-          <div className="card" style={{borderRight:'4px solid #f59e0b'}}>
-            <div className="val-sub">العائد على الأصول (ROA)</div>
-            <div className="val-big" style={{fontSize:'1.2rem', color:'#f59e0b'}}>14.2%</div>
-          </div>
-        </div>
-
-        <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
-          <div className="card">
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-              <h3 style={{fontSize:'1.1rem'}}>تحليل حالة الأصول (Asset Condition)</h3>
-              <Activity size={20} color="var(--accent)" />
-            </div>
-            <div style={{height:'300px'}}>
-              <Bar data={{
-                labels: ['يعمل بكفاءة', 'يحتاج صيانة', 'تحت المستودع', 'تالف/إعدام'],
-                datasets: [{
-                  label: 'عدد الأصول',
-                  data: [15, 3, 2, 1],
-                  backgroundColor: ['#10b981', '#f59e0b', '#3b82f6', '#ef4444'],
-                  borderRadius: 8
-                }]
-              }} options={{ responsive: true, maintainAspectRatio: false }} />
-            </div>
-          </div>
-          <div className="card">
-            <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>توزيع الفئات</h3>
-            <div style={{height:'250px', display:'flex', justifyContent:'center'}}>
-              <Doughnut data={{
-                labels: ['تقنية', 'مركبات', 'مباني', 'أثاث'],
-                datasets: [{
-                  data: [40, 25, 20, 15],
-                  backgroundColor: ['#6366f1', '#f43f5e', '#10b981', '#f59e0b'],
-                  borderWidth: 0
-                }]
-              }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }} />
-            </div>
-          </div>
-        </div>
-
-        <div className="card" style={{background:'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)', border:'1px solid #bae6fd'}}>
-          <div style={{display:'flex', gap:'1rem', alignItems:'flex-start'}}>
-            <div style={{background:'white', padding:'0.75rem', borderRadius:'12px', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}}>
-              <TrendingUp color="#0369a1" size={24} />
-            </div>
-            <div>
-              <h4 style={{color:'#0369a1', fontWeight:700, marginBottom:'0.5rem'}}>توصيات الذكاء الاصطناعي للتحسين (Report Insights)</h4>
-              <ul style={{fontSize:'0.85rem', color:'#075985', paddingRight:'1.2rem', display:'flex', flexDirection:'column', gap:'0.5rem'}}>
-                <li>• يُلاحظ تركز 40% من الأصول في الفئة التقنية؛ نوصي بمراجعة عقود الصيانة الدورية لتقليل مخاطر التعطل.</li>
-                <li>• معدل الإهلاك السنوي ارتفع بنسبة 5% نتيجة الاستحواذات الأخيرة، مما يتطلب مراجعة التدفقات النقدية التشغيلية.</li>
-                <li>• هناك 3 أصول في "المستودع" منذ أكثر من 6 أشهر؛ نوصي بإعادة تخصيصها أو بيعها لتجنب تآكل قيمتها دون فائدة.</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-const renderMaintenance = () => (
-  <div className="view-anim">
-    <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
-      <div>
-        <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Wrench color="var(--accent)" /> سجل الصيانة والضمانات</h2>
-        <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إدارة طلبات الصيانة الدورية والتصحيحية ومتابعة عقود الضمان للأصول.</p>
-      </div>
-      <div style={{display:'flex', gap:'0.5rem'}}>
-         <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => showToast('✅ تم تحديث عقود الضمان من الموردين')}><RefreshCw size={16} /> مزامنة الضمانات</button>
-         <button className="btn btn-primary" onClick={() => { const v = window.prompt('رقم الأصل لطلب الصيانة:'); if (v) showToast(`📨 تم رفع تذكرة صيانة للأصل ${v}`); }}><Plus size={16} /> طلب صيانة جديد</button>
-      </div>
-    </div>
-    
-    <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
-      <div className="card" style={{borderTop:'4px solid #3b82f6'}}>
-        <div className="val-sub">طلبات الصيانة المفتوحة</div>
-        <div className="val-big" style={{color:'#3b82f6'}}>5</div>
-        <div className="val-sub">منها 2 طلب طارئ</div>
-      </div>
-      <div className="card" style={{borderTop:'4px solid #10b981'}}>
-        <div className="val-sub">صيانة مكتملة (الشهر الحالي)</div>
-        <div className="val-big" style={{color:'#10b981'}}>12</div>
-        <div className="val-sub">بكفاءة إنجاز 94%</div>
-      </div>
-      <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
-        <div className="val-sub">أصول ينتهي ضمانها قريباً</div>
-        <div className="val-big" style={{color:'#f59e0b'}}>3</div>
-        <div className="val-sub">خلال 30 يوماً</div>
-      </div>
-      <div className="card" style={{borderTop:'4px solid #ef4444'}}>
-        <div className="val-sub">تكلفة الصيانة السنوية</div>
-        <div className="val-big" style={{color:'#ef4444'}}>45,000 ر.س</div>
-      </div>
-    </div>
-
-    <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
-      <div className="card">
-        <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>سجل الصيانة النشط</h3>
-        <table style={{width:'100%', borderCollapse:'collapse'}}>
-          <thead style={{borderBottom:'2px solid var(--border)'}}>
-            <tr>
-              <th style={{padding:'0.75rem', textAlign:'right'}}>رقم التذكرة</th>
-              <th style={{padding:'0.75rem', textAlign:'right'}}>الأصل</th>
-              <th style={{padding:'0.75rem', textAlign:'right'}}>نوع الصيانة</th>
-              <th style={{padding:'0.75rem', textAlign:'right'}}>مزود الخدمة</th>
-              <th style={{padding:'0.75rem', textAlign:'center'}}>الحالة</th>
-            </tr>
-          </thead>
-          <tbody>
-            {[
-              { id: 'MT-1001', asset: 'سيارة فورد تورس', type: 'تصحيحية', provider: 'الوكالة', status: 'قيد التنفيذ', color: '#f59e0b' },
-              { id: 'MT-1002', asset: 'خادم بيانات Dell', type: 'وقائية', provider: 'عقد تقني', status: 'مفتوح', color: '#3b82f6' },
-              { id: 'MT-1003', asset: 'طابعة ليزر HP', type: 'استبدال قطع', provider: 'الصيانة الداخلية', status: 'مكتمل', color: '#10b981' }
-            ].map(m => (
-              <tr key={m.id} style={{borderBottom:'1px solid var(--border)'}}>
-                <td style={{padding:'0.75rem', fontWeight:600}}>{m.id}</td>
-                <td style={{padding:'0.75rem'}}>{m.asset}</td>
-                <td style={{padding:'0.75rem', fontSize:'0.85rem'}}>{m.type}</td>
-                <td style={{padding:'0.75rem', fontSize:'0.85rem', color:'var(--text-muted)'}}>{m.provider}</td>
-                <td style={{padding:'0.75rem', textAlign:'center'}}>
-                  <span style={{background:`${m.color}20`, color:m.color, padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{m.status}</span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="card">
-        <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>الضمانات النشطة</h3>
-        <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-           {[
-             { asset: 'لابتوب ديل XPS 15', provider: 'مكتبة جرير', end: '2025-01-15', remaining: 470 },
-             { asset: 'مبنى الإدارة', provider: 'المقاول الرئيسي', end: '2025-01-01', remaining: 450 },
-             { asset: 'سيارة كامري', provider: 'عبداللطيف جميل', end: '2024-06-20', remaining: 260, alert: true }
-           ].map((w, idx) => (
-             <div key={idx} style={{padding:'1rem', borderRadius:'8px', border:`1px solid ${w.alert ? '#fecaca' : 'var(--border)'}`, background: w.alert ? '#fef2f2' : 'var(--card-bg)'}}>
-               <div style={{fontWeight:700, marginBottom:'0.25rem', color: w.alert ? '#991b1b' : 'var(--text)'}}>{w.asset}</div>
-               <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:'0.5rem'}}>المزود: {w.provider}</div>
-               <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.75rem', fontWeight:600}}>
-                 <span>انتهاء: {w.end}</span>
-                 <span style={{color: w.alert ? '#ef4444' : '#10b981'}}>{w.remaining} يوم متبقي</span>
-               </div>
-             </div>
-           ))}
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-
-  
-  const renderDepreciation = () => {
-    const activeAssetsForDep = accountingEngine.filter(a => a.status === 'نشط' || a.status === 'متوقف');
-    const totalDepCost = activeAssetsForDep.reduce((s,a) => s + (Number(a.cost)||0), 0);
-    const totalAccDep = activeAssetsForDep.reduce((s,a) => s + (Number(a.accumulatedDep)||0), 0);
-    
-    // Calculate Monthly Depreciation (Straight Line)
-    const monthlyDep = activeAssetsForDep.map(a => {
-      const cost = Number(a.cost) || 0;
-      const salvage = Number(a.salvageValue) || 0;
-      const life = Number(a.usefulLife) || 5;
-      const depBasis = cost - salvage;
-      const yearly = life > 0 ? depBasis / life : 0;
-      const monthly = yearly / 12;
-      return { ...a, monthlyDep: monthly };
-    });
-    
-    const totalMonthly = monthlyDep.reduce((s,a) => s + a.monthlyDep, 0);
-
-    return (
-      <div className="view-anim">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
-          <div>
-            <h2 style={{fontSize:'1.5rem', fontWeight:800, color:'var(--text)', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}>
-              <Calculator size={24} color="var(--brand-teal)" />
-              إدارة وحساب الإهلاك (Depreciation Engine)
-            </h2>
-            <p style={{color:'var(--text-muted)'}}>محرك احتساب الإهلاك التلقائي (طريقة القسط الثابت) للأصول الثابتة.</p>
-          </div>
-          <button className="btn btn-primary" onClick={() => {
-             // Create Journal Entry
-             const je = {
-               entry_number: 'JE-' + Math.floor(1000 + Math.random() * 9000),
-               date: new Date().toISOString().split('T')[0],
-               description: 'قيد إثبات إهلاك الأصول الثابتة للشهر الحالي',
-               total_amount: totalMonthly.toFixed(2),
-               status: 'مرحل',
-               lines: [
-                 { account_name: 'مصروف إهلاك أصول ثابتة', type: 'مدين', amount: totalMonthly.toFixed(2) },
-                 { account_name: 'مجمع إهلاك أصول ثابتة', type: 'دائن', amount: totalMonthly.toFixed(2) }
-               ]
-             };
-             if (!totalMonthly || totalMonthly <= 0) { showToast('⚠️ لا يوجد إهلاك مستحق لهذا الشهر'); return; }
-             const amount = Math.round(totalMonthly * 100) / 100;
-             const jeRow = { journal_no: 'JV-DEP-' + Date.now().toString().slice(-6), entry_date: je.date, description: je.description, status: 'مرحل', source_module: 'depreciation' };
-             supabase.from('journal_entries').insert([jeRow]).select().single().then(({ data: ins, error }) => {
-               if (error) { showToast('❌ تعذر حفظ القيد: ' + error.message); return; }
-               setJournals(prev => [
-                 { id: jeRow.journal_no, db_id: ins?.id, date: jeRow.entry_date, desc: 'مصروف إهلاك أصول ثابتة', debit: amount, credit: null, status: 'مرحل' },
-                 { id: jeRow.journal_no, db_id: ins?.id, date: jeRow.entry_date, desc: 'مجمع إهلاك أصول ثابتة', debit: null, credit: amount, status: 'مرحل' },
-                 ...prev
-               ]);
-             });
-             showToast('✅ تم ترحيل قيد الإهلاك للشهر الحالي بنجاح!');
-          }}>
-            <RefreshCw size={18} /> ترحيل إهلاك الشهر الحالي
-          </button>
-        </div>
-
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem', marginBottom:'2rem'}}>
-          <div className="stat-card">
-            <div className="stat-title">إجمالي تكلفة الأصول الخاضعة</div>
-            <div className="stat-value">{totalDepCost.toLocaleString()} <span style={{fontSize:'1rem', fontWeight:400}}>ر.س</span></div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-title">إجمالي الإهلاك المتراكم</div>
-            <div className="stat-value" style={{color:'var(--danger)'}}>{totalAccDep.toLocaleString()} <span style={{fontSize:'1rem', fontWeight:400}}>ر.س</span></div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-title">إهلاك الشهر الحالي (مقدّر)</div>
-            <div className="stat-value" style={{color:'var(--warning)'}}>{totalMonthly.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})} <span style={{fontSize:'1rem', fontWeight:400}}>ر.س</span></div>
-          </div>
-        </div>
-
-        <div className="card" style={{overflowX:'auto'}}>
-          <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
-            <thead>
-              <tr style={{background:'var(--thead-bg)', color:'var(--text-secondary)', textAlign:'right'}}>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>رقم الأصل</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>اسم الأصل</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>التكلفة</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>الخردة</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>العمر (سنوات)</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>أساس الإهلاك</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>الإهلاك الشهري</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>المتراكم السابق</th>
-                <th style={{padding:'1rem', borderBottom:'1px solid var(--border)'}}>القيمة الدفترية (NBV)</th>
-              </tr>
-            </thead>
-            <tbody>
-              {monthlyDep.map((a, i) => (
-                <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
-                  <td style={{padding:'1rem', fontWeight:600}}>{a.id}</td>
-                  <td style={{padding:'1rem'}}>{a.name}</td>
-                  <td style={{padding:'1rem'}}>{(Number(a.cost)||0).toLocaleString()}</td>
-                  <td style={{padding:'1rem'}}>{(Number(a.salvageValue)||0).toLocaleString()}</td>
-                  <td style={{padding:'1rem'}}>{a.usefulLife}</td>
-                  <td style={{padding:'1rem'}}>{(Number(a.cost) - Number(a.salvageValue)).toLocaleString()}</td>
-                  <td style={{padding:'1rem', fontWeight:600, color:'var(--warning)'}}>{a.monthlyDep.toLocaleString(undefined, {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
-                  <td style={{padding:'1rem', color:'var(--danger)'}}>{(Number(a.accumulatedDep)||0).toLocaleString()}</td>
-                  <td style={{padding:'1rem', fontWeight:600, color:'var(--success)'}}>{((Number(a.cost)||0) - (Number(a.accumulatedDep)||0)).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  };
-
-  
-  const renderCustody = () => {
-    // Group assets by employee_id (Custody)
-    const custodyMap = {};
-    assets.forEach(a => {
-      if (a.employee_id) {
-        if (!custodyMap[a.employee_id]) custodyMap[a.employee_id] = [];
-        custodyMap[a.employee_id].push(a);
-      }
-    });
-    
-    // Sort employees by number of assets
-    const sortedCustodians = Object.keys(custodyMap).sort((a,b) => custodyMap[b].length - custodyMap[a].length);
-
-    return (
-      <div className="view-anim">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
-          <div>
-            <h2 style={{fontSize:'1.5rem', fontWeight:800, color:'var(--text)', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}>
-              <Users size={24} color="var(--brand-teal)" />
-              إدارة العهد (Custody Management)
-            </h2>
-            <p style={{color:'var(--text-muted)'}}>تتبع الأصول المسلمة عهدة للموظفين وإداراتهم.</p>
-          </div>
-          <button className="btn btn-primary">
-            <UserCircle size={18} /> تسليم عهدة جديدة
-          </button>
-        </div>
-
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'1.5rem'}}>
-          {sortedCustodians.map(emp => {
-            const empAssets = custodyMap[emp];
-            const totalValue = empAssets.reduce((s,a) => s + (Number(a.cost)||0), 0);
-            return (
-              <div key={emp} className="card" style={{display:'flex', flexDirection:'column', gap:'1rem', cursor:'pointer', transition:'transform 0.2s'}} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='none'} onClick={() => setSelectedEmployee({ name: emp, assets: empAssets, totalValue })}>
-                <div style={{display:'flex', alignItems:'center', gap:'1rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
-                  <div style={{background:'var(--thead-bg)', borderRadius:'50%', width:'50px', height:'50px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--accent)'}}>
-                    <UserCircle size={28} />
-                  </div>
-                  <div>
-                    <h3 style={{margin:0, fontSize:'1.1rem'}}>{emp}</h3>
-                    <div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إجمالي الأصول: {empAssets.length}</div>
-                  </div>
+             <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات المخاطر والتنبؤات</h3>
+             <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+                <div className="card" style={{borderTop:'4px solid #ef4444'}}>
+                  <div className="val-sub">أصناف مهددة بالنفاد</div>
+                  <div className="val-big" style={{color:'#ef4444'}}>{analyticsData.preds.stockRunout.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
+                  <div className="val-sub">استهلاك أعلى من المعدل الطبيعي. يتوقع النفاد قريباً.</div>
                 </div>
-                <div>
-                  <div style={{fontSize:'0.85rem', color:'var(--text-muted)', marginBottom:'0.5rem'}}>قيمة العهدة الإجمالية:</div>
-                  <div style={{fontWeight:800, fontSize:'1.25rem', color:'var(--text)'}}>{totalValue.toLocaleString()} <span style={{fontSize:'0.85rem', fontWeight:400}}>ر.س</span></div>
+                <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+                  <div className="val-sub">أولوية استبدال حرجة</div>
+                  <div className="val-big" style={{color:'#f59e0b'}}>{analyticsData.preds.replacementPriority.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
+                  <div className="val-sub">أصول تجاوزت العمر الافتراضي أو تكلفة صيانتها مرتفعة.</div>
                 </div>
-                <div style={{background:'var(--bg)', borderRadius:'8px', padding:'0.5rem', maxHeight:'150px', overflowY:'auto'}}>
-                  {empAssets.map(a => (
-                    <div key={a.id} style={{display:'flex', justifyContent:'space-between', padding:'0.5rem', borderBottom:'1px solid var(--border)', fontSize:'0.85rem'}}>
-                      <div>{a.name}</div>
-                      <div style={{fontWeight:600}}>{a.id}</div>
-                    </div>
-                  ))}
+                <div className="card" style={{borderTop:'4px solid #10b981'}}>
+                  <div className="val-sub">الميزانية التقديرية (تنبؤ)</div>
+                  <div className="val-big" style={{color:'#10b981'}}>{analyticsData.preds.estimatedBudgetNeeded.toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
+                  <div className="val-sub">ميزانية مقترحة للربع القادم بناءً على الاحتياج والإحلال.</div>
                 </div>
-                <button className="btn btn-ghost" style={{width:'100%', marginTop:'0.5rem'}}>
-                  <FileText size={16} /> طباعة نموذج تسليم عهدة
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-    );
-  };
-
-  
-      
-      {qrModalAsset && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, backdropFilter:'blur(5px)'}}>
-          <div className="card" style={{width:'350px', background:'white', padding:'2.5rem', textAlign:'center', borderRadius:'16px'}}>
-             <div style={{marginBottom:'1rem', fontWeight:800, color:'#0f172a', fontSize:'1.25rem'}}>ملصق الأصل الثابت</div>
-             <div style={{padding:'1rem', background:'white', display:'inline-block', border:'2px solid #e2e8f0', borderRadius:'12px', marginBottom:'1.5rem'}}>
-               <QRCodeSVG value={JSON.stringify({ id: qrModalAsset.id, name: qrModalAsset.name, category: qrModalAsset.category, date: qrModalAsset.date })} size={200} />
-             </div>
-             <div style={{fontWeight:800, fontSize:'1.5rem', color:'#0f172a', fontFamily:'monospace', letterSpacing:'2px'}}>{qrModalAsset.id}</div>
-             <div style={{fontSize:'0.9rem', color:'#64748b', marginTop:'0.5rem', marginBottom:'2rem'}}>{qrModalAsset.name}</div>
-             <div style={{display:'flex', gap:'1rem'}}>
-               <button className="btn btn-primary" style={{flex:1}} onClick={() => { showToast('🖨️ جاري الطباعة على طابعة الملصقات الحرارية...'); setQrModalAsset(null); }}><Printer size={18} /> طباعة الملصق</button>
-               <button className="btn btn-ghost" style={{flex:1, border:'1px solid #cbd5e1'}} onClick={() => setQrModalAsset(null)}>إغلاق</button>
              </div>
           </div>
         </div>
-      )}
-      {selectedEmployee && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'800px', maxHeight:'90vh', overflowY:'auto', background:'var(--bg)', padding:0, border:'1px solid var(--border)'}}>
-            
-            {/* Header */}
-            <div style={{padding:'2rem', background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color:'white', position:'relative'}}>
-              <button className="btn btn-ghost" style={{position:'absolute', top:'1rem', left:'1rem', color:'white', background:'rgba(255,255,255,0.1)'}} onClick={() => setSelectedEmployee(null)}><X size={18} /></button>
-              <div style={{display:'flex', alignItems:'center', gap:'1.5rem'}}>
-                <div style={{background:'rgba(255,255,255,0.1)', padding:'1rem', borderRadius:'50%'}}>
-                  <UserCircle size={48} />
-                </div>
-                <div>
-                  <h2 style={{margin:0, fontSize:'1.8rem', fontWeight:800}}>{selectedEmployee.name}</h2>
-                  <div style={{color:'#94a3b8', marginTop:'0.5rem'}}>إجمالي الأصول المستلمة عهدة: {selectedEmployee.assets.length} أصل | القيمة الإجمالية: {selectedEmployee.totalValue.toLocaleString()} ر.س</div>
-                </div>
-              </div>
+      ) : (
+        <div>
+          <h3 style={{marginBottom:'1rem', fontSize:'1.1rem'}}>مؤشرات المخاطر والتنبؤات (Anomaly Detection)</h3>
+          <div className="summary-grid" style={{gridTemplateColumns: 'repeat(3, 1fr)'}}>
+            <div className="card" style={{borderTop:'4px solid #ef4444'}}>
+              <div className="val-sub">نواقص المستودع المتوقعة</div>
+              <div className="val-big" style={{color:'#ef4444'}}>{lowStockItems.length} <span style={{fontSize:'1rem'}}>صنف</span></div>
+              <div className="val-sub">انخفضت دون الحد الأدنى. الرجاء توليد الملخص لحساب المتبقي.</div>
             </div>
-
-            {/* Actions */}
-            <div style={{padding:'1.5rem 2rem', borderBottom:'1px solid var(--border)', background:'var(--card-bg)', display:'flex', gap:'1rem'}}>
-              <button className="btn btn-primary" onClick={() => {
-                showToast('🖨️ جاري تجهيز وإصدار نموذج "إخلاء طرف / تسليم عهدة"...');
-              }}>
-                <FileText size={18} /> طباعة نموذج تسليم / إخلاء عهدة (PDF)
-              </button>
-              <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}>
-                <History size={18} /> سجل حركات الموظف
-              </button>
+            <div className="card" style={{borderTop:'4px solid #f59e0b'}}>
+              <div className="val-sub">أصول بدون نسبة إهلاك واضحة</div>
+              <div className="val-big" style={{color:'#f59e0b'}}>{anomalyDepreciation.length} <span style={{fontSize:'1rem'}}>أصل</span></div>
+              <div className="val-sub">بيانات غير مكتملة تؤثر على حساب القيمة الدفترية.</div>
             </div>
-
-            {/* Assets Table */}
-            <div style={{padding:'2rem'}}>
-              <h3 style={{fontSize:'1.2rem', marginBottom:'1rem', color:'var(--brand-teal)'}}>تفاصيل الأصول في العهدة الحالية</h3>
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem', background:'var(--card-bg)', borderRadius:'8px', overflow:'hidden'}}>
-                <thead style={{background:'var(--thead-bg)', borderBottom:'2px solid var(--border)'}}>
-                  <tr>
-                    <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>وصف الأصل</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>تاريخ الاستلام</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>التكلفة (ر.س)</th>
-                    <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedEmployee.assets.map((a, i) => (
-                    <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
-                      <td style={{padding:'1rem', fontWeight:800, color:'var(--accent)'}}>{a.id}</td>
-                      <td style={{padding:'1rem', fontWeight:600}}>{a.name}</td>
-                      <td style={{padding:'1rem'}}>{a.date}</td>
-                      <td style={{padding:'1rem'}}>{(Number(a.cost)||0).toLocaleString()}</td>
-                      <td style={{padding:'1rem', textAlign:'center'}}>
-                        <span style={{background:'rgba(16, 185, 129, 0.1)', color:'#10b981', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{a.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="card" style={{borderTop:'4px solid #10b981'}}>
+              <div className="val-sub">إجمالي قيمة الأصول التقديرية</div>
+              <div className="val-big" style={{color:'#10b981'}}>~ {(totalAssetsValue * 0.15).toLocaleString()} <span style={{fontSize:'1rem'}}>ر.س</span></div>
+              <div className="val-sub">قيمة تقريبية، اضغط توليد الملخص لحساب مجمع الإهلاك الفعلي.</div>
             </div>
-
           </div>
         </div>
       )}
-  
-      {warehouseMovementModal && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--border)', overflow:'hidden'}}>
-            
-            <div style={{padding:'1.5rem 2rem', background:'var(--card-bg)', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'var(--text)'}}>
-                <ArrowRightLeft size={22} color="var(--brand-teal)"/>
-                إنشاء مستند حركة مستودعية
-              </h2>
-              <button className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}><X size={18} /></button>
-            </div>
+    </div>
+    );
+  };
 
-            <form style={{padding:'2rem'}} onSubmit={(e) => {
-              e.preventDefault();
-              const type = e.target.movementType.value;
-              const isAsset = e.target.isAsset?.checked;
-              
-              if (type === 'صرف' && isAsset) {
-                // Open new asset modal implicitly
-                setWarehouseMovementModal(false);
-                setEditingAsset(null);
-                setView('new-asset');
-                setTimeout(() => showToast('💡 نظراً لأن الصنف المَصروف يصنّف كأصل ثابت، تم تحويلك مباشرة لشاشة تسجيل الأصل.'), 500);
-              } else {
-                setWarehouseMovementModal(false);
-                showToast(`✅ تم حفظ إذن الـ (${type}) وتحديث كميات المستودع بنجاح!`);
-              }
-            }}>
-              <div style={{display:'grid', gap:'1.5rem'}}>
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>نوع الحركة المستودعية *</label>
-                  <select name="movementType" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} onChange={e => {
-                    const chk = document.getElementById('isAssetContainer');
-                    if (chk) chk.style.display = e.target.value === 'صرف' ? 'block' : 'none';
-                  }}>
-                    <option value="استلام">إذن استلام (إضافة للمخزون)</option>
-                    <option value="صرف">إذن صرف (خصم من المخزون)</option>
-                    <option value="تحويل">إذن تحويل بين المستودعات</option>
-                    <option value="إرجاع">إذن إرجاع</option>
-                    <option value="تسوية">إذن تسوية (تعديل الأرصدة)</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الصنف *</label>
-                  <select name="item" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                    {warehouseItems.map(w => <option key={w.id} value={w.id}>{w.sku} - {w.name} (الرصيد: {w.qty})</option>)}
-                  </select>
-                </div>
-
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem'}}>
-                  <div>
-                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الكمية *</label>
-                    <input name="qty" type="number" min="1" required defaultValue="1" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
-                  </div>
-                  <div>
-                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>المستودع / الموقع</label>
-                    <select name="warehouse" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                      <option value="main">المستودع الرئيسي (الرياض)</option>
-                      <option value="sub1">مستودع فرع جدة</option>
-                      <option value="sub2">مستودع العهد التقنية</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div id="isAssetContainer" style={{display:'none', background:'rgba(245, 158, 11, 0.1)', border:'1px solid rgba(245, 158, 11, 0.3)', padding:'1rem', borderRadius:'8px'}}>
-                  <label style={{display:'flex', alignItems:'center', gap:'0.75rem', cursor:'pointer', color:'var(--warning)', fontWeight:700}}>
-                    <input type="checkbox" name="isAsset" style={{width:'20px', height:'20px', accentColor:'var(--warning)'}} />
-                    هل هذا الصنف المصروف يعتبر "أصلاً ثابتاً"؟ (سيقوم النظام تلقائياً بإنشاء بطاقة أصل ثابت له)
-                  </label>
-                </div>
-
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الملاحظات والبيان</label>
-                  <textarea name="notes" rows="2" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
-                </div>
-              </div>
-
-              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
-                <button type="button" className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">تنفيذ وحفظ</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-  
-      {disposalModal && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--danger)', overflow:'hidden'}}>
-            
-            <div style={{padding:'1.5rem 2rem', background:'#fef2f2', borderBottom:'1px solid #fecaca', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'#991b1b'}}>
-                <Trash2 size={22}/>
-                نموذج طلب استبعاد أصل ثابت
-              </h2>
-              <button className="btn btn-ghost" onClick={() => setDisposalModal(null)}><X size={18} color="#991b1b" /></button>
-            </div>
-
-            <form style={{padding:'2rem'}} onSubmit={async (e) => {
-              e.preventDefault();
-              const reason = e.target.reason.value;
-              const details = e.target.details.value;
-              const date = new Date().toISOString().split('T')[0];
-              
-              const { error } = await supabase.from('assets').update({
-                status: 'مستبعد',
-                disposal_date: date,
-                disposal_reason: `${reason}: ${details}`
-              }).eq('id', disposalModal.db_id);
-
-              if (error) {
-                showToast('❌ حدث خطأ أثناء الاستبعاد');
-              } else {
-                showToast('✅ تم استبعاد الأصل بنجاح وإيقاف إهلاكه مستقبلاً!');
-                fetchInitialData();
-                setDisposalModal(null);
-              }
-            }}>
-              
-              <div style={{background:'var(--card-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)'}}>
-                <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أنت تقوم الآن باستبعاد الأصل:</div>
-                <div style={{fontWeight:800, color:'var(--accent)', fontSize:'1.1rem'}}>{disposalModal.id} - {disposalModal.name}</div>
-                <div style={{fontSize:'0.85rem', color:'var(--danger)', marginTop:'0.5rem'}}>تنبيه: لن يتم حذف الأصل من قاعدة البيانات حفظاً للسجل التاريخي، ولكن ستتغير حالته إلى "مستبعد" وسيتوقف احتساب إهلاكه.</div>
-              </div>
-
-              <div style={{display:'grid', gap:'1.5rem'}}>
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>سبب الاستبعاد الأساسي *</label>
-                  <select name="reason" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                    <option value="تالف / خردة">تالف / خردة (لا جدوى من إصلاحه)</option>
-                    <option value="مفقود / مسروق">مفقود / مسروق</option>
-                    <option value="تم البيع">تم بيع الأصل</option>
-                    <option value="تبرع عيني">تم التبرع به</option>
-                    <option value="انتهاء العمر الافتراضي">انتهاء العمر الافتراضي</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>تفاصيل ومبررات الاستبعاد (قرار اللجنة) *</label>
-                  <textarea name="details" rows="3" required placeholder="أدخل مبررات الاستبعاد وأسماء أعضاء لجنة الفحص إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
-                </div>
-              </div>
-
-              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
-                <button type="button" className="btn btn-ghost" onClick={() => setDisposalModal(null)}>تراجع وإلغاء</button>
-                <button type="submit" className="btn btn-primary" style={{background:'var(--danger)', borderColor:'var(--danger)', color:'white'}}>تأكيد الاستبعاد</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
   const renderSettings = () => {
     const handleSaveSettings = async (e) => {
       e.preventDefault();
