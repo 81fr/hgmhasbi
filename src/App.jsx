@@ -139,19 +139,39 @@ const App = () => {
   const [userProfile, setUserProfile] = useState(null);
   
   useEffect(() => {
-    if (session?.user) {
-      // Determine user role
-      let role = session.user.user_metadata?.role || session.user.role || 'مسؤول نظام (Admin)';
-      setUserProfile({
-        id: session.user.id,
-        email: session.user.email,
-        name: session.user.user_metadata?.full_name || session.user.name || session.user.email?.split('@')[0],
-        role: role,
-        isAdmin: role.includes('مسؤول') || role.includes('Admin')
-      });
-    } else {
-      setUserProfile(null);
-    }
+    const fetchRealProfile = async () => {
+      if (session?.user) {
+        let role = session.user.user_metadata?.role || session.user.role || 'مسؤول نظام (Admin)';
+        let name = session.user.user_metadata?.full_name || session.user.name || session.user.email?.split('@')[0];
+        
+        // Supabase defaults role to 'authenticated', which breaks our RBAC.
+        // We must fetch the actual role from employees table!
+        const { data: empData } = await supabase
+          .from('employees')
+          .select('role, full_name')
+          .eq('email', session.user.email)
+          .single();
+          
+        if (empData) {
+          role = empData.role;
+          if (empData.full_name) name = empData.full_name;
+        } else if (role === 'authenticated') {
+          role = 'مسؤول نظام (Admin)'; // Fallback for the very first admin user
+        }
+        
+        setUserProfile({
+          id: session.user.id,
+          email: session.user.email,
+          name: name,
+          role: role,
+          isAdmin: role.includes('مسؤول') || role.includes('Admin')
+        });
+      } else {
+        setUserProfile(null);
+      }
+    };
+    
+    fetchRealProfile();
   }, [session]);
   
   
