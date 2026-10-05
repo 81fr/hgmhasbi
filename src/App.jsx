@@ -212,6 +212,13 @@ const App = () => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [systemSettings, setSystemSettings] = useState(null);
   const [dbNotifications, setDbNotifications] = useState([]);
+  const [systemLookups, setSystemLookups] = useState({
+    categories: ['أجهزة تقنية', 'أثاث مكتبي', 'سيارات', 'معدات طبية'],
+    departments: ['الإدارة العامة', 'تقنية المعلومات', 'المالية', 'الموارد البشرية'],
+    locations: ['المبنى الرئيسي', 'فرع الرياض', 'المستودع المركزي'],
+    suppliers: ['شركة التقنية', 'مؤسسة الأثاث', 'الوكالة العامة'],
+    status: ['نشط', 'قيد التجهيز', 'متوقف', 'تالف']
+  });
   const [inventoryCampaigns, setInventoryCampaigns] = useState([]);
   
   const [warehouseModal, setWarehouseModal] = useState(null);
@@ -354,7 +361,11 @@ const App = () => {
 
   const fetchInitialData = async () => {
     // جلب الأصول
-    const { data: asData, error: asErr } = await supabase.from('assets').select('*');
+    const { data: setData } = await supabase.from('system_settings').select('lookups').limit(1).single();
+      if (setData?.lookups) {
+        setSystemLookups(setData.lookups);
+      }
+      const { data: asData, error: asErr } = await supabase.from('assets').select('*');
     if (!asErr && asData) {
       const mappedAssets = asData.map(item => ({
           id: item.asset_no,
@@ -2466,6 +2477,28 @@ const renderDepreciation = () => {
   );
 
   const renderSettings = () => {
+
+
+    const handleSaveLookups = async (e) => {
+      e.preventDefault();
+      const fd = new FormData(e.target);
+      const parseList = (str) => str.split(',').map(s => s.trim()).filter(s => s);
+      
+      const newLookups = {
+        categories: parseList(fd.get('lk_categories')),
+        departments: parseList(fd.get('lk_departments')),
+        locations: parseList(fd.get('lk_locations')),
+        suppliers: parseList(fd.get('lk_suppliers')),
+        status: parseList(fd.get('lk_status'))
+      };
+
+      const { error } = await supabase.from('system_settings').update({ lookups: newLookups }).eq('id', systemSettings?.id);
+      if(error) showToast('❌ حدث خطأ أثناء حفظ القوائم المنسدلة');
+      else {
+        setSystemLookups(newLookups);
+        showToast('✅ تم تحديث مسميات وخيارات القوائم بنجاح!');
+      }
+    };
 
     const handleSaveSettings = async (e) => {
       e.preventDefault();
