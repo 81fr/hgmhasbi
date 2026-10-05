@@ -135,7 +135,8 @@ const Section = ({ title }) => (
 );
 
 
-const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
+
+const AssetForm = ({ ea, systemLookups, onSubmit, onCancel, linkedJournals }) => {
   const [cat, setCat] = React.useState(ea?.category || 'أجهزة تقنية');
   const isLand = cat === 'أراضي' || cat === 'اراضي';
   
@@ -148,106 +149,159 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
   const locs = lookups.locations || ['مبنى الإدارة', 'الفرع'];
   const statuses = lookups.status || ['نشط', 'متوقف', 'صيانة', 'مستبعد'];
   const suppliersList = lookups.suppliers || [];
+  const costCenters = lookups.cost_centers || ['المركز الرئيسي', 'الفرع', 'الإنتاج', 'المبيعات'];
+  const conditionsList = lookups.conditions || ['ممتاز', 'جيد جداً', 'جيد', 'مقبول', 'متهالك'];
 
   return (
     <div className="view-anim">
       <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <div>
-          <h2 style={{fontSize:'1.5rem', fontWeight:800}}>{ea ? 'تعديل بطاقة أصل ثابت' : 'إنشاء بطاقة أصل ثابت'}</h2>
-          <p style={{color:'var(--text-muted)'}}>{ea ? `تعديل بيانات الأصل: ${ea.name}` : 'أدخل بيانات الأصل الجديد مقسمة حسب التصنيفات القياسية'}</p>
+          <h2 style={{fontSize:'1.8rem', fontWeight:800}}>{ea ? 'تعديل بطاقة الأصل: ' + ea.name : 'إنشاء بطاقة أصل ثابت (سجل متكامل)'}</h2>
+          <p style={{color:'var(--text-muted)'}}>{ea ? 'تعديل البيانات التفصيلية للأصل' : 'يرجى تعبئة الحقول الإجبارية المعلمة بـ (*) لارتباطها بالقيود المحاسبية'}</p>
         </div>
         <button type="button" className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={onCancel}>إلغاء والعودة</button>
       </div>
 
-      <div className="card" style={{maxWidth: '1200px', background: 'var(--card-bg)', padding:0, overflow:'hidden'}}>
+      <div className="card" style={{maxWidth: '1200px', background: 'var(--card-bg)', padding:0, overflow:'hidden', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.1)'}}>
         <form key={ea ? ea.id : 'new'} onSubmit={onSubmit}>
           
+          {/* 1. البيانات الأساسية */}
           <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={20}/> 1. البيانات الأساسية للأصل</h3>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={20}/> 1. البيانات الأساسية والتصنيف</h3>
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
-              <F label="رقم الأصل (تلقائي)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-..." style={inp} /></F>
-              <F label="اسم / وصف الأصل *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: لابتوب ديل بلس" required style={inp} /></F>
+              <F label="رقم الأصل (تلقائي)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-..." style={{...inp, background:'var(--bg)', opacity:0.7}} /></F>
+              <F label="اسم الأصل / الوصف *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: لابتوب ديل بلس" required style={inp} /></F>
               <F label="الفئة *">
                 <select name="category" value={cat} onChange={e => setCat(e.target.value)} required style={inp}>
                   {cats.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </F>
-              {!isLand && <F label="الرقم التسلسلي (SN)"><input name="serialNumber" type="text" defaultValue={ea?.serialNumber} placeholder="S/N..." style={inp} /></F>}
-              {!isLand && <F label="الشركة المصنعة"><input name="manufacturer" type="text" defaultValue={ea?.manufacturer} placeholder="Dell, HP..." style={inp} /></F>}
-              {!isLand && <F label="الموديل"><input name="model" type="text" defaultValue={ea?.model} placeholder="Latitude 5530..." style={inp} /></F>}
-              <F label="حالة الأصل">
-                <select name="status" defaultValue={ea?.status || 'نشط'} style={inp}>
+              <F label="مركز التكلفة *">
+                <select name="cost_center" defaultValue={ea?.cost_center || costCenters[0]} required style={inp}>
+                  {costCenters.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </F>
+              <F label="حالة الأصل العملية *">
+                <select name="status" defaultValue={ea?.status || 'نشط'} required style={inp}>
                   {statuses.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </F>
+              <F label="الحالة الفنية للأصل *">
+                <select name="asset_condition" defaultValue={ea?.asset_condition || conditionsList[0]} required style={inp}>
+                  {conditionsList.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </F>
             </div>
           </div>
 
+          {/* 2. الفنية والتأمين */}
+          {!isLand && (
           <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><MapPin size={20}/> 2. الموقع والعهدة</h3>
-            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem'}}>
-              <F label="الموقع">
-                <select name="location" defaultValue={ea?.location || locs[0]} style={inp}>
-                  {locs.map(l => <option key={l} value={l}>{l}</option>)}
-                </select>
-              </F>
-              <F label="الإدارة المستفيدة">
-                <select name="department" defaultValue={ea?.department || depts[0]} style={inp}>
-                  {depts.map(d => <option key={d} value={d}>{d}</option>)}
-                </select>
-              </F>
-              <F label="الموظف / صاحب العهدة"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="اسم الموظف المستلم" style={inp} /></F>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Settings size={20}/> 2. البيانات الفنية والضمان</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
+              <F label="الرقم التسلسلي (SN)"><input name="serialNumber" type="text" defaultValue={ea?.serialNumber} placeholder="S/N..." style={inp} /></F>
+              <F label="الشركة المصنعة"><input name="manufacturer" type="text" defaultValue={ea?.manufacturer} placeholder="Dell, Toyota..." style={inp} /></F>
+              <F label="الموديل"><input name="model" type="text" defaultValue={ea?.model} placeholder="2024 / Latitude..." style={inp} /></F>
+              <F label="جهة الضمان"><input name="warranty_provider" type="text" defaultValue={ea?.warranty_provider} placeholder="الوكيل المحلي..." style={inp} /></F>
+              <F label="تاريخ انتهاء الضمان"><input name="warranty" type="date" defaultValue={ea?.warranty} style={inp} /></F>
+              <F label="رقم بوليصة التأمين"><input name="insurance_policy" type="text" defaultValue={ea?.insurance_policy} placeholder="رقم البوليصة..." style={inp} /></F>
+              <F label="تاريخ انتهاء التأمين"><input name="insurance_expiry" type="date" defaultValue={ea?.insurance_expiry} style={inp} /></F>
             </div>
           </div>
+          )}
 
+          {/* 3. الشراء والتشغيل */}
           <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><History size={20}/> 3. الشراء والتشغيل</h3>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><History size={20}/> 3. بيانات الاستحواذ والمورد</h3>
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
-              <F label="المورد">
+              <F label="المورد *">
                 {suppliersList.length > 0 ? (
-                  <select name="supplier" defaultValue={ea?.supplier || suppliersList[0]} style={inp}>
+                  <select name="supplier" defaultValue={ea?.supplier || suppliersList[0]} required style={inp}>
                     <option value="">بدون مورد محدد</option>
                     {suppliersList.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 ) : (
-                  <input name="supplier" type="text" defaultValue={ea?.supplier} placeholder="اسم المورد/الشركة" style={inp} />
+                  <input name="supplier" type="text" defaultValue={ea?.supplier} placeholder="اسم المورد/الشركة" required style={inp} />
                 )}
               </F>
-              <F label="رقم الفاتورة"><input name="invoiceNumber" type="text" defaultValue={ea?.invoiceNumber} placeholder="INV-..." style={inp} /></F>
+              <F label="رقم الفاتورة *"><input name="invoiceNumber" type="text" defaultValue={ea?.invoiceNumber} placeholder="INV-..." required style={inp} /></F>
               <F label="رقم أمر الشراء (PO)"><input name="poNumber" type="text" defaultValue={ea?.poNumber} placeholder="PO-..." style={inp} /></F>
-              <F label="تاريخ الشراء / الاستلام"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
-              {!isLand && <F label="تاريخ جاهزية الاستخدام"><input name="readyDate" type="date" defaultValue={ea?.readyDate || new Date().toISOString().split('T')[0]} required style={inp} /></F>}
-              {!isLand && <F label="الضمان (مدة/نهاية)"><input name="warranty" type="text" defaultValue={ea?.warranty} placeholder="مثال: سنتين تنتهي 2026" style={inp} /></F>}
+              <F label="تاريخ الشراء / الاستحواذ *"><input name="date" type="date" defaultValue={ea?.date || new Date().toISOString().split('T')[0]} required style={inp} /></F>
+              {!isLand && <F label="تاريخ جاهزية الاستخدام *"><input name="readyDate" type="date" defaultValue={ea?.readyDate || new Date().toISOString().split('T')[0]} required style={inp} /></F>}
             </div>
           </div>
 
+          {/* 4. الموقع والعهدة */}
           <div style={{padding:'2rem', borderBottom:'1px solid var(--border)'}}>
-            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Calculator size={20}/> 4. البيانات المالية {isLand ? '' : 'والإهلاك'}</h3>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><MapPin size={20}/> 4. التموضع الجغرافي والعهدة</h3>
+            <div style={{display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1.25rem'}}>
+              <F label="الموقع / الفرع *">
+                <select name="location" defaultValue={ea?.location || locs[0]} required style={inp}>
+                  {locs.map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </F>
+              <F label="القسم الإداري *">
+                <select name="department" defaultValue={ea?.department || depts[0]} required style={inp}>
+                  {depts.map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </F>
+              <F label="الموظف / صاحب العهدة *"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="اسم الموظف المستلم" required style={inp} /></F>
+            </div>
+          </div>
+
+          {/* 5. المالية */}
+          <div style={{padding:'2rem', borderBottom:'1px solid var(--border)', background:'rgba(59, 130, 246, 0.05)'}}>
+            <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Calculator size={20}/> 5. البيانات المالية {isLand ? '' : 'والإهلاك'}</h3>
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
-              <F label="تكلفة الأصل (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} required placeholder="0.00" style={inp} /></F>
+              <F label="تكلفة الأصل / الحيازة (ر.س) *"><input name="cost" type="number" step="0.01" defaultValue={ea?.cost} required placeholder="0.00" style={inp} /></F>
               {!isLand && <F label="القيمة التخريدية (الخردة)"><input name="salvage" type="number" step="0.01" defaultValue={ea?.salvage} placeholder="0.00" style={inp} /></F>}
-              {!isLand && <F label="العمر الإنتاجي (سنوات)"><input name="life" type="number" defaultValue={ea?.life || 5} required style={inp} /></F>}
+              {!isLand && <F label="العمر الإنتاجي (سنوات) *"><input name="life" type="number" defaultValue={ea?.life || 5} required style={inp} /></F>}
               {!isLand && (
-                <F label="طريقة الإهلاك">
-                  <select name="method" defaultValue={ea?.method || 'SL'} style={inp}>
+                <F label="طريقة الإهلاك *">
+                  <select name="method" defaultValue={ea?.method || 'SL'} required style={inp}>
                     <option value="SL">القسط الثابت (SL)</option>
                     <option value="DB">القسط المتناقص (DB)</option>
                   </select>
                 </F>
               )}
-              <F label="مصدر التمويل"><input name="fundingSource" type="text" defaultValue={ea?.fundingSource} placeholder="إيرادات ذاتية / منحة" style={inp} /></F>
+              <F label="مصدر التمويل *">
+                <select name="fundingSource" defaultValue={ea?.fundingSource || 'إيرادات ذاتية'} required style={inp}>
+                  <option value="إيرادات ذاتية">إيرادات ذاتية (نقدية)</option>
+                  <option value="قرض بنكي">قرض بنكي</option>
+                  <option value="منحة حكومية">منحة حكومية</option>
+                </select>
+              </F>
             </div>
+            {ea && linkedJournals && linkedJournals.length > 0 && (
+              <div style={{marginTop: '2rem', padding:'1.5rem', background:'var(--bg)', borderRadius:'12px', border:'1px solid var(--brand-teal)'}}>
+                <h4 style={{marginBottom:'1rem', color:'var(--brand-teal)', fontWeight:700, display:'flex', alignItems:'center', gap:'0.5rem'}}><FileText size={18}/> القيود المحاسبية المرتبطة بهذا الأصل</h4>
+                <table className="table">
+                  <thead><tr><th>رقم القيد</th><th>التاريخ</th><th>البيان</th><th>الحالة</th></tr></thead>
+                  <tbody>
+                    {linkedJournals.map(j => (
+                      <tr key={j.id}>
+                        <td style={{color:'var(--brand-teal)', fontWeight:'bold'}}>{j.journal_no}</td>
+                        <td>{new Date(j.entry_date).toLocaleDateString('ar-SA')}</td>
+                        <td>{j.description}</td>
+                        <td><span className="badge" style={{background: j.status==='معتمد'?'var(--success)':'var(--warning)'}}>{j.status}</span></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           <div style={{padding:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem', background:'var(--bg)'}}>
-             <button type="button" className="btn btn-ghost" onClick={onCancel}>إلغاء</button>
-             <button type="submit" className="btn btn-primary" style={{padding:'0.75rem 2.5rem', fontSize:'1.1rem'}}><CheckCircle size={20} style={{marginRight:'0.5rem'}} /> حفظ بطاقة الأصل في النظام</button>
+             <button type="button" className="btn btn-ghost" onClick={onCancel}>إلغاء والتراجع</button>
+             <button type="submit" className="btn btn-primary" style={{padding:'0.75rem 2.5rem', fontSize:'1.1rem'}}><CheckCircle size={20} style={{marginRight:'0.5rem'}} /> {ea ? 'تحديث بطاقة الأصل' : 'اعتماد وحفظ بطاقة الأصل'}</button>
           </div>
         </form>
       </div>
     </div>
   );
 };
+
 
 const App = () => {
   const [session, setSession] = useState({ user: { id: 'test', email: 'test@test.com' } });
@@ -873,178 +927,6 @@ const App = () => {
 
     importPreview.rows.forEach(({ data }, i) => {
       const dbRecord = {
-        asset_no: data.id || `AST-${Date.now().toString().slice(-6)}${i}`,
-        name: data.name,
-        description: data.description || '',
-        cost: data.cost,
-        salvage_value: data.salvage || 0,
-        purchase_date: data.date || new Date().toISOString().split('T')[0],
-        status: data.status || 'يعمل',
-        qr_code: data.code || `CD-${Math.floor(Math.random()*9000 + 1000)}`
-      };
-      
-      const existingAsset = assets.find(a => a.id === data.id);
-      if (existingAsset && existingAsset.db_id) {
-        recordsToUpdate.push({ ...dbRecord, id: existingAsset.db_id });
-        updated++;
-      } else {
-        recordsToInsert.push(dbRecord);
-        added++;
-      }
-    });
-
-    try {
-      if (recordsToInsert.length > 0) {
-        const { error: insertErr } = await supabase.from('assets').insert(recordsToInsert);
-        if (insertErr) throw insertErr;
-      }
-      
-      for (const record of recordsToUpdate) {
-        const { id, ...updateData } = record;
-        const { error: updateErr } = await supabase.from('assets').update(updateData).eq('id', id);
-        if (updateErr) throw updateErr;
-      }
-
-      await fetchInitialData();
-      setImportPreview(null);
-      showToast(`✅ تم الاستيراد بنجاح: ${added} أصل جديد، ${updated} محدّث في قاعدة البيانات`);
-    } catch (err) {
-      console.error(err);
-      showToast('❌ حدث خطأ أثناء الحفظ في قاعدة البيانات: ' + err.message);
-    }
-  };
-
-  const renderRegister = () => {
-    const filteredAssets = accountingEngine.filter(a => {
-      const q = filterParams.query.trim().toLowerCase();
-      const matchQuery = !q || [a.name, a.code, a.id, a.location, a.custody, a.supplier, a.department].some(v => (v || '').toString().toLowerCase().includes(q));
-      const matchCat = filterParams.category === 'الكل' || a.category === filterParams.category;
-      return matchQuery && matchCat;
-    });
-
-    const activeAssets = accountingEngine.filter(a => a.status === 'يعمل').length;
-    const alertAssets = accountingEngine.filter(a => a.accumulatedDep >= a.cost * 0.8 && a.category !== 'أراضي').length;
-
-    return (
-      <div className="view-anim">
-        <div style={{background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding:'2rem', borderRadius:'16px', color:'white', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.5)', display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem'}}>
-          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>القيمة الرأسمالية الإجمالية</div>
-            <div style={{fontSize:'1.5rem', fontWeight:800}}>{totals.cost.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400, opacity:0.7}}>ر.س</span></div>
-          </div>
-          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>صافي ثروة الأصول (NBV)</div>
-            <div style={{fontSize:'1.5rem', fontWeight:800, color:'#34d399'}}>{totals.nbv.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400, opacity:0.7}}>ر.س</span></div>
-          </div>
-          <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>الأصول المتاحة للخدمة</div>
-            <div style={{fontSize:'1.5rem', fontWeight:800, color:'#fbbf24'}}>{activeAssets} <span style={{fontSize:'0.8rem', fontWeight:400, opacity:0.7}}>أصل</span></div>
-          </div>
-          <div>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>توصيات الإحلال النشطة</div>
-            <div style={{fontSize:'1.5rem', fontWeight:800, color:'#fb7185'}}>{alertAssets} <span style={{fontSize:'0.8rem', fontWeight:400, opacity:0.7}}>تنبيه</span></div>
-          </div>
-        </div>
-
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={28} color="var(--accent)" /> السجل المركزي للأصول الثابتة (FAR)</h2>
-          <div style={{display:'flex', gap:'0.5rem'}}>
-            <button className="btn btn-ghost" style={{color:'var(--accent)', background: 'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.2)'}} onClick={() => setShowScanner(true)}>
-              <QrCode size={18} /> المسح الميداني النشط
-            </button>
-            <div style={{width:'1px', background:'var(--border)', margin:'0 0.5rem'}}></div>
-            <button className={`btn btn-ghost ${showFilter ? 'b-active' : ''}`} onClick={() => setShowFilter(!showFilter)} style={{padding:'0.6rem 1.2rem'}}><Filter size={18} /> تصفية السجل</button>
-            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} title="تنزيل نموذج Excel فارغ للتعبئة" onClick={() => { downloadTemplate(); showToast('📄 تم تنزيل نموذج التعبئة'); }}><FileText size={18} /> نموذج التعبئة</button>
-            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} title="رفع ملف Excel معبّأ" onClick={() => importInputRef.current?.click()}><Upload size={18} /> استيراد Excel</button>
-            <button className="btn btn-ghost" style={{padding:'0.6rem 1.2rem'}} title="تصدير السجل الحالي" onClick={exportCSV}><Download size={18} /> تصدير Excel</button>
-            <button className="btn btn-primary" style={{padding:'0.6rem 1.5rem'}} onClick={() => { setEditingAsset(null); setView('new-asset'); }}><FilePlus size={18} /> إضافة أصل جديد</button>
-          </div>
-        </div>
-
-        {showFilter && (
-          <div style={{display:'flex', gap:'1rem', marginBottom:'1.5rem', padding:'1.5rem', background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', animation:'slideDown 0.3s ease-out', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}}>
-            <div style={{flex:1}}>
-               <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>البحث الذكي (الاسم، الرمز، المعرف)</label>
-               <input type="text" placeholder="مثال: لابتوب، AST-1234..." value={filterParams.query} onChange={e => setFilterParams({...filterParams, query: e.target.value})} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
-            </div>
-            <div style={{width:'250px'}}>
-               <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الفئة التصنيفية</label>
-               <select value={filterParams.category} onChange={e => setFilterParams({...filterParams, category: e.target.value})} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                 <option value="الكل">جميع الفئات</option>
-                 <option value="أراضي">أراضي</option>
-                 <option value="مباني">مباني</option>
-                 <option value="أصول تقنية">أصول تقنية</option>
-                 <option value="مركبات">مركبات</option>
-                 <option value="أصول أوقاف">أصول أوقاف</option>
-               </select>
-            </div>
-          </div>
-        )}
-
-        <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'16px', border:'1px solid var(--border)', overflowX:'auto', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
-          <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem'}}>
-            <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
-              <tr>
-                <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>الأصل</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>الفئة</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>الإدارة</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>الموقع</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>العهدة</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>التكلفة</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>القيمة الدفترية</th>
-                <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>آخر جرد</th>
-                <th style={{padding:'1rem', textAlign:'center'}}>إجراءات</th>
-              </tr>
-            </thead>
-            <tbody>
-            {filteredAssets.map((asset, index) => {
-              const statusColor = { 'نشط': '#10b981', 'صيانة': '#3b82f6', 'متوقف': '#ef4444', 'مستبعد': '#6b7280' }[asset.status] || '#64748b';
-              return (
-              <tr key={asset.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)', transition:'background 0.2s', cursor:'pointer'}} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'} onClick={() => setSelectedAsset(asset)}>
-                <td style={{padding:'1rem', color:'var(--accent)', fontWeight:800}}>{asset.id}</td>
-                <td style={{padding:'1rem', fontWeight:600}}>{asset.name}</td>
-                <td style={{padding:'1rem'}}>{asset.category}</td>
-                <td style={{padding:'1rem'}}>{asset.department || '-'}</td>
-                <td style={{padding:'1rem'}}>{asset.location || '-'}</td>
-                <td style={{padding:'1rem'}}>{asset.custody || '-'}</td>
-                <td style={{padding:'1rem'}}>{(Number(asset.cost)||0).toLocaleString()}</td>
-                <td style={{padding:'1rem', fontWeight:600, color:'#34d399'}}>{(Number(asset.netBookValue)||0).toLocaleString()}</td>
-                <td style={{padding:'1rem', textAlign:'center'}}>
-                  <span style={{background: statusColor + '20', color: statusColor, padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{asset.status}</span>
-                </td>
-                <td style={{padding:'1rem'}}>{asset.lastInventory || '-'}</td>
-                <td style={{padding:'1rem', textAlign:'center'}} onClick={e => e.stopPropagation()}>
-                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--text-muted)'}} title="تعديل"><Edit size={16}/></button>
-                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--danger)'}} title="حذف"><Trash2 size={16}/></button>
-                </td>
-              </tr>
-              )
-            })}
-            </tbody>
-          </table>
-        {filteredAssets.length === 0 && <div style={{padding:'5rem', textAlign:'center', color:'var(--text-muted)'}}><Box size={64} color="#e2e8f0" style={{margin:'0 auto 1.5rem'}} />لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
-      </div>
-    </div>
-    );
-  };
-
-  const handleAddAsset = async (e) => {
-    e.preventDefault();
-    const fd = new FormData(e.target);
-    const g = (k) => (fd.get(k) || '').toString().trim();
-    const n = (k) => parseFloat(fd.get(k) || 0) || 0;
-    
-    const typedId = g('id');
-    if (!editingAsset && typedId && assets.some(a => a.id === typedId)) {
-      showToast('❌ رقم الأصل مسجل مسبقاً، يرجى تغييره.');
-      return;
-    }
-    
-    const asset_no = editingAsset ? editingAsset.id : (typedId || `AST-${Date.now().toString().slice(-6)}`);
-    
-    const dbRecord = {
       asset_no,
       name: g('name'),
       description: g('description') || '',
@@ -1066,7 +948,13 @@ const App = () => {
       location_id: g('location'),
       department_id: g('department'),
       custodian_id: g('custody'),
-      supplier_id: g('supplier')
+      supplier_id: g('supplier'),
+      // NEW PHASE 10 FIELDS
+      asset_condition: g('asset_condition') || 'ممتاز',
+      cost_center: g('cost_center'),
+      warranty_provider: g('warranty_provider'),
+      insurance_policy: g('insurance_policy'),
+      insurance_expiry: g('insurance_expiry') || null
     };
 
     if (editingAsset) {
@@ -1082,12 +970,14 @@ const App = () => {
       const acct1201 = accountsData?.find(a => a.account_code === '1201')?.id;
       
       if (acct1101 && acct1201) {
+        const { data: createdAsset } = await supabase.from('assets').select('id').eq('asset_no', asset_no).single();
         const { data: jEntry, error: jErr } = await supabase.from('journal_entries').insert([{
           journal_no: 'JE-AST-' + Date.now().toString().slice(-6),
           entry_date: dbRecord.purchase_date,
           description: 'إثبات شراء أصل ثابت: ' + dbRecord.name,
           source_module: 'الأصول الثابتة',
-          status: 'معتمد'
+          status: 'معتمد',
+          linked_entity_id: createdAsset ? createdAsset.id : null
         }]).select().single();
         
         if (!jErr && jEntry) {
@@ -1109,7 +999,16 @@ const App = () => {
 
   
   const renderNewAsset = () => {
-    return <AssetForm ea={editingAsset} systemLookups={systemLookups} onSubmit={handleAddAsset} onCancel={() => { setEditingAsset(null); setView('register'); }} />;
+    const [linkedJournals, setLinkedJournals] = React.useState([]);
+    React.useEffect(() => {
+      if (editingAsset && editingAsset.db_id) {
+        supabase.from('journal_entries').select('*').eq('linked_entity_id', editingAsset.db_id).then(({data}) => {
+          if (data) setLinkedJournals(data);
+        });
+      }
+    }, [editingAsset]);
+    
+    return <AssetForm ea={editingAsset} systemLookups={systemLookups} onSubmit={handleAddAsset} onCancel={() => { setEditingAsset(null); setView('register'); }} linkedJournals={linkedJournals} />;
   };
 
   const renderJournal = () => {
