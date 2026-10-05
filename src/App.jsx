@@ -1529,7 +1529,6 @@ const App = () => {
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
     const [analyticsData, setAnalyticsData] = useState(null);
-    const [analyticsData, setAnalyticsData] = useState(null);
   const generateSmartReport = async () => {
     setIsGeneratingReport(true);
     showToast('جاري حساب المعطيات وتوليد التقرير التنفيذي...');
