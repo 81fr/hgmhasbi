@@ -2751,9 +2751,11 @@ const renderMaintenance = () => (
           <div className={`nav-item ${view === 'custody' ? 'active' : ''}`} onClick={() => setView('custody')}>
             <div className="nav-icon-box"><Users size={18} /></div> إدارة العهد
           </div>
-          <div className={`nav-item ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>
-            <div className="nav-icon-box"><Shield size={18} /></div> الموظفين والصلاحيات
-          </div>
+          {userProfile?.isAdmin && (
+            <div className={`nav-item ${view === 'employees' ? 'active' : ''}`} onClick={() => setView('employees')}>
+              <div className="nav-icon-box"><Shield size={18} /></div> الموظفين والصلاحيات
+            </div>
+          )}
           <div className={`nav-item ${view === 'depreciation' ? 'active' : ''}`} onClick={() => setView('depreciation')}>
             <div className="nav-icon-box"><Calculator size={18} /></div> حاسبة الإهلاك
           </div>
