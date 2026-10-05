@@ -1144,7 +1144,7 @@ const App = () => {
           description: 'إثبات شراء أصل ثابت: ' + dbRecord.name,
           source_module: 'الأصول الثابتة',
           status: 'معتمد',
-          linked_entity_id: createdAsset ? createdAsset.id : null
+          linked_entity_id: createdAsset ? createdAsset.id : null\n        }]).select().single();
         
         if (!jErr && jEntry) {
           await supabase.from('journal_lines').insert([
