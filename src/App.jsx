@@ -1528,34 +1528,21 @@ const App = () => {
   const [aiReport, setAiReport] = useState(null);
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
+    const [analyticsData, setAnalyticsData] = useState(null);
   const generateSmartReport = async () => {
     setIsGeneratingReport(true);
-    showToast('جاري قراءة البيانات وتحليلها بالذكاء الاصطناعي...');
+    showToast('جاري حساب المعطيات وتوليد التقرير التنفيذي...');
     try {
-      // 1. Gather real data context
-      const totalAssetsValue = assets.reduce((s, a) => s + (Number(a.cost)||0), 0);
-      const activeAssets = assets.filter(a => a.status === 'نشط').length;
-      const lowStock = warehouseItems.filter(w => w.qty <= w.minQty).length;
-      
-      const prompt = `
-أنت محلل مالي ذكي ومستشار للعمليات. 
-قم بتحليل البيانات التالية للنظام وكتابة تقرير تنفيذي قصير (3 فقرات) يوضح:
-1. ماذا تعني النتائج؟
-2. ما أبرز الملاحظات أو الشذوذ (Anomalies)؟
-3. ما فرص التحسين أو المخاطر المستقبلية؟
-
-البيانات الحالية:
-- إجمالي قيمة الأصول: ${totalAssetsValue} ريال
-- عدد الأصول النشطة: ${activeAssets} من أصل ${assets.length}
-- عدد الأصناف في المستودع التي وصلت لحد الخطر (نواقص): ${lowStock} من أصل ${warehouseItems.length}
-      `;
-
-      const ai = new AIService(aiApiKey);
-      const msg = await ai.sendChat([{ role: 'user', content: prompt }], false); // disable tools for raw summary
-      setAiReport(msg.content);
-      showToast('✅ اكتمل التقرير الذكي');
+      const analytics = new AnalyticsService(aiApiKey);
+      const result = await analytics.generateAIExecutiveSummary();
+      setAiReport(result.report);
+      setAnalyticsData({
+        stats: result.rawAnalytics,
+        preds: result.rawPredictions
+      });
+      showToast('تم التوليد بنجاح!');
     } catch(err) {
-      showToast('❌ تعذر توليد التقرير: ' + err.message);
+      showToast('فشل توليد التقرير: ' + err.message);
     }
     setIsGeneratingReport(false);
   };
