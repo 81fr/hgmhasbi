@@ -176,6 +176,7 @@ const App = () => {
   const [dbNotifications, setDbNotifications] = useState([]);
   const [inventoryCampaigns, setInventoryCampaigns] = useState([]);
   
+  const [warehouseModal, setWarehouseModal] = useState(null);
   const [warehouseItems, setWarehouseItems] = useState([
     { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
     { id: 'WH-002', sku: 'OF-SKU-202', name: 'مكتب إداري فاخر', category: 'أثاث ومعدات', qty: 3, minQty: 2, location: 'B-02-01', status: 'مخصص', stage: 'Allocate', lastAudit: '2024-07-20' },
@@ -2559,6 +2560,67 @@ const renderMaintenance = () => (
   };
   
   // ===== WAREHOUSE RADAR SYSTEM =====
+  
+  const handleSaveWarehouseItem = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const itemData = {
+      name: fd.get('name'),
+      item_no: fd.get('item_no'),
+      category: fd.get('category'),
+      quantity: parseInt(fd.get('quantity') || 0, 10),
+      min_quantity: parseInt(fd.get('min_quantity') || 0, 10),
+      bin_location: fd.get('bin_location'),
+      status: fd.get('status'),
+      unit: fd.get('unit'),
+      cost: parseFloat(fd.get('cost') || 0),
+      supplier: fd.get('supplier'),
+      description: fd.get('description')
+    };
+
+    let res;
+    if (warehouseModal.id) {
+      res = await supabase.from('warehouse_items').update(itemData).eq('id', warehouseModal.id);
+    } else {
+      res = await supabase.from('warehouse_items').insert([itemData]);
+    }
+
+    if (res.error) {
+      if (res.error.message.includes('column') && res.error.message.includes('does not exist')) {
+        // Fallback for missing columns
+        const fallbackData = {
+          name: itemData.name,
+          item_no: itemData.item_no,
+          category: itemData.category,
+          quantity: itemData.quantity,
+          min_quantity: itemData.min_quantity,
+          bin_location: itemData.bin_location,
+          status: itemData.status
+        };
+        let fbRes;
+        if (warehouseModal.id) {
+          fbRes = await supabase.from('warehouse_items').update(fallbackData).eq('id', warehouseModal.id);
+        } else {
+          fbRes = await supabase.from('warehouse_items').insert([fallbackData]);
+        }
+        
+        if (fbRes.error) {
+          showToast('❌ خطأ أثناء حفظ الصنف: ' + fbRes.error.message);
+        } else {
+          showToast('⚠️ تم الحفظ جزئياً. (يجب ترقية قاعدة البيانات Phase 8 لحفظ السعر، الوحدة، الوصف)');
+          setWarehouseModal(null);
+          fetchInitialData();
+        }
+      } else {
+        showToast('❌ خطأ أثناء الحفظ: ' + res.error.message);
+      }
+    } else {
+      showToast('✅ تم حفظ بيانات الصنف بنجاح!');
+      setWarehouseModal(null);
+      fetchInitialData();
+    }
+  };
+
   const renderWarehouse = () => {
     const filteredItems = warehouseItems.filter(item => 
       warehouseFilter === 'الكل' || item.status === warehouseFilter
