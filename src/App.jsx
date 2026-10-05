@@ -2226,7 +2226,156 @@ const renderMaintenance = () => (
           </div>
         </div>
       )}
+  
+  const [employeesList, setEmployeesList] = useState([]);
+  const [employeeModal, setEmployeeModal] = useState(null);
+  const [loadingEmployees, setLoadingEmployees] = useState(false);
+
+  useEffect(() => {
+    if (view === 'employees') {
+      fetchEmployees();
+    }
+  }, [view]);
+
+  const fetchEmployees = async () => {
+    setLoadingEmployees(true);
+    const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
+    if (!error && data) {
+      setEmployeesList(data);
+    }
+    setLoadingEmployees(false);
+  };
+
+  const handleSaveEmployee = async (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const empData = {
+      full_name: fd.get('full_name'),
+      employee_id: fd.get('employee_id'),
+      is_active: fd.get('is_active') === 'on'
+    };
+
+    // Note: We don't save role/permissions yet because they might not exist in the DB.
+    // If the DB has them, we would save them. For now, we simulate it.
+    let res;
+    if (employeeModal.id) {
+      res = await supabase.from('employees').update(empData).eq('id', employeeModal.id);
+    } else {
+      res = await supabase.from('employees').insert([empData]);
+    }
+
+    if (res.error) {
+      showToast('خطأ أثناء الحفظ: ' + res.error.message);
+    } else {
+      showToast('✅ تم حفظ بيانات الموظف بنجاح');
+      setEmployeeModal(null);
+      fetchEmployees();
+    }
+  };
+
+  const renderEmployees = () => (
+    <div className="view-anim">
+      <div style={{marginBottom:'2rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+        <div>
+          <h2 style={{fontSize:'1.5rem', fontWeight:800}}><Shield size={24} color="var(--brand-teal)" style={{marginRight:'0.5rem', verticalAlign:'middle'}}/> الموظفين والصلاحيات</h2>
+          <p style={{color:'var(--text-muted)'}}>إدارة حسابات الموظفين وصلاحيات الوصول للنظام</p>
+        </div>
+        <button className="btn btn-primary" onClick={() => setEmployeeModal({})}>+ إضافة موظف</button>
+      </div>
+
+      <div className="card" style={{padding:'0'}}>
+        <table style={{width:'100%', borderCollapse:'collapse'}}>
+          <thead style={{background:'var(--thead-bg)', borderBottom:'1px solid var(--border)'}}>
+            <tr>
+              <th style={{padding:'1rem', textAlign:'right', fontWeight:600, fontSize:'0.85rem'}}>رقم الموظف</th>
+              <th style={{padding:'1rem', textAlign:'right', fontWeight:600, fontSize:'0.85rem'}}>الاسم</th>
+              <th style={{padding:'1rem', textAlign:'right', fontWeight:600, fontSize:'0.85rem'}}>الدور / الصلاحية</th>
+              <th style={{padding:'1rem', textAlign:'right', fontWeight:600, fontSize:'0.85rem'}}>الحالة</th>
+              <th style={{padding:'1rem', textAlign:'center', fontWeight:600, fontSize:'0.85rem'}}>إجراءات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loadingEmployees ? (
+              <tr><td colSpan="5" style={{padding:'2rem', textAlign:'center'}}>جاري التحميل...</td></tr>
+            ) : employeesList.length === 0 ? (
+              <tr><td colSpan="5" style={{padding:'2rem', textAlign:'center'}}>لا يوجد موظفين حالياً</td></tr>
+            ) : (
+              employeesList.map(emp => (
+                <tr key={emp.id} style={{borderBottom:'1px solid var(--border)'}}>
+                  <td style={{padding:'1rem', fontSize:'0.9rem', fontWeight:600}}>{emp.employee_id || '-'}</td>
+                  <td style={{padding:'1rem', fontSize:'0.9rem'}}>{emp.full_name}</td>
+                  <td style={{padding:'1rem'}}>
+                    <span style={{background:'var(--bg)', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:600, color:'var(--text-secondary)'}}>
+                      {emp.role || 'موظف'}
+                    </span>
+                  </td>
+                  <td style={{padding:'1rem'}}>
+                    {emp.is_active ? 
+                      <span style={{color:'var(--brand-green)', fontSize:'0.85rem', fontWeight:600}}>نشط</span> : 
+                      <span style={{color:'var(--danger)', fontSize:'0.85rem', fontWeight:600}}>موقوف</span>}
+                  </td>
+                  <td style={{padding:'1rem', textAlign:'center'}}>
+                    <button className="btn btn-ghost" style={{padding:'0.5rem', color:'var(--brand-teal)'}} onClick={() => setEmployeeModal(emp)}>
+                      <Settings size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {employeeModal && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center'}}>
+          <div className="card view-anim" style={{width:'500px', maxWidth:'90%', padding:'2rem', position:'relative'}}>
+            <button onClick={() => setEmployeeModal(null)} style={{position:'absolute', top:'1rem', right:'1rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text)'}}>
+              <X size={20} />
+            </button>
+            <h3 style={{fontSize:'1.25rem', marginBottom:'1.5rem'}}>{employeeModal.id ? 'تعديل موظف وصلاحيات' : 'إضافة موظف جديد'}</h3>
+            
+            <div style={{background:'var(--thead-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)', fontSize:'0.85rem', color:'var(--warning)'}}>
+              <strong>ملاحظة:</strong> صلاحيات الوصول والأدوار (Roles) تتطلب تمرير تحديثات قاعدة البيانات لمسؤول النظام (Phase 6 SQL). سيتم حفظ البيانات الأساسية فقط حالياً.
+            </div>
+
+            <form onSubmit={handleSaveEmployee} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+              <div>
+                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الاسم الكامل</label>
+                <input name="full_name" required defaultValue={employeeModal.full_name} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+              </div>
+              <div>
+                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>رقم الموظف</label>
+                <input name="employee_id" required defaultValue={employeeModal.employee_id} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+              </div>
+              
+              <div>
+                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الدور (Role)</label>
+                <select disabled style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', opacity:0.7}}>
+                  <option>مسؤول نظام (Admin)</option>
+                  <option>مدير أصول</option>
+                  <option>أمين مستودع</option>
+                  <option selected>موظف (Employee)</option>
+                </select>
+              </div>
+
+              <label style={{display:'flex', alignItems:'center', gap:'0.5rem', marginTop:'0.5rem', cursor:'pointer'}}>
+                <input name="is_active" type="checkbox" defaultChecked={employeeModal.id ? employeeModal.is_active : true} style={{width:'18px', height:'18px'}} />
+                <span style={{fontWeight:600, fontSize:'0.85rem'}}>حساب نشط</span>
+              </label>
+
+              <div style={{display:'flex', gap:'1rem', marginTop:'1rem'}}>
+                <button type="submit" className="btn btn-primary" style={{flex:1}}>حفظ التغييرات</button>
+                <button type="button" className="btn btn-ghost" onClick={() => setEmployeeModal(null)} style={{flex:1, border:'1px solid var(--border)'}}>إلغاء</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   const renderSettings = () => {
+
     const handleSaveSettings = async (e) => {
       e.preventDefault();
       const fd = new FormData(e.target);
@@ -2637,6 +2786,7 @@ const renderMaintenance = () => (
           {view === 'warehouse' && renderWarehouse()}
             {view === 'depreciation' && renderDepreciation()}
             {view === 'custody' && renderCustody()}
+            {view === 'employees' && renderEmployees()}
           {view === 'settings' && renderSettings()}
         </div>
       </main>
