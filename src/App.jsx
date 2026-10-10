@@ -413,6 +413,9 @@ const App = () => {
   const importInputRef = useRef(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
+  const [journalFilter, setJournalFilter] = useState('all');
+  const [selectedJournal, setSelectedJournal] = useState(null);
+  const [accountsList, setAccountsList] = useState([]);
   const [fiscalYear, setFiscalYear] = useState('2026');
   const [erpConnected, setErpConnected] = useState(true);
   const [chartMode, setChartMode] = useState('hist');
@@ -612,6 +615,62 @@ const App = () => {
     
     const { data: notifs } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
     if (notifs) setDbNotifications(notifs);
+    // جلب شجرة الحسابات
+    const { data: acctsData } = await supabase.from('accounts').select('*');
+    if (acctsData) setAccountsList(acctsData);
+    const accountMap = {};
+    (acctsData || []).forEach(a => {
+      accountMap[a.id] = `${a.account_code} - ${a.account_name}`;
+    });
+
+    // جلب قيود اليومية المركزية وسطورها المحاسبية
+    const { data: jeData, error: jeErr } = await supabase
+      .from('journal_entries')
+      .select(`
+        id,
+        journal_no,
+        entry_date,
+        description,
+        status,
+        source_module,
+        linked_entity_id,
+        created_at,
+        journal_lines (
+          id,
+          account_id,
+          debit,
+          credit,
+          description
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (!jeErr && jeData) {
+      const mappedJournals = jeData.map(entry => {
+        const lines = (entry.journal_lines || []).map(l => ({
+          ...l,
+          account_label: accountMap[l.account_id] || l.description || 'حساب فرعي',
+          debit: Number(l.debit) || 0,
+          credit: Number(l.credit) || 0
+        }));
+        const totalDebit = lines.reduce((s, l) => s + l.debit, 0);
+        const totalCredit = lines.reduce((s, l) => s + l.credit, 0);
+        return {
+          id: entry.journal_no,
+          db_id: entry.id,
+          date: entry.entry_date,
+          desc: entry.description,
+          status: entry.status || 'مسودة',
+          source: entry.source_module || 'الأصول الثابتة',
+          debit: totalDebit,
+          credit: totalCredit,
+          lines: lines,
+          linked_entity_id: entry.linked_entity_id,
+          created_at: entry.created_at
+        };
+      });
+      setJournals(mappedJournals);
+    }
   };
 
   const [journals, setJournals] = useState([
@@ -1152,7 +1211,7 @@ const App = () => {
           entry_date: dbRecord.purchase_date,
           description: 'إثبات شراء أصل ثابت: ' + dbRecord.name,
           source_module: 'الأصول الثابتة',
-          status: 'معتمد',
+          status: 'بانتظار الاعتماد',
           linked_entity_id: createdAsset ? createdAsset.id : null
         }]).select().single();
         
@@ -1179,131 +1238,317 @@ const App = () => {
   };
 
   const renderJournal = () => {
-    const totalDebit = journals.reduce((acc, j) => acc + (j.debit || 0), 0);
-    const totalCredit = journals.reduce((acc, j) => acc + (j.credit || 0), 0);
-    const draftCount = journals.filter(j => j.status === 'مسودة').length;
-    
+    // اعتماد قيد فردي
+    const handleApproveJournal = async (j) => {
+      showToast('جاري اعتماد القيد المحاسبي...');
+      const { error } = await supabase.from('journal_entries').update({ status: 'معتمد' }).eq('id', j.db_id);
+      if (!error) {
+        setJournals(prev => prev.map(item => item.db_id === j.db_id ? { ...item, status: 'معتمد' } : item));
+        showToast('✅ تم اعتماد القيد بنجاح!');
+        fetchInitialData();
+      } else {
+        showToast('❌ تعذر اعتماد القيد: ' + error.message);
+      }
+    };
+
+    // إعادة القيد إلى مسودة
+    const handleRejectOrDraftJournal = async (j) => {
+      showToast('جاري فك الاعتماد...');
+      const { error } = await supabase.from('journal_entries').update({ status: 'مسودة' }).eq('id', j.db_id);
+      if (!error) {
+        setJournals(prev => prev.map(item => item.db_id === j.db_id ? { ...item, status: 'مسودة' } : item));
+        showToast('تمت إعادة القيد إلى مسودة للمراجعة');
+        fetchInitialData();
+      } else {
+        showToast('❌ حدث خطأ: ' + error.message);
+      }
+    };
+
+    // اعتماد كافة القيود الجديدة دفعة واحدة
+    const handleApproveAllPending = async () => {
+      const pending = journals.filter(j => j.status === 'بانتظار الاعتماد' || j.status === 'مسودة' || j.status === 'جديد');
+      if (pending.length === 0) {
+        showToast('⚠️ لا توجد قيود جديدة بانتظار الاعتماد');
+        return;
+      }
+      showToast(`جاري اعتماد ${pending.length} قيد محاسبي...`);
+      const ids = pending.map(p => p.db_id).filter(Boolean);
+      if (ids.length > 0) {
+        const { error } = await supabase.from('journal_entries').update({ status: 'معتمد' }).in('id', ids);
+        if (error) {
+          showToast('❌ خطأ أثناء الاعتماد الجماعي: ' + error.message);
+          return;
+        }
+      }
+      setJournals(prev => prev.map(item => 
+        (item.status === 'بانتظار الاعتماد' || item.status === 'مسودة' || item.status === 'جديد') ? { ...item, status: 'معتمد' } : item
+      ));
+      showToast('✅ تم اعتماد كافة القيود الجديدة بنجاح!');
+      fetchInitialData();
+    };
+
+    // احتساب الإحصائيات
+    const totalDebit = journals.reduce((acc, j) => acc + (Number(j.debit) || 0), 0);
+    const totalCredit = journals.reduce((acc, j) => acc + (Number(j.credit) || 0), 0);
+    const pendingList = journals.filter(j => j.status === 'بانتظار الاعتماد' || j.status === 'مسودة' || j.status === 'جديد');
+    const approvedList = journals.filter(j => j.status === 'معتمد' || j.status === 'مرحل');
+    const draftList = journals.filter(j => j.status === 'مسودة');
+
+    // تصفية القيود وفق الفلتر المحدد
+    const filteredJournals = journals.filter(j => {
+      if (journalFilter === 'pending') {
+        return j.status === 'بانتظار الاعتماد' || j.status === 'مسودة' || j.status === 'جديد';
+      }
+      if (journalFilter === 'approved') {
+        return j.status === 'معتمد' || j.status === 'مرحل';
+      }
+      if (journalFilter === 'draft') {
+        return j.status === 'مسودة';
+      }
+      return true; // all
+    });
+
     return (
       <div className="view-anim">
+        {/* ملخص الإحصائيات المالية */}
         <div style={{background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', padding:'2rem', borderRadius:'16px', color:'white', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(0,0,0,0.5)', display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem'}}>
           <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>إجمالي المدين (DR)</div>
-            <div style={{fontSize:'1.75rem', fontWeight:800, color:'#fb7185'}}>{totalDebit.toLocaleString()} <span style={{fontSize:'0.9rem', fontWeight:400, opacity:0.7}}>ر.س</span></div>
+            <div style={{fontSize:'0.85rem', color:'#94a3b8', marginBottom:'0.5rem'}}>إجمالي حركات المدين (Debit)</div>
+            <div style={{fontSize:'1.8rem', fontWeight:800, color:'#fb7185'}}>{totalDebit.toLocaleString()} <span style={{fontSize:'0.9rem', fontWeight:400}}>ر.س</span></div>
           </div>
           <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>إجمالي الدائن (CR)</div>
-            <div style={{fontSize:'1.75rem', fontWeight:800, color:'#34d399'}}>{totalCredit.toLocaleString()} <span style={{fontSize:'0.9rem', fontWeight:400, opacity:0.7}}>ر.س</span></div>
+            <div style={{fontSize:'0.85rem', color:'#94a3b8', marginBottom:'0.5rem'}}>إجمالي حركات الدائن (Credit)</div>
+            <div style={{fontSize:'1.8rem', fontWeight:800, color:'#34d399'}}>{totalCredit.toLocaleString()} <span style={{fontSize:'0.9rem', fontWeight:400}}>ر.س</span></div>
           </div>
           <div style={{borderLeft:'1px solid rgba(255,255,255,0.1)', paddingLeft:'1rem'}}>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>قيود غير مرحلة</div>
-            <div style={{fontSize:'1.75rem', fontWeight:800, color:'#fbbf24'}}>{draftCount} <span style={{fontSize:'0.9rem', fontWeight:400, opacity:0.7}}>قيد</span></div>
+            <div style={{fontSize:'0.85rem', color:'#94a3b8', marginBottom:'0.5rem'}}>قيود جديدة للمراجعة والاعتماد</div>
+            <div style={{fontSize:'1.8rem', fontWeight:800, color:'#fbbf24', display:'flex', alignItems:'center', gap:'0.5rem'}}>
+              {pendingList.length}
+              {pendingList.length > 0 && <span style={{fontSize:'0.75rem', background:'rgba(251, 191, 36, 0.2)', padding:'0.2rem 0.6rem', borderRadius:'20px', color:'#fbbf24', fontWeight:600}}>تتطلب اعتمادك</span>}
+            </div>
           </div>
           <div>
-            <div style={{color:'#94a3b8', fontSize:'0.85rem', marginBottom:'0.5rem'}}>توازن الدفاتر</div>
-            <div style={{fontSize:'1.25rem', fontWeight:700, color: totalDebit === totalCredit ? '#10b981' : '#ef4444'}}>
-              {totalDebit === totalCredit ? '✓ متوازنة' : '⚠ غير متوازنة'}
-            </div>
-            <div style={{fontSize:'0.75rem', opacity:0.6}}>نظام المطابقة الآلي نشط</div>
+            <div style={{fontSize:'0.85rem', color:'#94a3b8', marginBottom:'0.5rem'}}>القيود المعتمدة والمرحلة</div>
+            <div style={{fontSize:'1.8rem', fontWeight:800, color:'#60a5fa'}}>{approvedList.length} <span style={{fontSize:'0.9rem', fontWeight:400}}>قيد</span></div>
           </div>
         </div>
 
-        <div style={{display:'grid', gridTemplateColumns:'1fr 3fr', gap:'1.5rem', marginBottom:'2rem'}}>
-          <div className="card">
-             <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>نشاط التدوين الأسبوعي</h3>
-             <div style={{height:'220px'}}>
-                <Line data={{
-                  labels: ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس'],
-                  datasets: [{
-                    label: 'عدد القيود',
-                    data: [12, 19, 15, 28, 22],
-                    borderColor: 'var(--accent)',
-                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.4,
-                    fill: true,
-                    pointRadius: 4,
-                    pointBackgroundColor: 'var(--accent)'
-                  }]
-                }} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }} />
-             </div>
-             <div style={{marginTop:'1.5rem', padding:'1rem', background:'#f0f9ff', borderRadius:'8px', fontSize:'0.8rem', color:'#0369a1', border:'1px solid #bae6fd'}}>
-                <Sparkles size={14} style={{marginLeft:'0.4rem'}} />
-                <strong>تحليل النمط الزمني:</strong> يلاحظ كثافة في توليد القيود يوم الأربعاء نتيجة إغلاق عهد الموظفين؛ نوصي بجدولة الترحيل النهائي صباح الخميس لضمان دقة التقارير.
-             </div>
+        <div>
+          {/* عنوان وشريط الفلاتر والإجراءات */}
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
+            <div>
+              <h2 style={{fontSize:'1.35rem', fontWeight:800, display:'flex', alignItems:'center', gap:'0.6rem'}}>
+                <FileText size={24} color="var(--brand-teal)" /> سجل قيود اليومية المركزية
+              </h2>
+              <p style={{fontSize:'0.85rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>
+                استعراض ومراجعة القيود المحاسبية المولدة آلياً من الأصول والإهلاك مع إمكانية التدقيق والاعتماد المالي.
+              </p>
+            </div>
+
+            <div style={{display:'flex', gap:'0.6rem', alignItems:'center'}}>
+              {pendingList.length > 0 && (
+                <button 
+                  className="btn btn-primary" 
+                  style={{background:'#10b981', borderColor:'#10b981', padding:'0.6rem 1.4rem', color:'white', display:'flex', alignItems:'center', gap:'0.5rem', fontWeight:700}}
+                  onClick={handleApproveAllPending}
+                >
+                  <CheckCircle size={18} /> اعتماد كافة القيود الجديدة ({pendingList.length})
+                </button>
+              )}
+              
+              <button className="btn btn-ghost" style={{border:'1px solid var(--border)', padding:'0.6rem 1.2rem'}} onClick={async () => {
+                showToast('جاري تشغيل محرك الإهلاك وتوليد مسودة القيد...');
+                const totalDep = accountingEngine.reduce((acc, a) => acc + (a.periodDep || 0), 0);
+                if (totalDep <= 0) {
+                   showToast('⚠️ لا يوجد إهلاك مستحق للفترة الحالية');
+                   return;
+                }
+                const newJournal = {
+                   journal_no: `JV-DEP-${Date.now().toString().slice(-6)}`,
+                   entry_date: new Date().toISOString().split('T')[0],
+                   description: 'إثبات إهلاك الأصول للفترة الحالية',
+                   status: 'بانتظار الاعتماد',
+                   source_module: 'محرك الإهلاك'
+                };
+                const { data: insJ, error } = await supabase.from('journal_entries').insert([newJournal]).select().single();
+                if (!error && insJ) {
+                  // جلب حسابات الإهلاك
+                  const { data: accts } = await supabase.from('accounts').select('id, account_code').in('account_code', ['5101', '1102']);
+                  const depExp = accts?.find(a => a.account_code === '5101')?.id;
+                  const depAcc = accts?.find(a => a.account_code === '1102')?.id;
+                  if (depExp && depAcc) {
+                    await supabase.from('journal_lines').insert([
+                      { journal_id: insJ.id, account_id: depExp, debit: Math.round(totalDep), credit: 0, description: 'مصروف إهلاك أصول الفترة' },
+                      { journal_id: insJ.id, account_id: depAcc, debit: 0, credit: Math.round(totalDep), description: 'مجمع إهلاك الأصول المتراكم' }
+                    ]);
+                  }
+                  showToast('✅ تم توليد قيد الإهلاك بنجاح (بانتظار الاعتماد)');
+                  fetchInitialData();
+                } else {
+                  showToast('❌ تعذر توليد القيد: ' + (error?.message || ''));
+                }
+              }}>
+                <Settings size={18} /> تشغيل محرك الإهلاك
+              </button>
+
+              <button className="btn btn-ghost" style={{border:'1px solid var(--border)', padding:'0.6rem 1rem'}} onClick={fetchInitialData} title="تحديث البيانات">
+                <RefreshCw size={16} />
+              </button>
+            </div>
           </div>
 
-          <div>
-            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-              <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><FileText size={24} color="var(--accent)" /> سجل قيود اليومية المركزية</h2>
-              <div style={{display:'flex', gap:'0.5rem'}}>
-                <button className="btn btn-ghost" style={{border:'1px solid var(--accent)', padding:'0.6rem 1.2rem', color:'var(--accent)'}} onClick={async () => {
-                  showToast('جاري توليد قيود الإهلاك من محرك الحسابات...');
-                  const totalDep = accountingEngine.reduce((acc, a) => acc + (a.periodDep || 0), 0);
-                  if (totalDep <= 0) {
-                     showToast('⚠️ لا يوجد إهلاك مستحق للفترة الحالية');
-                     return;
-                  }
-                  const newJournal = {
-                     journal_no: `JV-DEP-${Date.now().toString().slice(-6)}`,
-                     entry_date: new Date().toISOString().split('T')[0],
-                     description: `إثبات إهلاك الأصول للفترة الحالية`,
-                     status: 'مسودة'
-                  };
-                  const { error } = await supabase.from('journal_entries').insert([newJournal]);
-                  if (error) {
-                     console.warn('Supabase Insert failed (maybe table does not exist):', error.message);
-                  }
-                  
-                  // تحديث الواجهة محلياً
-                  setJournals([...journals, { id: newJournal.journal_no, date: newJournal.entry_date, desc: newJournal.description, debit: Math.round(totalDep), credit: null, status: 'مسودة' }, { id: newJournal.journal_no, date: newJournal.entry_date, desc: 'مجمع إهلاك الأصول', debit: null, credit: Math.round(totalDep), status: 'مسودة' }]);
-                  showToast('✅ تم توليد مسودة قيود الإهلاك بنجاح');
-                }}><Settings size={18} /> تشغيل محرك الإهلاك</button>
-                <button className="btn btn-ghost" style={{color:'var(--danger)', border:'1px solid var(--danger)', padding:'0.6rem 1.2rem'}} onClick={() => { showToast('تم فك ترحيل جميع القيود وإعادتها كمسودة'); setJournals(journals.map(j => ({...j, status: 'مسودة'}))); }}><X size={18} /> إلغاء الترحيل الجماعي</button>
-                <button className="btn btn-primary" style={{padding:'0.6rem 1.2rem'}} onClick={async () => { 
-                  showToast('جاري ترحيل القيود...');
-                  // تحديث قاعدة البيانات
-                  const draftJournals = journals.filter(j => j.status === 'مسودة' && j.db_id);
-                  for(const j of draftJournals) {
-                    await supabase.from('journal_entries').update({ status: 'مرحل' }).eq('id', j.db_id);
-                  }
-                  setJournals(journals.map(j => ({...j, status: 'مرحل'}))); 
-                  showToast('✅ تم ترحيل كافة القيود المعلقة للسجلات المالية');
-                }}><FileText size={18} /> ترحيل كافة القيود</button>
-              </div>
-            </div>
-            <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden'}}>
-              <table style={{width:'100%', borderCollapse:'collapse'}}>
-                <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
+          {/* شريط الفلاتر التفاعلي (أزرار التصفية) */}
+          <div style={{display:'flex', gap:'0.75rem', marginBottom:'1.5rem', flexWrap:'wrap', alignItems:'center', background:'var(--card-bg)', padding:'0.75rem 1rem', borderRadius:'12px', border:'1px solid var(--border)'}}>
+            <span style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginLeft:'0.5rem'}}>تصفية العرض:</span>
+            
+            <button 
+              type="button"
+              className={`btn ${journalFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{padding:'0.5rem 1.2rem', fontSize:'0.85rem', border: journalFilter === 'all' ? 'none' : '1px solid var(--border)'}}
+              onClick={() => setJournalFilter('all')}
+            >
+              جميع القيود ({journals.length})
+            </button>
+
+            <button 
+              type="button"
+              className={`btn ${journalFilter === 'pending' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{
+                padding:'0.5rem 1.2rem',
+                fontSize:'0.85rem',
+                fontWeight: 700,
+                border: journalFilter === 'pending' ? 'none' : '1px solid #f59e0b',
+                color: journalFilter === 'pending' ? 'white' : '#b45309',
+                background: journalFilter === 'pending' ? '#d97706' : 'rgba(245, 158, 11, 0.12)'
+              }}
+              onClick={() => setJournalFilter('pending')}
+            >
+              ⏳ قيود جديدة للمراجعة والاعتماد ({pendingList.length})
+            </button>
+
+            <button 
+              type="button"
+              className={`btn ${journalFilter === 'approved' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{
+                padding:'0.5rem 1.2rem',
+                fontSize:'0.85rem',
+                border: journalFilter === 'approved' ? 'none' : '1px solid #10b981',
+                color: journalFilter === 'approved' ? 'white' : '#047857',
+                background: journalFilter === 'approved' ? '#059669' : 'rgba(16, 185, 129, 0.1)'
+              }}
+              onClick={() => setJournalFilter('approved')}
+            >
+              ✅ قيود معتمدة ومرحلة ({approvedList.length})
+            </button>
+
+            <button 
+              type="button"
+              className={`btn ${journalFilter === 'draft' ? 'btn-primary' : 'btn-ghost'}`}
+              style={{padding:'0.5rem 1.2rem', fontSize:'0.85rem', border: journalFilter === 'draft' ? 'none' : '1px solid var(--border)'}}
+              onClick={() => setJournalFilter('draft')}
+            >
+              📝 مسودات ({draftList.length})
+            </button>
+          </div>
+
+          {/* جدول قيود اليومية */}
+          <div className="table-wrapper" style={{background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', overflow:'hidden', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.05)'}}>
+            <table style={{width:'100%', borderCollapse:'collapse'}}>
+              <thead style={{background:'var(--thead-bg, #f8fafc)', borderBottom:'2px solid var(--border)'}}>
+                <tr>
+                  <th style={{padding:'1rem', textAlign:'right', fontWeight:700}}>الرقم المرجعي</th>
+                  <th style={{padding:'1rem', textAlign:'right', fontWeight:700}}>التاريخ</th>
+                  <th style={{padding:'1rem', textAlign:'right', fontWeight:700}}>البيان المحاسبي</th>
+                  <th style={{padding:'1rem', textAlign:'right', fontWeight:700}}>المصدر</th>
+                  <th style={{padding:'1rem', textAlign:'right', fontWeight:700}}>المدين (ر.س)</th>
+                  <th style={{padding:'1rem', textAlign:'right', fontWeight:700}}>الدائن (ر.س)</th>
+                  <th style={{padding:'1rem', textAlign:'center', fontWeight:700}}>الحالة</th>
+                  <th style={{padding:'1rem', textAlign:'center', fontWeight:700}}>إجراءات المراجعة والاعتماد</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredJournals.length === 0 ? (
                   <tr>
-                    <th style={{padding:'1rem', textAlign:'right'}}>الرقم المرجعي</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>البيان المحاسبي</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>المدين (DR)</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>الدائن (CR)</th>
-                    <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+                    <td colSpan={8} style={{padding:'4rem 1rem', textAlign:'center', color:'var(--text-muted)'}}>
+                      <FileText size={48} style={{opacity:0.3, margin:'0 auto 1rem'}} />
+                      <div>لا توجد قيود مطابقة لهذا الفلتر حالياً.</div>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {journals.map((j, idx) => (
-                    <tr key={j.id} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
-                      <td style={{padding:'1rem', fontWeight:700, color:'#0f172a'}}>{j.id}</td>
-                      <td style={{padding:'1rem', fontSize:'0.85rem'}}>{j.date}</td>
-                      <td style={{padding:'1rem'}}>
-                         <div style={{fontWeight:600}}>{j.desc}</div>
-                         <div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>المصدر: نظام الأصول الثابتة الآلي</div>
-                      </td>
-                      <td style={{padding:'1rem', color:'#e11d48', fontWeight:700}}>{j.debit ? j.debit.toLocaleString() : '-'}</td>
-                      <td style={{padding:'1rem', color:'#10b981', fontWeight:700}}>{j.credit ? j.credit.toLocaleString() : '-'}</td>
-                      <td style={{padding:'1rem', textAlign:'center'}}>
-                        {j.status === 'مرحل' ? 
-                          <span className="badge b-active" style={{padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><CheckCircle size={12}/> مرحل</span> : 
-                          <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><Activity size={12}/> مسودة</span>
-                        }
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                ) : (
+                  filteredJournals.map((j, idx) => {
+                    const isPending = j.status === 'بانتظار الاعتماد' || j.status === 'مسودة' || j.status === 'جديد';
+                    const isApproved = j.status === 'معتمد' || j.status === 'مرحل';
+                    
+                    return (
+                      <tr key={j.db_id || j.id || idx} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.25)'}}>
+                        <td style={{padding:'1rem', fontWeight:800, color:'var(--accent, #3b82f6)', fontFamily:'monospace'}}>{j.id}</td>
+                        <td style={{padding:'1rem', fontSize:'0.85rem', whiteSpace:'nowrap'}}>{j.date}</td>
+                        <td style={{padding:'1rem'}}>
+                          <div style={{fontWeight:700, color:'var(--text)'}}>{j.desc}</div>
+                          {j.lines && j.lines.length > 0 && (
+                            <div style={{fontSize:'0.75rem', color:'var(--text-muted)', marginTop:'0.2rem'}}>
+                              {j.lines.length} أسطر محاسبية متوازنة
+                            </div>
+                          )}
+                        </td>
+                        <td style={{padding:'1rem', fontSize:'0.85rem', color:'var(--text-muted)'}}>{j.source || 'الأصول الثابتة'}</td>
+                        <td style={{padding:'1rem', color:'#e11d48', fontWeight:700, direction:'ltr', textAlign:'right'}}>
+                          {Number(j.debit || 0).toLocaleString()}
+                        </td>
+                        <td style={{padding:'1rem', color:'#10b981', fontWeight:700, direction:'ltr', textAlign:'right'}}>
+                          {Number(j.credit || 0).toLocaleString()}
+                        </td>
+                        <td style={{padding:'1rem', textAlign:'center'}}>
+                          {isApproved ? (
+                            <span className="badge b-active" style={{padding:'0.4rem 0.9rem', display:'inline-flex', alignItems:'center', gap:'0.25rem', background:'rgba(16, 185, 129, 0.15)', color:'#059669', border:'1px solid rgba(16, 185, 129, 0.3)', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>
+                              <CheckCircle size={12}/> معتمد
+                            </span>
+                          ) : (
+                            <span className="badge" style={{background:'rgba(245, 158, 11, 0.15)', color:'#b45309', border:'1px solid rgba(245, 158, 11, 0.3)', padding:'0.4rem 0.9rem', display:'inline-flex', alignItems:'center', gap:'0.25rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>
+                              <Clock size={12}/> {j.status || 'بانتظار الاعتماد'}
+                            </span>
+                          )}
+                        </td>
+                        <td style={{padding:'1rem', textAlign:'center'}}>
+                          <div style={{display:'flex', gap:'0.5rem', justifyContent:'center', alignItems:'center'}}>
+                            {/* زر مراجعة تفاصيل القيد */}
+                            <button 
+                              className="btn btn-ghost" 
+                              style={{padding:'0.4rem 0.75rem', border:'1px solid var(--border)', fontSize:'0.8rem', display:'flex', alignItems:'center', gap:'0.3rem'}}
+                              title="مراجعة وتفاصيل القيد"
+                              onClick={() => setSelectedJournal(j)}
+                            >
+                              <Eye size={14} color="var(--brand-teal)" /> مراجعة
+                            </button>
+
+                            {/* زر اعتماد أو فك اعتماد */}
+                            {isPending ? (
+                              <button 
+                                className="btn btn-primary"
+                                style={{padding:'0.4rem 0.9rem', background:'#10b981', borderColor:'#10b981', fontSize:'0.8rem', color:'white', display:'flex', alignItems:'center', gap:'0.3rem', fontWeight:700}}
+                                title="اعتماد القيد المحاسبي"
+                                onClick={() => handleApproveJournal(j)}
+                              >
+                                <CheckCircle size={14} /> اعتماد
+                              </button>
+                            ) : (
+                              <button 
+                                className="btn btn-ghost"
+                                style={{padding:'0.4rem 0.6rem', border:'1px solid var(--border)', fontSize:'0.75rem', color:'var(--text-muted)', display:'flex', alignItems:'center', gap:'0.2rem'}}
+                                title="إلغاء الاعتماد وإعادته للمراجعة"
+                                onClick={() => handleRejectOrDraftJournal(j)}
+                              >
+                                <RotateCcw size={12} /> فك الاعتماد
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -3615,6 +3860,127 @@ const renderDepreciation = () => {
           </div>
         </div>
       )}
+
+      {/* نافذة مراجعة وتفاصيل سند القيد المحاسبي */}
+      {selectedJournal && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.65)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, backdropFilter:'blur(4px)'}} onClick={() => setSelectedJournal(null)}>
+          <div className="card" style={{width:'820px', maxWidth:'95vw', maxHeight:'90vh', overflowY:'auto', background:'var(--card-bg)', padding:'2rem', border:'1px solid var(--border)', boxShadow:'0 20px 40px rgba(0,0,0,0.2)'}} onClick={e => e.stopPropagation()}>
+            
+            {/* ترويسة سند القيد */}
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', borderBottom:'2px solid var(--border)', paddingBottom:'1.25rem', marginBottom:'1.5rem'}}>
+              <div>
+                <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
+                  <h3 style={{fontSize:'1.35rem', fontWeight:800, margin:0, display:'flex', alignItems:'center', gap:'0.5rem'}}>
+                    <FileText size={24} color="var(--brand-teal)" /> سند قيد يومية: {selectedJournal.id}
+                  </h3>
+                  <span style={{
+                    padding:'0.25rem 0.75rem',
+                    borderRadius:'20px',
+                    fontSize:'0.75rem',
+                    fontWeight:700,
+                    background: (selectedJournal.status === 'معتمد' || selectedJournal.status === 'مرحل') ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                    color: (selectedJournal.status === 'معتمد' || selectedJournal.status === 'مرحل') ? '#059669' : '#b45309',
+                    border: '1px solid currentColor'
+                  }}>
+                    {selectedJournal.status}
+                  </span>
+                </div>
+                <div style={{color:'var(--text-muted)', fontSize:'0.85rem', marginTop:'0.5rem'}}>
+                  تاريخ القيد: <strong>{selectedJournal.date}</strong> | المصدر: <strong>{selectedJournal.source}</strong>
+                </div>
+              </div>
+              <button className="btn btn-ghost" onClick={() => setSelectedJournal(null)}><X size={20} /></button>
+            </div>
+
+            {/* البيان العام */}
+            <div style={{background:'var(--bg)', padding:'1rem 1.25rem', borderRadius:'8px', border:'1px solid var(--border)', marginBottom:'1.5rem'}}>
+              <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginBottom:'0.25rem'}}>البيان العام للقيد:</div>
+              <div style={{fontWeight:700, fontSize:'1rem'}}>{selectedJournal.desc}</div>
+            </div>
+
+            {/* جدول الأسطر المحاسبية (المدين والدائن) */}
+            <div style={{marginBottom:'1.5rem'}}>
+              <h4 style={{fontSize:'1rem', fontWeight:700, marginBottom:'0.75rem'}}>الأسطر المحاسبية للقيد (Double-Entry Ledger):</h4>
+              <table style={{width:'100%', borderCollapse:'collapse', border:'1px solid var(--border)', borderRadius:'8px', overflow:'hidden'}}>
+                <thead style={{background:'var(--thead-bg, #f8fafc)', borderBottom:'1px solid var(--border)'}}>
+                  <tr>
+                    <th style={{padding:'0.75rem 1rem', textAlign:'right', fontSize:'0.85rem'}}>الحساب المالي</th>
+                    <th style={{padding:'0.75rem 1rem', textAlign:'right', fontSize:'0.85rem'}}>البيان التفصيلي للسطر</th>
+                    <th style={{padding:'0.75rem 1rem', textAlign:'right', fontSize:'0.85rem'}}>مدين (ر.س)</th>
+                    <th style={{padding:'0.75rem 1rem', textAlign:'right', fontSize:'0.85rem'}}>دائن (ر.س)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(!selectedJournal.lines || selectedJournal.lines.length === 0) ? (
+                    <tr>
+                      <td colSpan={4} style={{padding:'2rem', textAlign:'center', color:'var(--text-muted)'}}>
+                        لا توجد أسطر تفصيلية مسجلة في هذا القيد.
+                      </td>
+                    </tr>
+                  ) : (
+                    selectedJournal.lines.map((l, i) => (
+                      <tr key={l.id || i} style={{borderBottom:'1px solid var(--border)'}}>
+                        <td style={{padding:'0.75rem 1rem', fontWeight:600}}>{l.account_label || l.account_id || 'حساب رئيسي'}</td>
+                        <td style={{padding:'0.75rem 1rem', fontSize:'0.85rem', color:'var(--text-muted)'}}>{l.description || selectedJournal.desc}</td>
+                        <td style={{padding:'0.75rem 1rem', fontWeight:700, color:'#e11d48', direction:'ltr', textAlign:'right'}}>
+                          {l.debit ? Number(l.debit).toLocaleString() : '-'}
+                        </td>
+                        <td style={{padding:'0.75rem 1rem', fontWeight:700, color:'#10b981', direction:'ltr', textAlign:'right'}}>
+                          {l.credit ? Number(l.credit).toLocaleString() : '-'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                <tfoot style={{background:'var(--bg)', fontWeight:800, borderTop:'2px solid var(--border)'}}>
+                  <tr>
+                    <td colSpan={2} style={{padding:'0.75rem 1rem', textAlign:'left'}}>المجموع المتوازن:</td>
+                    <td style={{padding:'0.75rem 1rem', color:'#e11d48', direction:'ltr', textAlign:'right'}}>
+                      {Number(selectedJournal.debit || 0).toLocaleString()}
+                    </td>
+                    <td style={{padding:'0.75rem 1rem', color:'#10b981', direction:'ltr', textAlign:'right'}}>
+                      {Number(selectedJournal.credit || 0).toLocaleString()}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+
+            {/* أزرار التحكم بالسند */}
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderTop:'1px solid var(--border)', paddingTop:'1.25rem'}}>
+              <div style={{display:'flex', gap:'0.75rem'}}>
+                {(selectedJournal.status === 'بانتظار الاعتماد' || selectedJournal.status === 'مسودة' || selectedJournal.status === 'جديد') && (
+                  <button 
+                    className="btn btn-primary" 
+                    style={{background:'#10b981', borderColor:'#10b981', padding:'0.6rem 1.5rem', fontWeight:700}}
+                    onClick={async () => {
+                      showToast('جاري اعتماد القيد المحاسبي...');
+                      const { error } = await supabase.from('journal_entries').update({ status: 'معتمد' }).eq('id', selectedJournal.db_id);
+                      if (!error) {
+                        setJournals(prev => prev.map(item => item.db_id === selectedJournal.db_id ? { ...item, status: 'معتمد' } : item));
+                        setSelectedJournal(prev => prev ? { ...prev, status: 'معتمد' } : null);
+                        showToast('✅ تم اعتماد القيد المحاسبي بنجاح!');
+                        fetchInitialData();
+                      } else {
+                        showToast('❌ تعذر اعتماد القيد: ' + error.message);
+                      }
+                    }}
+                  >
+                    <CheckCircle size={18} style={{marginRight:'0.4rem'}} /> اعتماد هذا القيد المالي
+                  </button>
+                )}
+                <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => showToast('🖨️ جاري تجهيز وطباعة سند القيد...')}>
+                  <Printer size={16} /> طباعة السند
+                </button>
+              </div>
+
+              <button className="btn btn-ghost" onClick={() => setSelectedJournal(null)}>إغلاق</button>
+            </div>
+
+          </div>
+        </div>
+      )}
+  
     </div>
   );
 };
