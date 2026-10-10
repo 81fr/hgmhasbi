@@ -142,7 +142,7 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
   
   React.useEffect(() => {
     if (ea && ea.db_id) {
-      window.supabase.from('journal_entries').select('*').eq('linked_entity_id', ea.db_id).then(({data}) => {
+      supabase.from('journal_entries').select('*').eq('linked_entity_id', ea.db_id).then(({data}) => {
         if (data) setLinkedJournals(data);
       });
     }
@@ -1175,16 +1175,7 @@ const App = () => {
 
   
   const renderNewAsset = () => {
-    const [linkedJournals, setLinkedJournals] = React.useState([]);
-    React.useEffect(() => {
-      if (editingAsset && editingAsset.db_id) {
-        supabase.from('journal_entries').select('*').eq('linked_entity_id', editingAsset.db_id).then(({data}) => {
-          if (data) setLinkedJournals(data);
-        });
-      }
-    }, [editingAsset]);
-    return <AssetForm ea={editingAsset} systemLookups={systemLookups} onSubmit={handleAddAsset} onCancel={() => { setEditingAsset(null); setView('register'); }} linkedJournals={linkedJournals} />;
-
+    return <AssetForm ea={editingAsset} systemLookups={systemLookups} onSubmit={handleAddAsset} onCancel={() => { setEditingAsset(null); setView('register'); }} />;
   };
 
   const renderJournal = () => {
@@ -2174,237 +2165,6 @@ const renderDepreciation = () => {
 
   
       
-      {qrModalAsset && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, backdropFilter:'blur(5px)'}}>
-          <div className="card" style={{width:'350px', background:'white', padding:'2.5rem', textAlign:'center', borderRadius:'16px'}}>
-             <div style={{marginBottom:'1rem', fontWeight:800, color:'#0f172a', fontSize:'1.25rem'}}>ملصق الأصل الثابت</div>
-             <div style={{padding:'1rem', background:'white', display:'inline-block', border:'2px solid #e2e8f0', borderRadius:'12px', marginBottom:'1.5rem'}}>
-               <QRCodeSVG value={JSON.stringify({ id: qrModalAsset.id, name: qrModalAsset.name, category: qrModalAsset.category, date: qrModalAsset.date })} size={200} />
-             </div>
-             <div style={{fontWeight:800, fontSize:'1.5rem', color:'#0f172a', fontFamily:'monospace', letterSpacing:'2px'}}>{qrModalAsset.id}</div>
-             <div style={{fontSize:'0.9rem', color:'#64748b', marginTop:'0.5rem', marginBottom:'2rem'}}>{qrModalAsset.name}</div>
-             <div style={{display:'flex', gap:'1rem'}}>
-               <button className="btn btn-primary" style={{flex:1}} onClick={() => { showToast('🖨️ جاري الطباعة على طابعة الملصقات الحرارية...'); setQrModalAsset(null); }}><Printer size={18} /> طباعة الملصق</button>
-               <button className="btn btn-ghost" style={{flex:1, border:'1px solid #cbd5e1'}} onClick={() => setQrModalAsset(null)}>إغلاق</button>
-             </div>
-          </div>
-        </div>
-      )}
-      {selectedEmployee && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'800px', maxHeight:'90vh', overflowY:'auto', background:'var(--bg)', padding:0, border:'1px solid var(--border)'}}>
-            
-            {/* Header */}
-            <div style={{padding:'2rem', background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color:'white', position:'relative'}}>
-              <button className="btn btn-ghost" style={{position:'absolute', top:'1rem', left:'1rem', color:'white', background:'rgba(255,255,255,0.1)'}} onClick={() => setSelectedEmployee(null)}><X size={18} /></button>
-              <div style={{display:'flex', alignItems:'center', gap:'1.5rem'}}>
-                <div style={{background:'rgba(255,255,255,0.1)', padding:'1rem', borderRadius:'50%'}}>
-                  <UserCircle size={48} />
-                </div>
-                <div>
-                  <h2 style={{margin:0, fontSize:'1.8rem', fontWeight:800}}>{selectedEmployee.name}</h2>
-                  <div style={{color:'#94a3b8', marginTop:'0.5rem'}}>إجمالي الأصول المستلمة عهدة: {selectedEmployee.assets.length} أصل | القيمة الإجمالية: {selectedEmployee.totalValue.toLocaleString()} ر.س</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div style={{padding:'1.5rem 2rem', borderBottom:'1px solid var(--border)', background:'var(--card-bg)', display:'flex', gap:'1rem'}}>
-              <button className="btn btn-primary" onClick={() => {
-                showToast('🖨️ جاري تجهيز وإصدار نموذج "إخلاء طرف / تسليم عهدة"...');
-              }}>
-                <FileText size={18} /> طباعة نموذج تسليم / إخلاء عهدة (PDF)
-              </button>
-              <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}>
-                <History size={18} /> سجل حركات الموظف
-              </button>
-            </div>
-
-            {/* Assets Table */}
-            <div style={{padding:'2rem'}}>
-              <h3 style={{fontSize:'1.2rem', marginBottom:'1rem', color:'var(--brand-teal)'}}>تفاصيل الأصول في العهدة الحالية</h3>
-              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem', background:'var(--card-bg)', borderRadius:'8px', overflow:'hidden'}}>
-                <thead style={{background:'var(--thead-bg)', borderBottom:'2px solid var(--border)'}}>
-                  <tr>
-                    <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>وصف الأصل</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>تاريخ الاستلام</th>
-                    <th style={{padding:'1rem', textAlign:'right'}}>التكلفة (ر.س)</th>
-                    <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedEmployee.assets.map((a, i) => (
-                    <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
-                      <td style={{padding:'1rem', fontWeight:800, color:'var(--accent)'}}>{a.id}</td>
-                      <td style={{padding:'1rem', fontWeight:600}}>{a.name}</td>
-                      <td style={{padding:'1rem'}}>{a.date}</td>
-                      <td style={{padding:'1rem'}}>{(Number(a.cost)||0).toLocaleString()}</td>
-                      <td style={{padding:'1rem', textAlign:'center'}}>
-                        <span style={{background:'rgba(16, 185, 129, 0.1)', color:'#10b981', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{a.status}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-          </div>
-        </div>
-      )}
-  
-      {warehouseMovementModal && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--border)', overflow:'hidden'}}>
-            
-            <div style={{padding:'1.5rem 2rem', background:'var(--card-bg)', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'var(--text)'}}>
-                <ArrowRightLeft size={22} color="var(--brand-teal)"/>
-                إنشاء مستند حركة مستودعية
-              </h2>
-              <button className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}><X size={18} /></button>
-            </div>
-
-            <form style={{padding:'2rem'}} onSubmit={(e) => {
-              e.preventDefault();
-              const type = e.target.movementType.value;
-              const isAsset = e.target.isAsset?.checked;
-              
-              if (type === 'صرف' && isAsset) {
-                // Open new asset modal implicitly
-                setWarehouseMovementModal(false);
-                setEditingAsset(null);
-                setView('new-asset');
-                setTimeout(() => showToast('💡 نظراً لأن الصنف المَصروف يصنّف كأصل ثابت، تم تحويلك مباشرة لشاشة تسجيل الأصل.'), 500);
-              } else {
-                setWarehouseMovementModal(false);
-                showToast(`✅ تم حفظ إذن الـ (${type}) وتحديث كميات المستودع بنجاح!`);
-              }
-            }}>
-              <div style={{display:'grid', gap:'1.5rem'}}>
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>نوع الحركة المستودعية *</label>
-                  <select name="movementType" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} onChange={e => {
-                    const chk = document.getElementById('isAssetContainer');
-                    if (chk) chk.style.display = e.target.value === 'صرف' ? 'block' : 'none';
-                  }}>
-                    <option value="استلام">إذن استلام (إضافة للمخزون)</option>
-                    <option value="صرف">إذن صرف (خصم من المخزون)</option>
-                    <option value="تحويل">إذن تحويل بين المستودعات</option>
-                    <option value="إرجاع">إذن إرجاع</option>
-                    <option value="تسوية">إذن تسوية (تعديل الأرصدة)</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الصنف *</label>
-                  <select name="item" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                    {warehouseItems.map(w => <option key={w.id} value={w.id}>{w.sku} - {w.name} (الرصيد: {w.qty})</option>)}
-                  </select>
-                </div>
-
-                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem'}}>
-                  <div>
-                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الكمية *</label>
-                    <input name="qty" type="number" min="1" required defaultValue="1" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
-                  </div>
-                  <div>
-                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>المستودع / الموقع</label>
-                    <select name="warehouse" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                      <option value="main">المستودع الرئيسي (الرياض)</option>
-                      <option value="sub1">مستودع فرع جدة</option>
-                      <option value="sub2">مستودع العهد التقنية</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div id="isAssetContainer" style={{display:'none', background:'rgba(245, 158, 11, 0.1)', border:'1px solid rgba(245, 158, 11, 0.3)', padding:'1rem', borderRadius:'8px'}}>
-                  <label style={{display:'flex', alignItems:'center', gap:'0.75rem', cursor:'pointer', color:'var(--warning)', fontWeight:700}}>
-                    <input type="checkbox" name="isAsset" style={{width:'20px', height:'20px', accentColor:'var(--warning)'}} />
-                    هل هذا الصنف المصروف يعتبر "أصلاً ثابتاً"؟ (سيقوم النظام تلقائياً بإنشاء بطاقة أصل ثابت له)
-                  </label>
-                </div>
-
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الملاحظات والبيان</label>
-                  <textarea name="notes" rows="2" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
-                </div>
-              </div>
-
-              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
-                <button type="button" className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}>إلغاء</button>
-                <button type="submit" className="btn btn-primary">تنفيذ وحفظ</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-  
-      {disposalModal && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--danger)', overflow:'hidden'}}>
-            
-            <div style={{padding:'1.5rem 2rem', background:'#fef2f2', borderBottom:'1px solid #fecaca', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
-              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'#991b1b'}}>
-                <Trash2 size={22}/>
-                نموذج طلب استبعاد أصل ثابت
-              </h2>
-              <button className="btn btn-ghost" onClick={() => setDisposalModal(null)}><X size={18} color="#991b1b" /></button>
-            </div>
-
-            <form style={{padding:'2rem'}} onSubmit={async (e) => {
-              e.preventDefault();
-              const reason = e.target.reason.value;
-              const details = e.target.details.value;
-              const date = new Date().toISOString().split('T')[0];
-              
-              const { error } = await supabase.from('assets').update({
-                status: 'مستبعد',
-                disposal_date: date,
-                disposal_reason: `${reason}: ${details}`
-              }).eq('id', disposalModal.db_id);
-
-              if (error) {
-                showToast('❌ حدث خطأ أثناء الاستبعاد');
-              } else {
-                showToast('✅ تم استبعاد الأصل بنجاح وإيقاف إهلاكه مستقبلاً!');
-                fetchInitialData();
-                setDisposalModal(null);
-              }
-            }}>
-              
-              <div style={{background:'var(--card-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)'}}>
-                <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أنت تقوم الآن باستبعاد الأصل:</div>
-                <div style={{fontWeight:800, color:'var(--accent)', fontSize:'1.1rem'}}>{disposalModal.id} - {disposalModal.name}</div>
-                <div style={{fontSize:'0.85rem', color:'var(--danger)', marginTop:'0.5rem'}}>تنبيه: لن يتم حذف الأصل من قاعدة البيانات حفظاً للسجل التاريخي، ولكن ستتغير حالته إلى "مستبعد" وسيتوقف احتساب إهلاكه.</div>
-              </div>
-
-              <div style={{display:'grid', gap:'1.5rem'}}>
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>سبب الاستبعاد الأساسي *</label>
-                  <select name="reason" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
-                    <option value="تالف / خردة">تالف / خردة (لا جدوى من إصلاحه)</option>
-                    <option value="مفقود / مسروق">مفقود / مسروق</option>
-                    <option value="تم البيع">تم بيع الأصل</option>
-                    <option value="تبرع عيني">تم التبرع به</option>
-                    <option value="انتهاء العمر الافتراضي">انتهاء العمر الافتراضي</option>
-                  </select>
-                </div>
-                
-                <div>
-                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>تفاصيل ومبررات الاستبعاد (قرار اللجنة) *</label>
-                  <textarea name="details" rows="3" required placeholder="أدخل مبررات الاستبعاد وأسماء أعضاء لجنة الفحص إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
-                </div>
-              </div>
-
-              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
-                <button type="button" className="btn btn-ghost" onClick={() => setDisposalModal(null)}>تراجع وإلغاء</button>
-                <button type="submit" className="btn btn-primary" style={{background:'var(--danger)', borderColor:'var(--danger)', color:'white'}}>تأكيد الاستبعاد</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
   
   const [employeesList, setEmployeesList] = useState([]);
   const [employeeModal, setEmployeeModal] = useState(null);
@@ -3624,6 +3384,237 @@ const renderDepreciation = () => {
         </div>
       )}
 
+      {qrModalAsset && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.8)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:10000, backdropFilter:'blur(5px)'}}>
+          <div className="card" style={{width:'350px', background:'white', padding:'2.5rem', textAlign:'center', borderRadius:'16px'}}>
+             <div style={{marginBottom:'1rem', fontWeight:800, color:'#0f172a', fontSize:'1.25rem'}}>ملصق الأصل الثابت</div>
+             <div style={{padding:'1rem', background:'white', display:'inline-block', border:'2px solid #e2e8f0', borderRadius:'12px', marginBottom:'1.5rem'}}>
+               <QRCodeSVG value={JSON.stringify({ id: qrModalAsset.id, name: qrModalAsset.name, category: qrModalAsset.category, date: qrModalAsset.date })} size={200} />
+             </div>
+             <div style={{fontWeight:800, fontSize:'1.5rem', color:'#0f172a', fontFamily:'monospace', letterSpacing:'2px'}}>{qrModalAsset.id}</div>
+             <div style={{fontSize:'0.9rem', color:'#64748b', marginTop:'0.5rem', marginBottom:'2rem'}}>{qrModalAsset.name}</div>
+             <div style={{display:'flex', gap:'1rem'}}>
+               <button className="btn btn-primary" style={{flex:1}} onClick={() => { showToast('🖨️ جاري الطباعة على طابعة الملصقات الحرارية...'); setQrModalAsset(null); }}><Printer size={18} /> طباعة الملصق</button>
+               <button className="btn btn-ghost" style={{flex:1, border:'1px solid #cbd5e1'}} onClick={() => setQrModalAsset(null)}>إغلاق</button>
+             </div>
+          </div>
+        </div>
+      )}
+      {selectedEmployee && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'800px', maxHeight:'90vh', overflowY:'auto', background:'var(--bg)', padding:0, border:'1px solid var(--border)'}}>
+            
+            {/* Header */}
+            <div style={{padding:'2rem', background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color:'white', position:'relative'}}>
+              <button className="btn btn-ghost" style={{position:'absolute', top:'1rem', left:'1rem', color:'white', background:'rgba(255,255,255,0.1)'}} onClick={() => setSelectedEmployee(null)}><X size={18} /></button>
+              <div style={{display:'flex', alignItems:'center', gap:'1.5rem'}}>
+                <div style={{background:'rgba(255,255,255,0.1)', padding:'1rem', borderRadius:'50%'}}>
+                  <UserCircle size={48} />
+                </div>
+                <div>
+                  <h2 style={{margin:0, fontSize:'1.8rem', fontWeight:800}}>{selectedEmployee.name}</h2>
+                  <div style={{color:'#94a3b8', marginTop:'0.5rem'}}>إجمالي الأصول المستلمة عهدة: {selectedEmployee.assets.length} أصل | القيمة الإجمالية: {selectedEmployee.totalValue.toLocaleString()} ر.س</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div style={{padding:'1.5rem 2rem', borderBottom:'1px solid var(--border)', background:'var(--card-bg)', display:'flex', gap:'1rem'}}>
+              <button className="btn btn-primary" onClick={() => {
+                showToast('🖨️ جاري تجهيز وإصدار نموذج "إخلاء طرف / تسليم عهدة"...');
+              }}>
+                <FileText size={18} /> طباعة نموذج تسليم / إخلاء عهدة (PDF)
+              </button>
+              <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}}>
+                <History size={18} /> سجل حركات الموظف
+              </button>
+            </div>
+
+            {/* Assets Table */}
+            <div style={{padding:'2rem'}}>
+              <h3 style={{fontSize:'1.2rem', marginBottom:'1rem', color:'var(--brand-teal)'}}>تفاصيل الأصول في العهدة الحالية</h3>
+              <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.9rem', background:'var(--card-bg)', borderRadius:'8px', overflow:'hidden'}}>
+                <thead style={{background:'var(--thead-bg)', borderBottom:'2px solid var(--border)'}}>
+                  <tr>
+                    <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>وصف الأصل</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>تاريخ الاستلام</th>
+                    <th style={{padding:'1rem', textAlign:'right'}}>التكلفة (ر.س)</th>
+                    <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedEmployee.assets.map((a, i) => (
+                    <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                      <td style={{padding:'1rem', fontWeight:800, color:'var(--accent)'}}>{a.id}</td>
+                      <td style={{padding:'1rem', fontWeight:600}}>{a.name}</td>
+                      <td style={{padding:'1rem'}}>{a.date}</td>
+                      <td style={{padding:'1rem'}}>{(Number(a.cost)||0).toLocaleString()}</td>
+                      <td style={{padding:'1rem', textAlign:'center'}}>
+                        <span style={{background:'rgba(16, 185, 129, 0.1)', color:'#10b981', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{a.status}</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+      )}
+  
+      {warehouseMovementModal && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--border)', overflow:'hidden'}}>
+            
+            <div style={{padding:'1.5rem 2rem', background:'var(--card-bg)', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'var(--text)'}}>
+                <ArrowRightLeft size={22} color="var(--brand-teal)"/>
+                إنشاء مستند حركة مستودعية
+              </h2>
+              <button className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}><X size={18} /></button>
+            </div>
+
+            <form style={{padding:'2rem'}} onSubmit={(e) => {
+              e.preventDefault();
+              const type = e.target.movementType.value;
+              const isAsset = e.target.isAsset?.checked;
+              
+              if (type === 'صرف' && isAsset) {
+                // Open new asset modal implicitly
+                setWarehouseMovementModal(false);
+                setEditingAsset(null);
+                setView('new-asset');
+                setTimeout(() => showToast('💡 نظراً لأن الصنف المَصروف يصنّف كأصل ثابت، تم تحويلك مباشرة لشاشة تسجيل الأصل.'), 500);
+              } else {
+                setWarehouseMovementModal(false);
+                showToast(`✅ تم حفظ إذن الـ (${type}) وتحديث كميات المستودع بنجاح!`);
+              }
+            }}>
+              <div style={{display:'grid', gap:'1.5rem'}}>
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>نوع الحركة المستودعية *</label>
+                  <select name="movementType" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} onChange={e => {
+                    const chk = document.getElementById('isAssetContainer');
+                    if (chk) chk.style.display = e.target.value === 'صرف' ? 'block' : 'none';
+                  }}>
+                    <option value="استلام">إذن استلام (إضافة للمخزون)</option>
+                    <option value="صرف">إذن صرف (خصم من المخزون)</option>
+                    <option value="تحويل">إذن تحويل بين المستودعات</option>
+                    <option value="إرجاع">إذن إرجاع</option>
+                    <option value="تسوية">إذن تسوية (تعديل الأرصدة)</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الصنف *</label>
+                  <select name="item" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                    {warehouseItems.map(w => <option key={w.id} value={w.id}>{w.sku} - {w.name} (الرصيد: {w.qty})</option>)}
+                  </select>
+                </div>
+
+                <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.5rem'}}>
+                  <div>
+                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الكمية *</label>
+                    <input name="qty" type="number" min="1" required defaultValue="1" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+                  </div>
+                  <div>
+                    <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>المستودع / الموقع</label>
+                    <select name="warehouse" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                      <option value="main">المستودع الرئيسي (الرياض)</option>
+                      <option value="sub1">مستودع فرع جدة</option>
+                      <option value="sub2">مستودع العهد التقنية</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div id="isAssetContainer" style={{display:'none', background:'rgba(245, 158, 11, 0.1)', border:'1px solid rgba(245, 158, 11, 0.3)', padding:'1rem', borderRadius:'8px'}}>
+                  <label style={{display:'flex', alignItems:'center', gap:'0.75rem', cursor:'pointer', color:'var(--warning)', fontWeight:700}}>
+                    <input type="checkbox" name="isAsset" style={{width:'20px', height:'20px', accentColor:'var(--warning)'}} />
+                    هل هذا الصنف المصروف يعتبر "أصلاً ثابتاً"؟ (سيقوم النظام تلقائياً بإنشاء بطاقة أصل ثابت له)
+                  </label>
+                </div>
+
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الملاحظات والبيان</label>
+                  <textarea name="notes" rows="2" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
+                </div>
+              </div>
+
+              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
+                <button type="button" className="btn btn-ghost" onClick={() => setWarehouseMovementModal(false)}>إلغاء</button>
+                <button type="submit" className="btn btn-primary">تنفيذ وحفظ</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+  
+      {disposalModal && (
+        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'600px', background:'var(--bg)', padding:0, border:'1px solid var(--danger)', overflow:'hidden'}}>
+            
+            <div style={{padding:'1.5rem 2rem', background:'#fef2f2', borderBottom:'1px solid #fecaca', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+              <h2 style={{margin:0, fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.75rem', color:'#991b1b'}}>
+                <Trash2 size={22}/>
+                نموذج طلب استبعاد أصل ثابت
+              </h2>
+              <button className="btn btn-ghost" onClick={() => setDisposalModal(null)}><X size={18} color="#991b1b" /></button>
+            </div>
+
+            <form style={{padding:'2rem'}} onSubmit={async (e) => {
+              e.preventDefault();
+              const reason = e.target.reason.value;
+              const details = e.target.details.value;
+              const date = new Date().toISOString().split('T')[0];
+              
+              const { error } = await supabase.from('assets').update({
+                status: 'مستبعد',
+                disposal_date: date,
+                disposal_reason: `${reason}: ${details}`
+              }).eq('id', disposalModal.db_id);
+
+              if (error) {
+                showToast('❌ حدث خطأ أثناء الاستبعاد');
+              } else {
+                showToast('✅ تم استبعاد الأصل بنجاح وإيقاف إهلاكه مستقبلاً!');
+                fetchInitialData();
+                setDisposalModal(null);
+              }
+            }}>
+              
+              <div style={{background:'var(--card-bg)', padding:'1rem', borderRadius:'8px', marginBottom:'1.5rem', border:'1px solid var(--border)'}}>
+                <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>أنت تقوم الآن باستبعاد الأصل:</div>
+                <div style={{fontWeight:800, color:'var(--accent)', fontSize:'1.1rem'}}>{disposalModal.id} - {disposalModal.name}</div>
+                <div style={{fontSize:'0.85rem', color:'var(--danger)', marginTop:'0.5rem'}}>تنبيه: لن يتم حذف الأصل من قاعدة البيانات حفظاً للسجل التاريخي، ولكن ستتغير حالته إلى "مستبعد" وسيتوقف احتساب إهلاكه.</div>
+              </div>
+
+              <div style={{display:'grid', gap:'1.5rem'}}>
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>سبب الاستبعاد الأساسي *</label>
+                  <select name="reason" required style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                    <option value="تالف / خردة">تالف / خردة (لا جدوى من إصلاحه)</option>
+                    <option value="مفقود / مسروق">مفقود / مسروق</option>
+                    <option value="تم البيع">تم بيع الأصل</option>
+                    <option value="تبرع عيني">تم التبرع به</option>
+                    <option value="انتهاء العمر الافتراضي">انتهاء العمر الافتراضي</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label style={{fontSize:'0.85rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>تفاصيل ومبررات الاستبعاد (قرار اللجنة) *</label>
+                  <textarea name="details" rows="3" required placeholder="أدخل مبررات الاستبعاد وأسماء أعضاء لجنة الفحص إن وجد..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}></textarea>
+                </div>
+              </div>
+
+              <div style={{marginTop:'2rem', display:'flex', justifyContent:'flex-end', gap:'1rem'}}>
+                <button type="button" className="btn btn-ghost" onClick={() => setDisposalModal(null)}>تراجع وإلغاء</button>
+                <button type="submit" className="btn btn-primary" style={{background:'var(--danger)', borderColor:'var(--danger)', color:'white'}}>تأكيد الاستبعاد</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
