@@ -19,6 +19,7 @@ const STEPS = [
 
 export default function AIStudio({ aiName, setAiName, aiSystemPrompt, setAiSystemPrompt, aiProvider, setAiProvider }) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
 
   const renderStepContent = () => {
     switch(currentStep) {
@@ -155,7 +156,8 @@ export default function AIStudio({ aiName, setAiName, aiSystemPrompt, setAiSyste
           <div style={{display:'flex', flexDirection:'column', gap:'1.5rem', alignItems:'center', justifyContent:'center', height:'100%'}}>
             <PlayCircle size={48} color="var(--brand-teal)"/>
             <h3 style={{marginTop:'1rem'}}>جاهز لاختبار المساعد؟</h3>
-            <button className="btn btn-primary" onClick={() => alert('تم اجتياز الفحص بنجاح!')}>إجراء فحص النظام (Health Check)</button>
+            <button className="btn btn-primary" onClick={() => setStatusMessage('✅ تم اجتياز فحص النظام واختبار المساعد بنجاح!')}>إجراء فحص النظام (Health Check)</button>
+            {statusMessage && <div style={{padding:'0.75rem 1.5rem', background:'var(--brand-teal)', color:'#fff', borderRadius:'8px', fontWeight:600}}>{statusMessage}</div>}
           </div>
         );
       case 9:
@@ -164,7 +166,8 @@ export default function AIStudio({ aiName, setAiName, aiSystemPrompt, setAiSyste
             <UploadCloud size={64} color="var(--success-text)"/>
             <h2 style={{marginTop:'1rem'}}>كل شيء جاهز للنشر!</h2>
             <p style={{color:'var(--text-muted)', textAlign:'center', maxWidth:'400px'}}>سيتم تفعيل المساعد الذكي لجميع المستخدمين وفق الصلاحيات المحددة.</p>
-            <button className="btn btn-primary" onClick={() => alert('تم نشر المساعد بنجاح!')} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', border:'none', padding:'1rem 3rem', fontSize:'1.1rem'}}>نشر المساعد الذكي 🚀</button>
+            <button className="btn btn-primary" onClick={() => setStatusMessage('🚀 تم نشر المساعد الذكي بنجاح لكافة المستخدمين!')} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', border:'none', padding:'1rem 3rem', fontSize:'1.1rem'}}>نشر المساعد الذكي 🚀</button>
+            {statusMessage && <div style={{padding:'0.75rem 1.5rem', background:'var(--brand-green)', color:'#fff', borderRadius:'8px', fontWeight:600}}>{statusMessage}</div>}
           </div>
         );
       default:

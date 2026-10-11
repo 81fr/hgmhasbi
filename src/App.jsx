@@ -433,6 +433,8 @@ const App = () => {
   const [warehouseActiveTab, setWarehouseActiveTab] = useState('items'); // 'items' | 'requests' | 'movements' | 'radar'
   const [issueModalItem, setIssueModalItem] = useState(null);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [promptDialog, setPromptDialog] = useState(null);
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const [warehouseRequests, setWarehouseRequests] = useState(() => {
     const saved = localStorage.getItem('warehouseRequests');
     if (saved) {
@@ -518,45 +520,29 @@ const App = () => {
     } catch(e) { return ''; }
   });
 
-  const editWarehouseItem = async (item) => {
-    const qty = window.prompt(`الكمية الجديدة للصنف "${item.name}":`, String(item.qty));
-    if (qty === null) return;
-    const q = parseInt(qty, 10);
-    if (isNaN(q) || q < 0) { showToast('⚠️ كمية غير صحيحة'); return; }
-    const loc = window.prompt('الموقع (Bin):', item.location);
-    if (loc === null) return;
-    const status = q === 0 ? 'نفاد' : (item.status === 'نفاد' ? 'متاح' : item.status);
-    
-    // إذا كان المعرف يبدو كـ UUID الخاص بـ Supabase
-    if (item.id.length > 20) {
-      const { error } = await supabase.from('warehouse_items').update({
-        quantity: q,
-        bin_location: loc.trim() || item.location,
-        status: status
-      }).eq('id', item.id);
-      if (error) {
-        showToast('❌ حدث خطأ أثناء التحديث: ' + error.message);
-        return;
-      }
-    }
-    
-    setWarehouseItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: q, location: loc.trim() || i.location, status } : i));
-    showToast('✅ تم تحديث بيانات الصنف');
+  const editWarehouseItem = (item) => {
+    setWarehouseModal(item);
   };
 
-  const deleteAsset = async (assetId, dbId) => {
-    if(window.confirm('هل أنت متأكد من حذف هذا الأصل نهائياً من السجل؟')) {
-      // Delete from Supabase
-      if (dbId) {
-        const { error } = await supabase.from('assets').delete().eq('id', dbId);
-        if (error) {
-          showToast('❌ حدث خطأ أثناء الحذف: ' + error.message);
-          return;
+  const deleteAsset = (assetId, dbId) => {
+    setConfirmDialog({
+      title: 'تأكيد حذف الأصل نهائياً',
+      message: 'هل أنت متأكد من رغبتك في حذف هذا الأصل نهائياً من السجل؟ هذا الإجراء لا يمكن التراجع عنه.',
+      confirmText: 'نعم، حذف نهائي',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: async () => {
+        // Delete from Supabase
+        if (dbId) {
+          const { error } = await supabase.from('assets').delete().eq('id', dbId);
+          if (error) {
+            showToast('❌ حدث خطأ أثناء الحذف: ' + error.message);
+            return;
+          }
         }
+        setAssets(prev => prev.filter(a => a.id !== assetId));
+        showToast('🗑️ تم حذف الأصل بنجاح');
       }
-      setAssets(assets.filter(a => a.id !== assetId));
-      showToast('🗑️ تم حذف الأصل بنجاح');
-    }
+    });
   };
 
   const speak = (text) => {
@@ -1959,21 +1945,42 @@ const App = () => {
           <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مراقبة وتحليل خطط الشراء والاستحواذ مقارنة بالميزانية المعتمدة.</p>
         </div>
         <div style={{display:'flex', gap:'0.5rem'}}>
-           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={async () => { 
-             const v = window.prompt('أدخل السقف المالي الجديد (ر.س):', '1000000'); 
-             if (v && !isNaN(parseFloat(v))) {
-               const num = parseFloat(v);
-               const { error } = await supabase.from('capex_budgets').upsert({ fiscal_year: '2024', total_budget: num }, { onConflict: 'fiscal_year' });
-               if (error) console.warn('Supabase Upsert failed:', error.message);
-               showToast(`✅ تم ضبط السقف المالي إلى ${num.toLocaleString()} ر.س`); 
-             }
+           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => { 
+             setPromptDialog({
+               title: 'ضبط السقف المالي لميزانية CAPEX',
+               subtitle: 'تعديل السقف المالي المعتمد للمشاريع الرأسمالية للسنة المالية الحالية',
+               label: 'السقف المالي الجديد (ر.س) *',
+               defaultValue: '1000000',
+               inputType: 'number',
+               confirmText: 'حفظ السقف المالي',
+               onConfirm: async (v) => {
+                 if (v && !isNaN(parseFloat(v))) {
+                   const num = parseFloat(v);
+                   const { error } = await supabase.from('capex_budgets').upsert({ fiscal_year: '2024', total_budget: num }, { onConflict: 'fiscal_year' });
+                   if (error) console.warn('Supabase Upsert failed:', error.message);
+                   showToast(`✅ تم ضبط السقف المالي إلى ${num.toLocaleString()} ر.س`); 
+                 } else {
+                   showToast('⚠️ يرجى إدخال مبلغ صحيح');
+                 }
+               }
+             });
            }}><Settings size={16} /> ضبط السقف المالي</button>
-           <button className="btn btn-primary" onClick={async () => { 
-             const v = window.prompt('مبلغ التعزيز المطلوب (ر.س):', '100000'); 
-             if (v && !isNaN(parseFloat(v))) {
-               // Here we could hypothetically write a budget request to a table
-               showToast(`📨 تم رفع طلب تعزيز ميزانية بمبلغ ${parseFloat(v).toLocaleString()} ر.س للاعتماد`); 
-             }
+           <button className="btn btn-primary" onClick={() => { 
+             setPromptDialog({
+               title: 'طلب تعزيز ميزانية رأسمالية',
+               subtitle: 'رفع طلب تعزيز مالي للميزانية التقديرية الرأسمالية للاعتماد',
+               label: 'مبلغ التعزيز المطلوب (ر.س) *',
+               defaultValue: '100000',
+               inputType: 'number',
+               confirmText: 'إرسال طلب التعزيز',
+               onConfirm: (v) => {
+                 if (v && !isNaN(parseFloat(v))) {
+                   showToast(`📨 تم رفع طلب تعزيز ميزانية بمبلغ ${parseFloat(v).toLocaleString()} ر.س للاعتماد`); 
+                 } else {
+                   showToast('⚠️ يرجى إدخال مبلغ صحيح');
+                 }
+               }
+             });
            }}><FilePlus size={16} /> طلب تعزيز ميزانية</button>
         </div>
       </div>
@@ -2377,7 +2384,23 @@ const renderMaintenance = () => (
       </div>
       <div style={{display:'flex', gap:'0.5rem'}}>
          <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => showToast('✅ تم تحديث عقود الضمان من الموردين')}><RefreshCw size={16} /> مزامنة الضمانات</button>
-         <button className="btn btn-primary" onClick={() => { const v = window.prompt('رقم الأصل لطلب الصيانة:'); if (v) showToast(`📨 تم رفع تذكرة صيانة للأصل ${v}`); }}><Plus size={16} /> طلب صيانة جديد</button>
+         <button className="btn btn-primary" onClick={() => {
+           setPromptDialog({
+             title: 'طلب صيانة جديد',
+             subtitle: 'فتح تذكرة صيانة دورية أو طارئة لأحد الأصول المسجلة',
+             label: 'رقم أو كود الأصل *',
+             defaultValue: '',
+             placeholder: 'مثال: AST-2024-001',
+             confirmText: 'إنشاء تذكرة الصيانة',
+             onConfirm: (v) => {
+               if (v && v.trim()) {
+                 showToast(`📨 تم رفع تذكرة صيانة للأصل ${v.trim()}`);
+               } else {
+                 showToast('⚠️ يرجى إدخال رقم الأصل');
+               }
+             }
+           });
+         }}><Plus size={16} /> طلب صيانة جديد</button>
       </div>
     </div>
     
@@ -3353,16 +3376,27 @@ const renderDepreciation = () => {
   };
 
   const handleRejectIssueRequest = (req) => {
-    const reason = window.prompt('يرجى كتابة سبب رفض طلب الصرف:', 'عدم اكتمال المبررات / توفر بديل قائم');
-    if (reason === null) return;
-
-    setWarehouseRequests(prev => prev.map(r => r.id === req.id ? {
-      ...r,
-      status: 'مرفوض',
-      rejectionReason: reason.trim() || 'تم الرفض بواسطة الإدارة'
-    } : r));
-
-    showToast('⚠️ تم رفض طلب الصرف وحفظ السبب دون خصم أي كمية');
+    setPromptDialog({
+      title: `رفض طلب صرف مستودعي (${req.id})`,
+      subtitle: `الصنف: ${req.itemName} - الكمية المطلوبة: ${req.qty} ${req.unit} - طالب الصرف: ${req.requestedBy || 'غير محدد'}`,
+      label: 'سبب رفض طلب الصرف *',
+      defaultValue: 'عدم اكتمال المبررات / توفر بديل قائم',
+      inputType: 'textarea',
+      confirmText: 'تأكيد رفض الطلب',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: (reason) => {
+        if (!reason || !reason.trim()) {
+          showToast('⚠️ يرجى تدوين سبب الرفض');
+          return;
+        }
+        setWarehouseRequests(prev => prev.map(r => r.id === req.id ? {
+          ...r,
+          status: 'مرفوض',
+          rejectionReason: reason.trim()
+        } : r));
+        showToast('⚠️ تم رفض طلب الصرف وحفظ السبب دون خصم أي كمية');
+      }
+    });
   };
 
   const renderWarehouse = () => {
@@ -5074,6 +5108,105 @@ const renderDepreciation = () => {
               <button className="btn btn-ghost" onClick={() => setSelectedJournal(null)}>إغلاق</button>
             </div>
 
+          </div>
+        </div>
+      )}
+      {/* نافذة الإدخال الاحترافية المخصصة (بديل لـ window.prompt لمنع حظر المتصفح) */}
+      {promptDialog && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15, 23, 42, 0.75)', zIndex:99999, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)', padding:'1rem'}}>
+          <div className="card view-anim" style={{width:'500px', maxWidth:'94vw', padding:'2rem', position:'relative', background:'var(--card-bg, #ffffff)', borderRadius:'16px', border:'1px solid var(--border)', boxShadow:'0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}>
+            <button onClick={() => setPromptDialog(null)} style={{position:'absolute', top:'1.25rem', right:'1.25rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-muted)'}}>
+              <X size={20} />
+            </button>
+            <h3 style={{fontSize:'1.2rem', fontWeight:800, margin:0, marginBottom:'0.35rem', color:'var(--brand-teal)'}}>
+              {promptDialog.title}
+            </h3>
+            {promptDialog.subtitle && (
+              <p style={{margin:'0 0 1.25rem 0', color:'var(--text-muted)', fontSize:'0.85rem', lineHeight:1.5}}>
+                {promptDialog.subtitle}
+              </p>
+            )}
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const val = e.target.elements.promptInput.value;
+              const cb = promptDialog.onConfirm;
+              setPromptDialog(null);
+              if (cb) cb(val);
+            }}>
+              <div style={{marginBottom:'1.5rem'}}>
+                {promptDialog.label && (
+                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:700, fontSize:'0.85rem'}}>
+                    {promptDialog.label}
+                  </label>
+                )}
+                {promptDialog.inputType === 'textarea' ? (
+                  <textarea
+                    name="promptInput"
+                    defaultValue={promptDialog.defaultValue || ''}
+                    placeholder={promptDialog.placeholder || ''}
+                    required
+                    rows={4}
+                    autoFocus
+                    style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:'0.9rem'}}
+                  />
+                ) : (
+                  <input
+                    name="promptInput"
+                    type={promptDialog.inputType === 'number' ? 'number' : 'text'}
+                    defaultValue={promptDialog.defaultValue || ''}
+                    placeholder={promptDialog.placeholder || ''}
+                    required
+                    autoFocus
+                    style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:'0.9rem'}}
+                  />
+                )}
+              </div>
+              <div style={{display:'flex', justifyContent:'flex-end', gap:'0.75rem'}}>
+                <button type="button" className="btn btn-ghost" onClick={() => setPromptDialog(null)} style={{border:'1px solid var(--border)'}}>
+                  إلغاء
+                </button>
+                <button type="submit" className="btn btn-primary" style={{background: promptDialog.confirmColor || undefined, borderColor: promptDialog.confirmColor || undefined}}>
+                  {promptDialog.confirmText || 'تأكيد'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* نافذة التأكيد الاحترافية المخصصة (بديل لـ window.confirm لمنع حظر المتصفح) */}
+      {confirmDialog && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15, 23, 42, 0.75)', zIndex:99999, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)', padding:'1rem'}}>
+          <div className="card view-anim" style={{width:'460px', maxWidth:'94vw', padding:'2rem', position:'relative', background:'var(--card-bg, #ffffff)', borderRadius:'16px', border:'1px solid var(--border)', boxShadow:'0 25px 50px -12px rgba(0, 0, 0, 0.25)'}}>
+            <button onClick={() => setConfirmDialog(null)} style={{position:'absolute', top:'1.25rem', right:'1.25rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-muted)'}}>
+              <X size={20} />
+            </button>
+            <div style={{display:'flex', alignItems:'center', gap:'0.75rem', marginBottom:'0.75rem'}}>
+              <AlertTriangle size={24} color={confirmDialog.confirmColor || '#ef4444'} />
+              <h3 style={{fontSize:'1.2rem', fontWeight:800, margin:0, color:'var(--text)'}}>
+                {confirmDialog.title || 'تأكيد الإجراء'}
+              </h3>
+            </div>
+            <p style={{margin:'0 0 1.5rem 0', color:'var(--text-muted)', fontSize:'0.9rem', lineHeight:1.6}}>
+              {confirmDialog.message}
+            </p>
+            <div style={{display:'flex', justifyContent:'flex-end', gap:'0.75rem'}}>
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmDialog(null)} style={{border:'1px solid var(--border)'}}>
+                إلغاء
+              </button>
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                style={{background: confirmDialog.confirmColor || 'var(--danger, #ef4444)', borderColor: confirmDialog.confirmColor || 'var(--danger, #ef4444)'}}
+                onClick={() => {
+                  const cb = confirmDialog.onConfirm;
+                  setConfirmDialog(null);
+                  if (cb) cb();
+                }}
+              >
+                {confirmDialog.confirmText || 'تأكيد'}
+              </button>
+            </div>
           </div>
         </div>
       )}
