@@ -35,6 +35,11 @@ import ExecutiveVoiceBriefing from './ExecutiveVoiceBriefing';
 import DoubleEntryLedgerFlow from './DoubleEntryLedgerFlow';
 import CustodyOrgTreeModal from './CustodyOrgTreeModal';
 import { sfx } from './audioEffects';
+import realAssetsData from './data/realAssets.json';
+import realCustodyData from './data/realCustody.json';
+import realLookupsData from './data/realLookups.json';
+import realEmployeesData from './data/realEmployees.json';
+import realWarehouseData from './data/realWarehouseItems.json';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -390,7 +395,40 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
             <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={20}/> 1. البيانات الأساسية والتصنيف</h3>
             <div style={{display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1.25rem'}}>
               <F label="رقم الأصل (تلقائي)"><input name="id" type="text" defaultValue={ea?.id} readOnly={!!ea} placeholder="AST-..." style={{...inp, background:'var(--bg)', opacity:0.7}} /></F>
-              <F label="اسم الأصل / الوصف *"><input name="name" type="text" defaultValue={ea?.name} placeholder="مثال: لابتوب ديل بلس" required style={inp} /></F>
+              <F label="اسم الأصل / الصنف *">
+                <div style={{display:'flex', gap:'0.4rem'}}>
+                  <input 
+                    id="asset_name_field"
+                    list="asset_items_datalist" 
+                    name="name" 
+                    type="text" 
+                    defaultValue={ea?.name} 
+                    placeholder="اختر الصنف من القائمة المنسدلة..." 
+                    required 
+                    style={{...inp, flex:1}} 
+                  />
+                  <select 
+                    style={{...inp, width:'135px', padding:'0.4rem', fontSize:'0.8rem', cursor:'pointer'}} 
+                    defaultValue=""
+                    onChange={e => {
+                      if (e.target.value) {
+                        const el = document.getElementById('asset_name_field');
+                        if (el) el.value = e.target.value;
+                      }
+                    }}
+                  >
+                    <option value="" disabled>قائمة الأصناف ({realLookupsData.itemsList.length})</option>
+                    {realLookupsData.itemsList.map((it, idx) => (
+                      <option key={idx} value={it}>{it}</option>
+                    ))}
+                  </select>
+                  <datalist id="asset_items_datalist">
+                    {realLookupsData.itemsList.map((it, idx) => (
+                      <option key={idx} value={it} />
+                    ))}
+                  </datalist>
+                </div>
+              </F>
               <F label="الفئة *">
                 <select name="category" value={cat} onChange={e => setCat(e.target.value)} required style={inp}>
                   {cats.map(c => <option key={c} value={c}>{c}</option>)}
@@ -462,7 +500,40 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
                   {depts.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
               </F>
-              <F label="الموظف / صاحب العهدة *"><input name="custody" type="text" defaultValue={ea?.custody} placeholder="اسم الموظف المستلم" required style={inp} /></F>
+              <F label="الموظف / صاحب العهدة *">
+                <div style={{display:'flex', gap:'0.4rem'}}>
+                  <input 
+                    id="asset_custody_field"
+                    list="asset_custodians_datalist"
+                    name="custody" 
+                    type="text" 
+                    defaultValue={ea?.custody || ''} 
+                    placeholder="اختر الموظف أو اكتب اسمه..." 
+                    required 
+                    style={{...inp, flex:1}} 
+                  />
+                  <select 
+                    style={{...inp, width:'135px', padding:'0.4rem', fontSize:'0.8rem', cursor:'pointer'}} 
+                    defaultValue=""
+                    onChange={e => {
+                      if (e.target.value) {
+                        const el = document.getElementById('asset_custody_field');
+                        if (el) el.value = e.target.value;
+                      }
+                    }}
+                  >
+                    <option value="" disabled>الموظفون ({realEmployeesData.length})</option>
+                    {realEmployeesData.map(e => (
+                      <option key={e.id} value={e.full_name}>{e.full_name} ({e.department})</option>
+                    ))}
+                  </select>
+                  <datalist id="asset_custodians_datalist">
+                    {realEmployeesData.map(e => (
+                      <option key={e.id} value={e.full_name}>{e.department}</option>
+                    ))}
+                  </datalist>
+                </div>
+              </F>
             </div>
           </div>
 
@@ -619,7 +690,10 @@ const App = () => {
   const [disposalModal, setDisposalModal] = useState(null);
   const [showScanner, setShowScanner] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
-  const [filterParams, setFilterParams] = useState({ query: '', category: 'الكل' });
+  const [filterParams, setFilterParams] = useState({ query: '', category: 'الكل', department: 'الكل', item: 'الكل' });
+  const [registerPage, setRegisterPage] = useState(1);
+  const [custodyPage, setCustodyPage] = useState(1);
+  const [custodySearch, setCustodySearch] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState(() => [{role: 'bot', text: `أهلاً بك! أنا ${localStorage.getItem('aiName') || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}]);
   const [chatInput, setChatInput] = useState('');
@@ -636,34 +710,34 @@ const App = () => {
   const [systemSettings, setSystemSettings] = useState(null);
   const [dbNotifications, setDbNotifications] = useState([]);
   const [systemLookups, setSystemLookups] = useState({
-    categories: ['أجهزة تقنية', 'أثاث مكتبي', 'سيارات', 'معدات طبية'],
-    departments: ['الإدارة العامة', 'تقنية المعلومات', 'المالية', 'الموارد البشرية'],
-    locations: ['المبنى الرئيسي', 'فرع الرياض', 'المستودع المركزي'],
-    suppliers: ['شركة التقنية', 'مؤسسة الأثاث', 'الوكالة العامة'],
-    status: ['نشط', 'قيد التجهيز', 'متوقف', 'تالف']
+    categories: realLookupsData.categories,
+    departments: realLookupsData.departments,
+    locations: realLookupsData.locations || ['المقر الرئيسي / الجمعية', 'مركز رعاية اليتيمات', 'مركز رعاية الأيتام', 'المستودع المركزي'],
+    suppliers: realLookupsData.suppliers || ['مورد معتمد', 'شركة التقنيات الحديثة', 'مؤسسة التوريدات الشاملة'],
+    status: ['نشط', 'قيد التجهيز', 'متوقف', 'تالف'],
+    itemsList: realLookupsData.itemsList
   });
   const [inventoryCampaigns, setInventoryCampaigns] = useState([]);
   
   const [warehouseModal, setWarehouseModal] = useState(null);
   const [warehouseItems, setWarehouseItems] = useState(() => {
+    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
+      try {
+        localStorage.removeItem('warehouseItems');
+        localStorage.removeItem('deletedWarehouseIds');
+      } catch(e) {}
+    }
     const deletedWhIds = JSON.parse(localStorage.getItem('deletedWarehouseIds') || '[]');
     const saved = localStorage.getItem('warehouseItems');
     if (saved) {
       try {
-        return JSON.parse(saved).filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0 && !parsed.some(w => w.id === 'WH-001' && w.name === 'لابتوب ديل XPS 15')) {
+          return parsed.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+        }
       } catch(e) {}
     }
-    const defaults = [
-      { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
-      { id: 'WH-002', sku: 'OF-SKU-202', name: 'مكتب إداري فاخر', category: 'أثاث ومعدات', qty: 3, minQty: 2, location: 'B-02-01', status: 'مخصص', stage: 'Allocate', lastAudit: '2024-07-20' },
-      { id: 'WH-003', sku: 'VH-SKU-303', name: 'سيارة نقل تويوتا هايلكس', category: 'مركبات', qty: 1, minQty: 1, location: 'G-01-01', status: 'صيانة', stage: 'Audit', lastAudit: '2024-09-01' },
-      { id: 'WH-004', sku: 'IT-SKU-104', name: 'طابعة HP LaserJet Pro', category: 'أصول تقنية', qty: 25, minQty: 10, location: 'A-02-05', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-28' },
-      { id: 'WH-005', sku: 'OF-SKU-205', name: 'كرسي مكتبي مريح', category: 'أثاث ومعدات', qty: 0, minQty: 5, location: 'B-03-02', status: 'نفاد', stage: 'Receive', lastAudit: '2024-06-10' },
-      { id: 'WH-006', sku: 'IT-SKU-106', name: 'شاشة عرض تفاعلية 65 بوصة', category: 'أصول تقنية', qty: 4, minQty: 2, location: 'C-01-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-10' },
-      { id: 'WH-007', sku: 'VH-SKU-307', name: 'رافعة شوكية كاتربيلر', category: 'مركبات', qty: 2, minQty: 1, location: 'G-02-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-05' },
-      { id: 'WH-008', sku: 'OF-SKU-208', name: 'مكيف مركزي سبليت', category: 'أثاث ومعدات', qty: 8, minQty: 3, location: 'D-01-04', status: 'تالف', stage: 'Retire', lastAudit: '2024-05-20' },
-    ];
-    return defaults.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+    return realWarehouseData.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
   });
   const [warehouseFilter, setWarehouseFilter] = useState('الكل');
   const [viewAsset, setViewAsset] = useState(null);
@@ -1041,7 +1115,33 @@ const App = () => {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const [assets, setAssets] = useState([]);
+  const [assets, setAssets] = useState(() => {
+    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
+      try {
+        localStorage.removeItem('traouf_assets');
+        localStorage.removeItem('deletedAssetIds');
+      } catch(e) {}
+    }
+    const deletedAssetIds = JSON.parse(localStorage.getItem('deletedAssetIds') || '[]');
+    const saved = localStorage.getItem('traouf_assets');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0 && !parsed.some(a => a.id === 'AST-001' && a.name === 'لابتوب ديل XPS 15')) {
+          return parsed.filter(a => !deletedAssetIds.includes(a.id) && !deletedAssetIds.includes(a.db_id));
+        }
+      } catch(e) {}
+    }
+    const allReal = [...realAssetsData, ...realCustodyData];
+    return allReal.filter(a => !deletedAssetIds.includes(a.id) && !deletedAssetIds.includes(a.code));
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('traouf_assets', JSON.stringify(assets));
+      localStorage.setItem('traouf_real_dataset_v1', 'true');
+    } catch(e) {}
+  }, [assets]);
 
   useEffect(() => {
     if (session) {
@@ -1057,9 +1157,11 @@ const App = () => {
     }
     const { data: asData, error: asErr } = await supabase.from('assets').select('*');
     const deletedAssetIds = JSON.parse(localStorage.getItem('deletedAssetIds') || '[]');
-    if (!asErr && asData) {
+    if (!asErr && asData && asData.length > 0) {
       const filteredAssets = asData.filter(item => !deletedAssetIds.includes(item.id) && !deletedAssetIds.includes(item.asset_no));
-      const mappedAssets = filteredAssets.map(item => ({
+      const cleanAssets = filteredAssets.filter(item => item.asset_no !== 'AST-001' || !item.name.includes('لابتوب ديل XPS'));
+      if (cleanAssets.length > 0) {
+        const mappedAssets = cleanAssets.map(item => ({
           id: item.asset_no,
           db_id: item.id,
           code: item.serial_number || item.qr_code || 'N/A',
@@ -1088,9 +1190,16 @@ const App = () => {
           warranty: item.warranty_details || 'سنتين',
           isExpense: false
         }));
-      setAssets(mappedAssets);
+        setAssets(mappedAssets);
+      }
     } else {
-      setAssets([]);
+      setAssets(prev => {
+        if (prev && prev.length > 0 && !prev.some(a => a.id === 'AST-001' && a.name === 'لابتوب ديل XPS 15')) {
+          return prev;
+        }
+        const allReal = [...realAssetsData, ...realCustodyData];
+        return allReal.filter(a => !deletedAssetIds.includes(a.id));
+      });
     }
 
     // جلب التحويلات
@@ -1159,15 +1268,12 @@ const App = () => {
       setWarehouseItems(mappedWh);
       localStorage.setItem('warehouseItems', JSON.stringify(mappedWh));
     } else {
-      const saved = localStorage.getItem('warehouseItems');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          setWarehouseItems(parsed.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku)));
-        } catch(e) {
-          setWarehouseItems([]);
+      setWarehouseItems(prev => {
+        if (prev && prev.length > 0 && !prev.some(w => w.id === 'WH-001' && w.name === 'لابتوب ديل XPS 15')) {
+          return prev;
         }
-      }
+        return realWarehouseData.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+      });
     }
 
     // جلب قائمة الموظفين
@@ -1360,16 +1466,12 @@ const App = () => {
   };
 
   const categoryData = {
-    labels: ['أراضي ومباني', 'أصول تقنية', 'مركبات ورافعات', 'أثاث ومعدات', 'أوقاف'],
+    labels: realLookupsData.categories,
     datasets: [{
-      data: [
-        accountingEngine.filter(a => a.category === 'أراضي' || a.category === 'مباني').reduce((s,a)=>s+a.cost,0),
-        accountingEngine.filter(a => a.category === 'أصول تقنية').reduce((s,a)=>s+a.cost,0),
-        accountingEngine.filter(a => a.category === 'مركبات').reduce((s,a)=>s+a.cost,0),
-        accountingEngine.filter(a => a.category === 'أثاث ومعدات').reduce((s,a)=>s+a.cost,0),
-        accountingEngine.filter(a => a.category === 'أصول أوقاف').reduce((s,a)=>s+a.cost,0)
-      ],
-      backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981'],
+      data: realLookupsData.categories.map(cat => 
+        accountingEngine.filter(a => a.category === cat).reduce((s, a) => s + (Number(a.cost) || 0), 0)
+      ),
+      backgroundColor: ['#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444', '#10b981', '#06b6d4', '#ec4899'],
       borderWidth: 0
     }]
   };
@@ -1942,11 +2044,18 @@ const App = () => {
       const q = filterParams.query.trim().toLowerCase();
       const matchQuery = !q || [a.name, a.code, a.id, a.location, a.custody, a.supplier, a.department].some(v => (v || '').toString().toLowerCase().includes(q));
       const matchCat = filterParams.category === 'الكل' || a.category === filterParams.category;
-      return matchQuery && matchCat;
+      const matchDept = filterParams.department === 'الكل' || a.department === filterParams.department;
+      const matchItem = filterParams.item === 'الكل' || (a.name || '').includes(filterParams.item);
+      return matchQuery && matchCat && matchDept && matchItem;
     });
 
-    const activeAssets = accountingEngine.filter(a => a.status === 'يعمل').length;
+    const activeAssets = accountingEngine.filter(a => a.status === 'نشط' || a.status === 'يعمل').length;
     const alertAssets = accountingEngine.filter(a => a.accumulatedDep >= a.cost * 0.8 && a.category !== 'أراضي').length;
+
+    const registerPageSize = 50;
+    const totalPages = Math.ceil(filteredAssets.length / registerPageSize) || 1;
+    const currentPage = Math.min(Math.max(1, registerPage), totalPages);
+    const paginatedAssets = filteredAssets.slice((currentPage - 1) * registerPageSize, currentPage * registerPageSize);
 
     return (
       <div className="view-anim">
@@ -1969,9 +2078,9 @@ const App = () => {
           </div>
         </div>
 
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={28} color="var(--accent)" /> السجل المركزي للأصول الثابتة (FAR)</h2>
-          <div style={{display:'flex', gap:'0.5rem'}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
+          <h2 style={{fontSize:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Box size={28} color="var(--accent)" /> السجل المركزي للأصول الثابتة (FAR) <span style={{fontSize:'0.9rem', color:'var(--text-muted)', fontWeight:400}}>({filteredAssets.length.toLocaleString()} أصل)</span></h2>
+          <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
             <button className="btn btn-ghost" style={{color:'var(--accent)', background: 'rgba(59,130,246,0.1)', border:'1px solid rgba(59,130,246,0.2)'}} onClick={() => setShowScanner(true)}>
               <QrCode size={18} /> المسح الميداني النشط
             </button>
@@ -1985,20 +2094,35 @@ const App = () => {
         </div>
 
         {showFilter && (
-          <div style={{display:'flex', gap:'1rem', marginBottom:'1.5rem', padding:'1.5rem', background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', animation:'slideDown 0.3s ease-out', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}}>
-            <div style={{flex:1}}>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'1rem', marginBottom:'1.5rem', padding:'1.5rem', background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', animation:'slideDown 0.3s ease-out', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}}>
+            <div>
                <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>البحث الذكي (الاسم، الرمز، المعرف)</label>
-               <input type="text" placeholder="مثال: لابتوب، AST-1234..." value={filterParams.query} onChange={e => setFilterParams({...filterParams, query: e.target.value})} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+               <input list="register_search_datalist" type="text" placeholder="مثال: لابتوب، ديل، AST-..." value={filterParams.query} onChange={e => { setFilterParams({...filterParams, query: e.target.value}); setRegisterPage(1); }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+               <datalist id="register_search_datalist">
+                 {realLookupsData.itemsList.map((it, idx) => <option key={idx} value={it} />)}
+               </datalist>
             </div>
-            <div style={{width:'250px'}}>
+            <div>
+               <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>قائمة الأصناف المنسدلة ({realLookupsData.itemsList.length})</label>
+               <select value={filterParams.item} onChange={e => { setFilterParams({...filterParams, item: e.target.value}); setRegisterPage(1); }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                 <option value="الكل">جميع الأصناف ({realLookupsData.itemsList.length})</option>
+                 {realLookupsData.itemsList.map((it, idx) => (
+                   <option key={idx} value={it}>{it}</option>
+                 ))}
+               </select>
+            </div>
+            <div>
                <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>الفئة التصنيفية</label>
-               <select value={filterParams.category} onChange={e => setFilterParams({...filterParams, category: e.target.value})} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+               <select value={filterParams.category} onChange={e => { setFilterParams({...filterParams, category: e.target.value}); setRegisterPage(1); }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
                  <option value="الكل">جميع الفئات</option>
-                 <option value="أراضي">أراضي</option>
-                 <option value="مباني">مباني</option>
-                 <option value="أصول تقنية">أصول تقنية</option>
-                 <option value="مركبات">مركبات</option>
-                 <option value="أصول أوقاف">أصول أوقاف</option>
+                 {realLookupsData.categories.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+            </div>
+            <div>
+               <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>القسم الإداري</label>
+               <select value={filterParams.department} onChange={e => { setFilterParams({...filterParams, department: e.target.value}); setRegisterPage(1); }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}}>
+                 <option value="الكل">كافة الأقسام ({realLookupsData.departments.length})</option>
+                 {realLookupsData.departments.map(d => <option key={d} value={d}>{d}</option>)}
                </select>
             </div>
           </div>
@@ -2009,7 +2133,7 @@ const App = () => {
             <thead style={{background:'#f8fafc', borderBottom:'2px solid var(--border)'}}>
               <tr>
                 <th style={{padding:'1rem', textAlign:'right'}}>رقم الأصل</th>
-                <th style={{padding:'1rem', textAlign:'right'}}>الأصل</th>
+                <th style={{padding:'1rem', textAlign:'right'}}>الأصل / الصنف</th>
                 <th style={{padding:'1rem', textAlign:'right'}}>الفئة</th>
                 <th style={{padding:'1rem', textAlign:'right'}}>الإدارة</th>
                 <th style={{padding:'1rem', textAlign:'right'}}>الموقع</th>
@@ -2022,8 +2146,8 @@ const App = () => {
               </tr>
             </thead>
             <tbody>
-            {filteredAssets.map((asset, index) => {
-              const statusColor = { 'نشط': '#10b981', 'صيانة': '#3b82f6', 'متوقف': '#ef4444', 'مستبعد': '#6b7280' }[asset.status] || '#64748b';
+            {paginatedAssets.map((asset, index) => {
+              const statusColor = { 'نشط': '#10b981', 'يعمل': '#10b981', 'صيانة': '#3b82f6', 'متوقف': '#ef4444', 'مستبعد': '#6b7280' }[asset.status] || '#64748b';
               return (
               <tr key={asset.id} style={{borderBottom:'1px solid var(--border)', background: index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)', transition:'background 0.2s', cursor:'pointer'}} onMouseEnter={e => e.currentTarget.style.background = 'rgba(59,130,246,0.05)'} onMouseLeave={e => e.currentTarget.style.background = index % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'} onClick={() => setSelectedAsset(asset)}>
                 <td style={{padding:'1rem', color:'var(--accent)', fontWeight:800}}>{asset.id}</td>
@@ -2048,9 +2172,55 @@ const App = () => {
             })}
             </tbody>
           </table>
-        {filteredAssets.length === 0 && <div style={{padding:'5rem', textAlign:'center', color:'var(--text-muted)'}}><Box size={64} color="#e2e8f0" style={{margin:'0 auto 1.5rem'}} />لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
+          {filteredAssets.length === 0 && <div style={{padding:'5rem', textAlign:'center', color:'var(--text-muted)'}}><Box size={64} color="#e2e8f0" style={{margin:'0 auto 1.5rem'}} />لا توجد أصول مطابقة لمعايير البحث الحالية.</div>}
+          
+          {/* Pagination bar */}
+          {filteredAssets.length > 0 && (
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1rem 1.5rem', borderTop:'1px solid var(--border)', background:'rgba(255,255,255,0.02)', flexWrap:'wrap', gap:'1rem'}}>
+              <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>
+                عرض الأصول من <strong>{((currentPage - 1) * registerPageSize) + 1}</strong> إلى <strong>{Math.min(currentPage * registerPageSize, filteredAssets.length)}</strong> من إجمالي <strong>{filteredAssets.length.toLocaleString()}</strong> أصل معتمد
+              </div>
+              <div style={{display:'flex', alignItems:'center', gap:'0.4rem'}}>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                  disabled={currentPage <= 1} 
+                  onClick={() => setRegisterPage(1)}
+                >
+                  « الأولى
+                </button>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                  disabled={currentPage <= 1} 
+                  onClick={() => setRegisterPage(p => Math.max(1, p - 1))}
+                >
+                  ‹ السابق
+                </button>
+                <span style={{padding:'0.4rem 0.9rem', fontSize:'0.85rem', fontWeight:700, background:'var(--brand-teal)', color:'white', borderRadius:'8px'}}>
+                  صفحة {currentPage} من {totalPages}
+                </span>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                  disabled={currentPage >= totalPages} 
+                  onClick={() => setRegisterPage(p => Math.min(totalPages, p + 1))}
+                >
+                  التالي ›
+                </button>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                  disabled={currentPage >= totalPages} 
+                  onClick={() => setRegisterPage(totalPages)}
+                >
+                  الأخيرة »
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
     );
   };
 
@@ -3332,11 +3502,24 @@ const renderDepreciation = () => {
       return custodyMap[b].length - custodyMap[a].length;
     });
 
+    const filteredCustodians = sortedCustodians.filter(emp => {
+      if (!custodySearch.trim()) return true;
+      const q = custodySearch.toLowerCase().trim();
+      if (emp.toLowerCase().includes(q)) return true;
+      const empAssets = custodyMap[emp] || [];
+      return empAssets.some(a => (a.name || '').toLowerCase().includes(q) || (a.id || '').toLowerCase().includes(q) || (a.code || '').toLowerCase().includes(q));
+    });
+
     const totalCustodians = sortedCustodians.filter(k => k !== 'أصول بدون عهدة مسندة').length;
     const totalCustodyAssets = assets.filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص').length;
     const totalCustodyValue = assets
       .filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص')
       .reduce((sum, a) => sum + (Number(a.cost) || 0), 0);
+
+    const custodyPageSize = 24;
+    const totalCustodyPages = Math.ceil(filteredCustodians.length / custodyPageSize) || 1;
+    const currentCustodyPage = Math.min(Math.max(1, custodyPage), totalCustodyPages);
+    const paginatedCustodians = filteredCustodians.slice((currentCustodyPage - 1) * custodyPageSize, currentCustodyPage * custodyPageSize);
 
     return (
       <div className="view-anim">
@@ -3348,7 +3531,7 @@ const renderDepreciation = () => {
               إدارة العهد الميدانية والموظفين (Custody & Assets)
             </h2>
             <p style={{color:'var(--text-muted)', margin:'0.3rem 0 0', fontSize:'0.9rem'}}>
-              تتبع العهد المسلمة، طباعة ملصقات الباركود والحرارية، وتوليد نماذج الاستلام والتسليم الرسمية.
+              تتبع العهد المسلمة لـ <strong>{totalCustodians}</strong> موظف رسمي بجمعية تراؤف بعدد <strong>{totalCustodyAssets.toLocaleString()}</strong> عهدة مسجلة.
             </p>
           </div>
           
@@ -3396,14 +3579,14 @@ const renderDepreciation = () => {
         </div>
 
         {/* Custody Summary KPI Banner */}
-        <div className="summary-grid" style={{gridTemplateColumns:'repeat(3, 1fr)', gap:'1.25rem', marginBottom:'2rem'}}>
+        <div className="summary-grid" style={{gridTemplateColumns:'repeat(3, 1fr)', gap:'1.25rem', marginBottom:'1.5rem'}}>
           <div className="card" style={{display:'flex', alignItems:'center', gap:'1rem', borderRight:'4px solid var(--brand-teal)'}}>
             <div style={{background:'rgba(13, 148, 136, 0.12)', padding:'0.85rem', borderRadius:'14px', color:'var(--brand-teal)'}}>
               <Users size={28} />
             </div>
             <div>
               <div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي مستلمي العهد</div>
-              <div style={{fontSize:'1.5rem', fontWeight:800}}>{totalCustodians} <span style={{fontSize:'0.75rem', fontWeight:400}}>موظف</span></div>
+              <div style={{fontSize:'1.5rem', fontWeight:800}}>{totalCustodians} <span style={{fontSize:'0.75rem', fontWeight:400}}>موظف معتمد</span></div>
             </div>
           </div>
 
@@ -3413,7 +3596,7 @@ const renderDepreciation = () => {
             </div>
             <div>
               <div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي الأصول المسلّمة</div>
-              <div style={{fontSize:'1.5rem', fontWeight:800}}>{totalCustodyAssets} <span style={{fontSize:'0.75rem', fontWeight:400}}>أصل / جهاز</span></div>
+              <div style={{fontSize:'1.5rem', fontWeight:800}}>{totalCustodyAssets.toLocaleString()} <span style={{fontSize:'0.75rem', fontWeight:400}}>أصل / جهاز</span></div>
             </div>
           </div>
 
@@ -3428,9 +3611,27 @@ const renderDepreciation = () => {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div style={{display:'flex', gap:'1rem', marginBottom:'1.5rem', background:'var(--card-bg)', padding:'1rem 1.25rem', borderRadius:'12px', border:'1px solid var(--border)', alignItems:'center'}}>
+          <Search size={20} color="var(--brand-teal)" />
+          <input 
+            type="text" 
+            placeholder="ابحث باسم الموظف أو مسمى العهدة أو الرقم التسلسلي..." 
+            value={custodySearch} 
+            onChange={e => { setCustodySearch(e.target.value); setCustodyPage(1); }} 
+            style={{flex:1, padding:'0.6rem 0.8rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)', fontSize:'0.95rem'}} 
+          />
+          {custodySearch && (
+            <button className="btn btn-ghost" style={{padding:'0.4rem 0.8rem', fontSize:'0.8rem'}} onClick={() => { setCustodySearch(''); setCustodyPage(1); }}>مسح البحث</button>
+          )}
+          <span style={{fontSize:'0.85rem', color:'var(--text-muted)', whiteSpace:'nowrap'}}>
+            عرض {filteredCustodians.length} من {sortedCustodians.length} موظف
+          </span>
+        </div>
+
         {/* Custodians Grid */}
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:'1.5rem'}}>
-          {sortedCustodians.map(emp => {
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:'1.5rem', marginBottom:'2rem'}}>
+          {paginatedCustodians.map(emp => {
             const empAssets = custodyMap[emp];
             const totalValue = empAssets.reduce((s, a) => s + (Number(a.cost) || 0), 0);
             const isUnassigned = emp === 'أصول بدون عهدة مسندة';
@@ -3525,6 +3726,52 @@ const renderDepreciation = () => {
             );
           })}
         </div>
+
+        {/* Custody Pagination Controls */}
+        {filteredCustodians.length > 0 && (
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'1rem 1.5rem', borderTop:'1px solid var(--border)', background:'var(--card-bg)', borderRadius:'12px', flexWrap:'wrap', gap:'1rem'}}>
+            <div style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>
+              عرض <strong>{((currentCustodyPage - 1) * custodyPageSize) + 1}</strong> إلى <strong>{Math.min(currentCustodyPage * custodyPageSize, filteredCustodians.length)}</strong> من إجمالي <strong>{filteredCustodians.length}</strong> موظف
+            </div>
+            <div style={{display:'flex', alignItems:'center', gap:'0.4rem'}}>
+              <button 
+                className="btn btn-ghost" 
+                style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                disabled={currentCustodyPage <= 1} 
+                onClick={() => setCustodyPage(1)}
+              >
+                « الأولى
+              </button>
+              <button 
+                className="btn btn-ghost" 
+                style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                disabled={currentCustodyPage <= 1} 
+                onClick={() => setCustodyPage(p => Math.max(1, p - 1))}
+              >
+                ‹ السابق
+              </button>
+              <span style={{padding:'0.4rem 0.9rem', fontSize:'0.85rem', fontWeight:700, background:'var(--brand-teal)', color:'white', borderRadius:'8px'}}>
+                صفحة {currentCustodyPage} من {totalCustodyPages}
+              </span>
+              <button 
+                className="btn btn-ghost" 
+                style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                disabled={currentCustodyPage >= totalCustodyPages} 
+                onClick={() => setCustodyPage(p => Math.min(totalCustodyPages, p + 1))}
+              >
+                التالي ›
+              </button>
+              <button 
+                className="btn btn-ghost" 
+                style={{padding:'0.4rem 0.8rem', fontSize:'0.85rem', border:'1px solid var(--border)'}} 
+                disabled={currentCustodyPage >= totalCustodyPages} 
+                onClick={() => setCustodyPage(totalCustodyPages)}
+              >
+                الأخيرة »
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -3532,7 +3779,32 @@ const renderDepreciation = () => {
   
       
   
-  const [employeesList, setEmployeesList] = useState([]);
+  const [employeesList, setEmployeesList] = useState(() => {
+    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
+      try {
+        localStorage.removeItem('traouf_employees');
+        localStorage.removeItem('deletedEmployeeIds');
+      } catch(e) {}
+    }
+    const deletedEmpIds = JSON.parse(localStorage.getItem('deletedEmployeeIds') || '[]');
+    const saved = localStorage.getItem('traouf_employees');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0) {
+          return parsed.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id));
+        }
+      } catch(e) {}
+    }
+    return realEmployeesData.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id));
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('traouf_employees', JSON.stringify(employeesList));
+    } catch(e) {}
+  }, [employeesList]);
+
   const [employeeModal, setEmployeeModal] = useState(null);
   const [loadingEmployees, setLoadingEmployees] = useState(false);
 
@@ -3545,8 +3817,14 @@ const renderDepreciation = () => {
   const fetchEmployees = async () => {
     setLoadingEmployees(true);
     const { data, error } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
-    if (!error && data) {
-      setEmployeesList(data);
+    const deletedEmpIds = JSON.parse(localStorage.getItem('deletedEmployeeIds') || '[]');
+    if (!error && data && data.length > 0) {
+      setEmployeesList(data.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id)));
+    } else {
+      setEmployeesList(prev => {
+        if (prev && prev.length > 0) return prev;
+        return realEmployeesData.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id));
+      });
     }
     setLoadingEmployees(false);
   };
@@ -5356,7 +5634,38 @@ const renderDepreciation = () => {
               <div style={{display:'grid', gridTemplateColumns:'3fr 2fr', gap:'1rem'}}>
                 <div>
                   <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>اسم الصنف ومواصفاته *</label>
-                  <input name="name" required defaultValue={warehouseModal.name || ''} placeholder="مثال: لابتوب ديل Latitude 5520 core i7" type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                  <div style={{display:'flex', gap:'0.4rem'}}>
+                    <input 
+                      id="wh_item_name_field"
+                      name="name" 
+                      required 
+                      defaultValue={warehouseModal.name || ''} 
+                      placeholder="اختر الصنف من القائمة المنسدلة أو اكتب اسماً..." 
+                      list="wh_items_datalist" 
+                      type="text" 
+                      style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', flex:1}} 
+                    />
+                    <select 
+                      style={{width:'140px', padding:'0.4rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontSize:'0.8rem', cursor:'pointer'}}
+                      defaultValue=""
+                      onChange={e => {
+                        if (e.target.value) {
+                          const el = document.getElementById('wh_item_name_field');
+                          if (el) el.value = e.target.value;
+                        }
+                      }}
+                    >
+                      <option value="" disabled>قائمة الأصناف ({realLookupsData.itemsList.length})</option>
+                      {realLookupsData.itemsList.map((it, idx) => (
+                        <option key={idx} value={it}>{it}</option>
+                      ))}
+                    </select>
+                    <datalist id="wh_items_datalist">
+                      {realLookupsData.itemsList.map((it, idx) => (
+                        <option key={idx} value={it} />
+                      ))}
+                    </datalist>
+                  </div>
                 </div>
                 <div>
                   <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.4rem'}}>
@@ -5620,15 +5929,18 @@ const renderDepreciation = () => {
               <div>
                 <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الموظف المستلم / الإدارة المستفيدة *</label>
                 <select name="recipient" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontWeight:600}}>
-                  <option value="أحمد الشمري (قسم المحاسبة والمالية)">أحمد الشمري — قسم المحاسبة والمالية</option>
-                  <option value="سعود العتيبي (تقنية المعلومات)">سعود العتيبي — تقنية المعلومات</option>
-                  <option value="محمد السالم (الموارد البشرية)">محمد السالم — الموارد البشرية</option>
-                  <option value="إدارة المشاريع والأوقاف">إدارة المشاريع والأوقاف</option>
-                  {employeesList.map(e => (
-                    <option key={e.id} value={`${e.full_name} (${e.department || e.role || 'موظف'})`}>
-                      {e.full_name} — {e.department || e.role || 'موظف'}
-                    </option>
-                  ))}
+                  <optgroup label="الإدارات والأقسام العامة">
+                    {realLookupsData.departments.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </optgroup>
+                  <optgroup label="الموظفون المعتمدون (تراؤف)">
+                    {employeesList.map(e => (
+                      <option key={e.id} value={`${e.full_name} (${e.department || e.role || 'موظف'})`}>
+                        {e.full_name} — {e.department || e.role || 'موظف'}
+                      </option>
+                    ))}
+                  </optgroup>
                 </select>
               </div>
 

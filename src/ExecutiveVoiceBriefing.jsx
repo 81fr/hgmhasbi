@@ -36,7 +36,7 @@ export default function ExecutiveVoiceBriefing({
     const nbvMillion = (totals.nbv / 1_000_000).toFixed(2);
     const depK = Math.round(totals.dep / 1_000);
 
-    return `السلام عليكم ورحمة الله وبركاته. مرحباً بكم في لوحة القيادة التنفيذية لمنظومة منافذ لإدارة الأصول والمستودعات. 
+    return `السلام عليكم ورحمة الله وبركاته. مرحباً بكم في لوحة القيادة التنفيذية لمنظومة جمعية تراؤف لرعاية الأيتام لإدارة الأصول والمستودعات. 
 يسعدنا إحاطتكم بالإيجاز المالي والتشغيلي اللحظي: 
 تبلغ القيمة الإجمالية لمحفظة الأصول المسجلة ${totals.cost > 1000000 ? `${costMillion} مليون` : `${Math.round(totals.cost).toLocaleString()}`} ${currencySymbol}، 
 بينما يبلغ صافي القيمة الدفترية الحالية ${totals.nbv > 1000000 ? `${nbvMillion} مليون` : `${Math.round(totals.nbv).toLocaleString()}`} ${currencySymbol}، بعد احتساب مجمع إهلاك تراكمي قدره ${depK.toLocaleString()} ألف ${currencySymbol}. 
