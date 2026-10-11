@@ -3,20 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>نظام إدارة الأصول الذكي</title>
-    <!-- Add global error handler to show errors directly on screen for debugging -->
+    <!-- Global error handler with instant reload button -->
     <script>
       window.addEventListener('error', function(e) {
+        if (document.getElementById('global-err-box')) return;
         var errDiv = document.createElement('div');
+        errDiv.id = 'global-err-box';
         errDiv.style.position = 'fixed';
-        errDiv.style.top = '0';
-        errDiv.style.left = '0';
-        errDiv.style.width = '100%';
-        errDiv.style.padding = '20px';
-        errDiv.style.backgroundColor = 'red';
+        errDiv.style.top = '15px';
+        errDiv.style.right = '15px';
+        errDiv.style.left = '15px';
+        errDiv.style.padding = '18px 24px';
+        errDiv.style.backgroundColor = '#991b1b';
         errDiv.style.color = 'white';
         errDiv.style.zIndex = '999999';
-        errDiv.innerHTML = '<h3>حدث خطأ غير متوقع:</h3><pre>' + e.message + '\\n' + (e.error && e.error.stack ? e.error.stack : '') + '</pre>';
+        errDiv.style.borderRadius = '14px';
+        errDiv.style.boxShadow = '0 20px 40px rgba(0,0,0,0.5)';
+        errDiv.style.fontFamily = 'system-ui, sans-serif';
+        errDiv.style.direction = 'rtl';
+        errDiv.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">' +
+          '<div><strong style="font-size:1.1rem;">⚠️ تم تحديث ملفات النظام:</strong><div style="font-size:0.85rem; margin-top:4px; opacity:0.9;">' + e.message + '</div></div>' +
+          '<div style="display:flex; gap:8px;">' +
+            '<button onclick="window.location.reload(true)" style="background:#fff; color:#991b1b; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">🔄 تحديث الصفحة الآن</button>' +
+            '<button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.2); color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;">إغلاق</button>' +
+          '</div></div>';
         document.body.appendChild(errDiv);
       });
       window.addEventListener('unhandledrejection', function(e) {
