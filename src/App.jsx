@@ -12,7 +12,19 @@ import {
   RotateCcw, ScanLine, MapPin, ArrowRightLeft, TrendingDown, Eye, Boxes, Upload, Wrench, RefreshCw, Users, Calculator, History, Clock, Printer
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
-import { downloadTemplate, exportAssets, parseAssetsFile } from './assetExcel';
+import { 
+  downloadTemplate, 
+  downloadAssetTemplate, 
+  exportAssets, 
+  parseAssetsFile, 
+  downloadWarehouseTemplate, 
+  exportWarehouse, 
+  parseWarehouseFile, 
+  downloadCustodyTemplate, 
+  exportCustody, 
+  parseCustodyFile 
+} from './assetExcel';
+import BarcodePrintModal from './BarcodePrintModal';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -411,6 +423,12 @@ const App = () => {
   const [viewWarehouse, setViewWarehouse] = useState(null);
   const [importPreview, setImportPreview] = useState(null);
   const importInputRef = useRef(null);
+  const [barcodeModalItem, setBarcodeModalItem] = useState(null);
+  const [barcodeModalType, setBarcodeModalType] = useState('asset'); // 'asset' | 'warehouse' | 'custody' | 'receipt'
+  const [warehouseImportPreview, setWarehouseImportPreview] = useState(null);
+  const [custodyImportPreview, setCustodyImportPreview] = useState(null);
+  const warehouseImportInputRef = useRef(null);
+  const custodyImportInputRef = useRef(null);
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [journalFilter, setJournalFilter] = useState('all');
@@ -598,9 +616,20 @@ const App = () => {
     const { data: whData, error: whErr } = await supabase.from('warehouse_items').select('*');
     if (!whErr && whData) {
       setWarehouseItems(whData.map(w => ({
-        id: w.id, sku: w.item_no || w.sku || 'SKU-N/A', name: w.name, category: w.category || w.category_id || 'غير محدد',
-        qty: w.quantity || w.current_qty || 0, minQty: w.min_quantity || w.min_qty || 0,
-        bin: w.bin_location || w.location_in_warehouse || 'N/A', status: w.status || 'متاح', stage: w.radar_stage || 'Receive'
+        id: w.id, 
+        sku: w.item_no || w.sku || 'SKU-N/A', 
+        name: w.name, 
+        category: w.category || w.category_id || 'غير محدد',
+        qty: w.quantity || w.current_qty || 0, 
+        minQty: w.min_quantity || w.min_qty || 0,
+        bin: w.bin_location || w.location_in_warehouse || 'A-01-01',
+        location: w.bin_location || w.location_in_warehouse || 'A-01-01',
+        unit: w.unit || 'حبة',
+        cost: Number(w.cost) || 0,
+        supplier: w.supplier || '',
+        status: w.status || 'متاح', 
+        stage: w.radar_stage || 'Receive',
+        description: w.description || ''
       })));
     }
 
@@ -994,11 +1023,22 @@ const App = () => {
         asset_no: data.id || `AST-${Date.now().toString().slice(-6)}${i}`,
         name: data.name,
         description: data.description || '',
+        category_id: data.category || 'أجهزة تقنية',
+        custodian_id: data.custody || 'غير محدد',
+        location_id: data.location || 'المركز الرئيسي',
+        department_id: data.department || 'الإدارة العامة',
         cost: data.cost,
         salvage_value: data.salvage || 0,
+        useful_life: data.life || 5,
+        depreciation_method: data.method || 'SL',
         purchase_date: data.date || new Date().toISOString().split('T')[0],
-        status: data.status || 'يعمل',
-        qr_code: data.code || `CD-${Math.floor(Math.random()*9000 + 1000)}`
+        status: data.status || 'نشط',
+        qr_code: data.id,
+        serial_number: data.serialNumber || '',
+        model: data.model || '',
+        supplier_id: data.supplier || '',
+        invoice_number: data.invoiceNumber || '',
+        funding_source: data.fundingSource || 'إيرادات ذاتية'
       };
       
       const existingAsset = assets.find(a => a.id === data.id);
@@ -1029,6 +1069,109 @@ const App = () => {
     } catch (err) {
       console.error(err);
       showToast('❌ حدث خطأ أثناء الحفظ في قاعدة البيانات: ' + err.message);
+    }
+  };
+
+  const handleWarehouseImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const result = await parseWarehouseFile(file);
+      if (result.total === 0) {
+        showToast('⚠️ الملف لا يحتوي على بيانات مستودع.');
+        return;
+      }
+      setWarehouseImportPreview(result);
+    } catch (err) {
+      console.error(err);
+      showToast('❌ تعذّرت قراءة ملف المستودع');
+    }
+  };
+
+  const confirmWarehouseImport = async () => {
+    if (!warehouseImportPreview) return;
+    showToast('جاري استيراد أصناف المستودع إلى قاعدة البيانات...');
+    const recordsToInsert = warehouseImportPreview.rows.map(({ data }) => ({
+      sku: data.sku,
+      name: data.name,
+      category_id: data.category,
+      quantity: data.quantity,
+      min_quantity: data.min_quantity,
+      bin_location: data.bin_location,
+      unit: data.unit,
+      cost: data.cost,
+      supplier: data.supplier,
+      radar_stage: data.stage,
+      status: data.status,
+      description: data.description
+    }));
+
+    try {
+      const { error } = await supabase.from('warehouse_items').insert(recordsToInsert);
+      if (error) throw error;
+      await fetchInitialData();
+      setWarehouseImportPreview(null);
+      showToast(`✅ تم استيراد ${recordsToInsert.length} صنف مستودع بنجاح`);
+    } catch (err) {
+      console.error(err);
+      showToast('❌ خطأ أثناء حفظ أصناف المستودع: ' + err.message);
+    }
+  };
+
+  const handleCustodyImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const result = await parseCustodyFile(file);
+      if (result.total === 0) {
+        showToast('⚠️ الملف لا يحتوي على بيانات عهد.');
+        return;
+      }
+      setCustodyImportPreview(result);
+    } catch (err) {
+      console.error(err);
+      showToast('❌ تعذّرت قراءة ملف العهد');
+    }
+  };
+
+  const confirmCustodyImport = async () => {
+    if (!custodyImportPreview) return;
+    showToast('جاري تحديث سجل العهد في قاعدة البيانات...');
+    try {
+      let count = 0;
+      for (const { data } of custodyImportPreview.rows) {
+        const existing = assets.find(a => a.id === data.id);
+        if (existing && existing.db_id) {
+          await supabase.from('assets').update({
+            custodian_id: data.custody,
+            location_id: data.location,
+            department_id: data.department
+          }).eq('id', existing.db_id);
+          count++;
+        } else {
+          await supabase.from('assets').insert([{
+            asset_no: data.id,
+            name: data.name,
+            custodian_id: data.custody,
+            location_id: data.location,
+            department_id: data.department,
+            category_id: data.category,
+            cost: data.cost,
+            status: data.status,
+            serial_number: data.serialNumber,
+            purchase_date: data.date
+          }]);
+          count++;
+        }
+      }
+      await fetchInitialData();
+      setCustodyImportPreview(null);
+      showToast(`✅ تم تحديث بيانات العهد بنجاح لـ ${count} أصل`);
+    } catch (err) {
+      console.error(err);
+      showToast('❌ خطأ أثناء حفظ العهد: ' + err.message);
     }
   };
 
@@ -1134,8 +1277,9 @@ const App = () => {
                 </td>
                 <td style={{padding:'1rem'}}>{asset.lastInventory || '-'}</td>
                 <td style={{padding:'1rem', textAlign:'center'}} onClick={e => e.stopPropagation()}>
-                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--text-muted)'}} title="تعديل"><Edit size={16}/></button>
-                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--danger)'}} title="حذف"><Trash2 size={16}/></button>
+                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--brand-teal)'}} title="طباعة ملصق الباركود (Code 128 / QR)" onClick={() => { setBarcodeModalItem(asset); setBarcodeModalType('asset'); }}><Printer size={16}/></button>
+                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--text-muted)'}} title="تعديل" onClick={() => { setEditingAsset(asset); setView('new-asset'); }}><Edit size={16}/></button>
+                  <button className="btn btn-ghost" style={{padding:'0.4rem', color:'var(--danger)'}} title="حذف" onClick={() => deleteAsset(asset.id, asset.db_id)}><Trash2 size={16}/></button>
                 </td>
               </tr>
               )
@@ -2343,65 +2487,189 @@ const renderDepreciation = () => {
 
   
   const renderCustody = () => {
-    // Group assets by employee_id (Custody)
+    // Group assets by custodian (custody or employee_id)
     const custodyMap = {};
     assets.forEach(a => {
-      if (a.employee_id) {
-        if (!custodyMap[a.employee_id]) custodyMap[a.employee_id] = [];
-        custodyMap[a.employee_id].push(a);
-      }
+      const custodian = (a.custody || a.employee_id || '').trim();
+      const key = custodian && custodian !== 'غير محدد' && custodian !== 'غير مخصص' ? custodian : 'أصول بدون عهدة مسندة';
+      if (!custodyMap[key]) custodyMap[key] = [];
+      custodyMap[key].push(a);
     });
     
-    // Sort employees by number of assets
-    const sortedCustodians = Object.keys(custodyMap).sort((a,b) => custodyMap[b].length - custodyMap[a].length);
+    // Sort custodians by number of assets (unassigned last)
+    const sortedCustodians = Object.keys(custodyMap).sort((a, b) => {
+      if (a === 'أصول بدون عهدة مسندة') return 1;
+      if (b === 'أصول بدون عهدة مسندة') return -1;
+      return custodyMap[b].length - custodyMap[a].length;
+    });
+
+    const totalCustodians = sortedCustodians.filter(k => k !== 'أصول بدون عهدة مسندة').length;
+    const totalCustodyAssets = assets.filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص').length;
+    const totalCustodyValue = assets
+      .filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص')
+      .reduce((sum, a) => sum + (Number(a.cost) || 0), 0);
 
     return (
       <div className="view-anim">
-        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'2rem'}}>
+        {/* Custody Header & Actions */}
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
           <div>
-            <h2 style={{fontSize:'1.5rem', fontWeight:800, color:'var(--text)', marginBottom:'0.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}>
-              <Users size={24} color="var(--brand-teal)" />
-              إدارة العهد (Custody Management)
+            <h2 style={{fontSize:'1.5rem', fontWeight:800, color:'var(--text)', margin:0, display:'flex', alignItems:'center', gap:'0.6rem'}}>
+              <Users size={26} color="var(--brand-teal)" />
+              إدارة العهد الميدانية والموظفين (Custody & Assets)
             </h2>
-            <p style={{color:'var(--text-muted)'}}>تتبع الأصول المسلمة عهدة للموظفين وإداراتهم.</p>
+            <p style={{color:'var(--text-muted)', margin:'0.3rem 0 0', fontSize:'0.9rem'}}>
+              تتبع العهد المسلمة، طباعة ملصقات الباركود والحرارية، وتوليد نماذج الاستلام والتسليم الرسمية.
+            </p>
           </div>
-          <button className="btn btn-primary">
-            <UserCircle size={18} /> تسليم عهدة جديدة
-          </button>
+          
+          <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+            <button 
+              className="btn btn-ghost" 
+              style={{padding:'0.55rem 1rem', fontSize:'0.85rem'}} 
+              title="تنزيل نموذج تعبئة العهد Excel مع القوائم المنسدلة" 
+              onClick={() => { downloadCustodyTemplate(); showToast('📄 تم تنزيل نموذج إدخال العهد Excel مع الخيارات'); }}
+            >
+              <FileText size={16} /> نموذج تعبئة العهد
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{padding:'0.55rem 1rem', fontSize:'0.85rem'}} 
+              title="استيراد بيانات العهد من ملف Excel" 
+              onClick={() => custodyImportInputRef.current?.click()}
+            >
+              <Upload size={16} /> استيراد عهد Excel
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{padding:'0.55rem 1rem', fontSize:'0.85rem'}} 
+              title="تصدير سجل العهد الكامل لملف Excel" 
+              onClick={() => { exportCustody(assets); showToast('✅ تم تصدير سجل العهد Excel بنجاح'); }}
+            >
+              <Download size={16} /> تصدير سجل العهد
+            </button>
+            <button 
+              className="btn btn-primary" 
+              style={{padding:'0.55rem 1.2rem', fontSize:'0.85rem'}}
+              onClick={() => { setEditingAsset(null); setView('new-asset'); }}
+            >
+              <UserCircle size={17} /> تسليم عهدة جديدة
+            </button>
+          </div>
         </div>
 
-        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(300px, 1fr))', gap:'1.5rem'}}>
+        {/* Custody Summary KPI Banner */}
+        <div className="summary-grid" style={{gridTemplateColumns:'repeat(3, 1fr)', gap:'1.25rem', marginBottom:'2rem'}}>
+          <div className="card" style={{display:'flex', alignItems:'center', gap:'1rem', borderRight:'4px solid var(--brand-teal)'}}>
+            <div style={{background:'rgba(13, 148, 136, 0.12)', padding:'0.85rem', borderRadius:'14px', color:'var(--brand-teal)'}}>
+              <Users size={28} />
+            </div>
+            <div>
+              <div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي مستلمي العهد</div>
+              <div style={{fontSize:'1.5rem', fontWeight:800}}>{totalCustodians} <span style={{fontSize:'0.75rem', fontWeight:400}}>موظف</span></div>
+            </div>
+          </div>
+
+          <div className="card" style={{display:'flex', alignItems:'center', gap:'1rem', borderRight:'4px solid var(--accent)'}}>
+            <div style={{background:'rgba(59, 130, 246, 0.12)', padding:'0.85rem', borderRadius:'14px', color:'var(--accent)'}}>
+              <Box size={28} />
+            </div>
+            <div>
+              <div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي الأصول المسلّمة</div>
+              <div style={{fontSize:'1.5rem', fontWeight:800}}>{totalCustodyAssets} <span style={{fontSize:'0.75rem', fontWeight:400}}>أصل / جهاز</span></div>
+            </div>
+          </div>
+
+          <div className="card" style={{display:'flex', alignItems:'center', gap:'1rem', borderRight:'4px solid #10b981'}}>
+            <div style={{background:'rgba(16, 185, 129, 0.12)', padding:'0.85rem', borderRadius:'14px', color:'#10b981'}}>
+              <Calculator size={28} />
+            </div>
+            <div>
+              <div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>القيمة الرأسمالية للعهد</div>
+              <div style={{fontSize:'1.5rem', fontWeight:800, color:'#10b981'}}>{totalCustodyValue.toLocaleString()} <span style={{fontSize:'0.75rem', fontWeight:400}}>ر.س</span></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Custodians Grid */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(320px, 1fr))', gap:'1.5rem'}}>
           {sortedCustodians.map(emp => {
             const empAssets = custodyMap[emp];
-            const totalValue = empAssets.reduce((s,a) => s + (Number(a.cost)||0), 0);
+            const totalValue = empAssets.reduce((s, a) => s + (Number(a.cost) || 0), 0);
+            const isUnassigned = emp === 'أصول بدون عهدة مسندة';
             return (
-              <div key={emp} className="card" style={{display:'flex', flexDirection:'column', gap:'1rem', cursor:'pointer', transition:'transform 0.2s'}} onMouseEnter={e => e.currentTarget.style.transform='translateY(-4px)'} onMouseLeave={e => e.currentTarget.style.transform='none'} onClick={() => setSelectedEmployee({ name: emp, assets: empAssets, totalValue })}>
-                <div style={{display:'flex', alignItems:'center', gap:'1rem', borderBottom:'1px solid var(--border)', paddingBottom:'1rem'}}>
-                  <div style={{background:'var(--thead-bg)', borderRadius:'50%', width:'50px', height:'50px', display:'flex', alignItems:'center', justifyContent:'center', color:'var(--accent)'}}>
-                    <UserCircle size={28} />
+              <div 
+                key={emp} 
+                className="card" 
+                style={{
+                  display:'flex', 
+                  flexDirection:'column', 
+                  gap:'1rem', 
+                  transition:'all 0.2s ease',
+                  border: isUnassigned ? '1px dashed var(--warning)' : '1px solid var(--border)',
+                  background: isUnassigned ? 'rgba(245, 158, 11, 0.02)' : 'var(--card-bg)'
+                }}
+              >
+                <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', borderBottom:'1px solid var(--border)', paddingBottom:'0.75rem'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
+                    <div style={{background: isUnassigned ? 'rgba(245, 158, 11, 0.15)' : 'var(--thead-bg)', borderRadius:'50%', width:'46px', height:'46px', display:'flex', alignItems:'center', justifyContent:'center', color: isUnassigned ? 'var(--warning)' : 'var(--accent)'}}>
+                      <UserCircle size={26} />
+                    </div>
+                    <div>
+                      <h3 style={{margin:0, fontSize:'1.05rem', fontWeight:700}}>{emp}</h3>
+                      <div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>عدد الأصول: {empAssets.length} أصل</div>
+                    </div>
                   </div>
-                  <div>
-                    <h3 style={{margin:0, fontSize:'1.1rem'}}>{emp}</h3>
-                    <div style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>إجمالي الأصول: {empAssets.length}</div>
+                  <div style={{textAlign:'left'}}>
+                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>إجمالي القيمة</div>
+                    <div style={{fontWeight:800, fontSize:'1rem', color:'var(--brand-teal)'}}>{totalValue.toLocaleString()} <span style={{fontSize:'0.65rem'}}>ر.س</span></div>
                   </div>
                 </div>
-                <div>
-                  <div style={{fontSize:'0.85rem', color:'var(--text-muted)', marginBottom:'0.5rem'}}>قيمة العهدة الإجمالية:</div>
-                  <div style={{fontWeight:800, fontSize:'1.25rem', color:'var(--text)'}}>{totalValue.toLocaleString()} <span style={{fontSize:'0.85rem', fontWeight:400}}>ر.س</span></div>
-                </div>
-                <div style={{background:'var(--bg)', borderRadius:'8px', padding:'0.5rem', maxHeight:'150px', overflowY:'auto'}}>
+
+                {/* Assets List */}
+                <div style={{background:'var(--bg, #f8fafc)', borderRadius:'10px', padding:'0.6rem', maxHeight:'180px', overflowY:'auto', display:'flex', flexDirection:'column', gap:'0.4rem', border:'1px solid var(--border)'}}>
                   {empAssets.map(a => (
-                    <div key={a.id} style={{display:'flex', justifyContent:'space-between', padding:'0.5rem', borderBottom:'1px solid var(--border)', fontSize:'0.85rem'}}>
-                      <div>{a.name}</div>
-                      <div style={{fontWeight:600}}>{a.id}</div>
+                    <div key={a.id} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.45rem 0.6rem', background:'var(--card-bg, #fff)', borderRadius:'6px', border:'1px solid var(--border)', fontSize:'0.82rem'}}>
+                      <div style={{overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', maxWidth:'140px'}}>
+                        <div style={{fontWeight:600}} title={a.name}>{a.name}</div>
+                        <div style={{fontSize:'0.7rem', color:'var(--text-muted)', fontFamily:'monospace'}}>{a.id}</div>
+                      </div>
+                      <div style={{display:'flex', alignItems:'center', gap:'0.3rem'}}>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{padding:'0.25rem 0.5rem', fontSize:'0.72rem', color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'0.25rem', border:'1px solid var(--border)'}} 
+                          title="طباعة باركود العهدة للصقه على الأصل"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setBarcodeModalItem(a);
+                            setSelectedEmployee({ name: emp, assets: empAssets, totalValue });
+                            setBarcodeModalType('custody');
+                          }}
+                        >
+                          <Printer size={12} /> باركود
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-ghost" style={{width:'100%', marginTop:'0.5rem'}}>
-                  <FileText size={16} /> طباعة نموذج تسليم عهدة
-                </button>
+
+                {/* Handover Receipt & Batch Action */}
+                {!isUnassigned && (
+                  <button 
+                    className="btn btn-ghost" 
+                    style={{width:'100%', marginTop:'auto', border:'1px solid var(--border)', fontSize:'0.82rem', fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:'0.4rem', color:'var(--brand-teal)'}}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBarcodeModalItem(empAssets[0]);
+                      setSelectedEmployee({ name: emp, assets: empAssets, totalValue });
+                      setBarcodeModalType('receipt');
+                    }}
+                  >
+                    <FileText size={15} /> طباعة سند تسليم واستلام عهدة رسمي
+                  </button>
+                )}
               </div>
-            )
+            );
           })}
         </div>
       </div>
@@ -2960,12 +3228,37 @@ const renderDepreciation = () => {
       {/* Inventory Table */}
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
         <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Warehouse size={24} color="var(--brand-teal)" /> جدول المخزون المباشر</h2>
-        <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+        <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', alignItems:'center'}}>
+          <button 
+            className="btn btn-ghost" 
+            style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}} 
+            title="تنزيل نموذج تعبئة المستودعات مع القوائم المنسدلة" 
+            onClick={() => { downloadWarehouseTemplate(); showToast('📄 تم تنزيل نموذج إدخال المستودعات Excel مع الخيارات'); }}
+          >
+            <FileText size={15} /> نموذج المستودع
+          </button>
+          <button 
+            className="btn btn-ghost" 
+            style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}} 
+            title="استيراد أصناف المستودع من Excel" 
+            onClick={() => warehouseImportInputRef.current?.click()}
+          >
+            <Upload size={15} /> استيراد Excel
+          </button>
+          <button 
+            className="btn btn-ghost" 
+            style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}} 
+            title="تصدير بيانات المستودع كاملة إلى Excel" 
+            onClick={() => { exportWarehouse(warehouseItems); showToast('✅ تم تصدير بيانات المخزون إلى Excel'); }}
+          >
+            <Download size={15} /> تصدير المخزون
+          </button>
           {userProfile?.isAdmin && (
-            <button className="btn btn-primary" onClick={() => setWarehouseModal({})} style={{padding:'0.4rem 1rem', fontSize:'0.8rem', background:'var(--brand-teal)', color:'white', border:'none', marginRight:'auto'}}>+ إضافة صنف</button>
+            <button className="btn btn-primary" onClick={() => setWarehouseModal({})} style={{padding:'0.4rem 1rem', fontSize:'0.8rem', background:'var(--brand-teal)', color:'white', border:'none'}}>+ إضافة صنف</button>
           )}
+          <div style={{width:'1px', height:'24px', background:'var(--border)', margin:'0 0.25rem'}}></div>
           {['الكل', 'متاح', 'مخصص', 'صيانة', 'نفاد', 'تالف'].map(f => (
-            <button key={f} onClick={() => setWarehouseFilter(f)} className={`btn ${warehouseFilter === f ? 'btn-primary' : 'btn-ghost'}`} style={{padding:'0.4rem 1rem', fontSize:'0.8rem'}}>{f}</button>
+            <button key={f} onClick={() => setWarehouseFilter(f)} className={`btn ${warehouseFilter === f ? 'btn-primary' : 'btn-ghost'}`} style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}}>{f}</button>
           ))}
         </div>
       </div>
@@ -3005,6 +3298,7 @@ const renderDepreciation = () => {
                 <td><span style={{background: `${statusColors[item.status]}15`, color: statusColors[item.status], padding:'0.3rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700, border:`1px solid ${statusColors[item.status]}30`}}>{item.status}</span></td>
                 <td>
                   <div style={{display:'flex', gap:'0.4rem'}}>
+                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="طباعة باركود الصنف / موقع الرف (Bin)" onClick={() => { setBarcodeModalItem(item); setBarcodeModalType('warehouse'); }}><Printer size={14} color="var(--brand-teal)" /></button>
                     <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="عرض" onClick={() => setViewWarehouse(item)}><Eye size={14} color="var(--brand-teal)" /></button>
                     <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="تعديل" onClick={() => editWarehouseItem(item)}><Edit size={14} color="var(--text-muted)" /></button>
                   </div>
@@ -3375,6 +3669,8 @@ const renderDepreciation = () => {
       )}
 
       <input ref={importInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleImportFile} />
+      <input ref={warehouseImportInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleWarehouseImportFile} />
+      <input ref={custodyImportInputRef} type="file" accept=".xlsx,.xls,.csv" style={{display:'none'}} onChange={handleCustodyImportFile} />
 
       {importPreview && (
         <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
@@ -3397,6 +3693,59 @@ const renderDepreciation = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {warehouseImportPreview && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'720px', maxWidth:'94vw', maxHeight:'88vh', overflowY:'auto', background:'var(--card-bg)', padding:'2rem'}}>
+            <h3 style={{fontSize:'1.25rem', marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--brand-teal)'}}><Warehouse size={22} /> معاينة استيراد أصناف المستودع من Excel</h3>
+            <div style={{display:'flex', gap:'1rem', marginBottom:'1.25rem'}}>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#f0fdf4', color:'#166534', fontWeight:700}}>✅ أصناف صالحة: {warehouseImportPreview.rows.length}</div>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#fef2f2', color:'#991b1b', fontWeight:700}}>⚠️ أخطاء: {warehouseImportPreview.errors.length}</div>
+            </div>
+            {warehouseImportPreview.errors.length > 0 && (
+              <div style={{marginBottom:'1.25rem', maxHeight:'200px', overflowY:'auto', border:'1px solid #fecaca', borderRadius:'8px', padding:'0.75rem', fontSize:'0.85rem'}}>
+                {warehouseImportPreview.errors.map(e => <div key={e.line} style={{padding:'0.25rem 0'}}><strong>سطر {e.line}:</strong> {e.issues}</div>)}
+              </div>
+            )}
+            <p style={{color:'var(--text-muted)', fontSize:'0.8rem', marginBottom:'1rem'}}>سيتم إضافة الأصناف الصالحة إلى سجل المستودع مباشرة وفق المعايير المدخلة.</p>
+            <div style={{display:'flex', gap:'0.75rem'}}>
+              <button className="btn btn-primary" disabled={warehouseImportPreview.rows.length === 0} onClick={confirmWarehouseImport}><CheckCircle size={16} /> استيراد {warehouseImportPreview.rows.length} صنف مستودع</button>
+              <button className="btn btn-ghost" onClick={() => setWarehouseImportPreview(null)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {custodyImportPreview && (
+        <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
+          <div className="card" style={{width:'720px', maxWidth:'94vw', maxHeight:'88vh', overflowY:'auto', background:'var(--card-bg)', padding:'2rem'}}>
+            <h3 style={{fontSize:'1.25rem', marginBottom:'1rem', display:'flex', alignItems:'center', gap:'0.5rem', color:'var(--brand-teal)'}}><Users size={22} /> معاينة استيراد سجل العهد من Excel</h3>
+            <div style={{display:'flex', gap:'1rem', marginBottom:'1.25rem'}}>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#f0fdf4', color:'#166534', fontWeight:700}}>✅ سجلات عهد صالحة: {custodyImportPreview.rows.length}</div>
+              <div style={{flex:1, padding:'1rem', borderRadius:'12px', background:'#fef2f2', color:'#991b1b', fontWeight:700}}>⚠️ أخطاء: {custodyImportPreview.errors.length}</div>
+            </div>
+            {custodyImportPreview.errors.length > 0 && (
+              <div style={{marginBottom:'1.25rem', maxHeight:'200px', overflowY:'auto', border:'1px solid #fecaca', borderRadius:'8px', padding:'0.75rem', fontSize:'0.85rem'}}>
+                {custodyImportPreview.errors.map(e => <div key={e.line} style={{padding:'0.25rem 0'}}><strong>سطر {e.line}:</strong> {e.issues}</div>)}
+              </div>
+            )}
+            <p style={{color:'var(--text-muted)', fontSize:'0.8rem', marginBottom:'1rem'}}>سيتم ربط العهد بالموظفين وتحديث المواقع والباركود تلقائياً في قاعدة البيانات.</p>
+            <div style={{display:'flex', gap:'0.75rem'}}>
+              <button className="btn btn-primary" disabled={custodyImportPreview.rows.length === 0} onClick={confirmCustodyImport}><CheckCircle size={16} /> اعتماد واستيراد {custodyImportPreview.rows.length} عهدة</button>
+              <button className="btn btn-ghost" onClick={() => setCustodyImportPreview(null)}>إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {barcodeModalItem && (
+        <BarcodePrintModal 
+          item={barcodeModalItem} 
+          type={barcodeModalType} 
+          onClose={() => setBarcodeModalItem(null)} 
+          employee={selectedEmployee} 
+        />
       )}
 
       {toastMessage && (
