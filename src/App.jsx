@@ -409,16 +409,26 @@ const App = () => {
   const [inventoryCampaigns, setInventoryCampaigns] = useState([]);
   
   const [warehouseModal, setWarehouseModal] = useState(null);
-  const [warehouseItems, setWarehouseItems] = useState([
-    { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
-    { id: 'WH-002', sku: 'OF-SKU-202', name: 'مكتب إداري فاخر', category: 'أثاث ومعدات', qty: 3, minQty: 2, location: 'B-02-01', status: 'مخصص', stage: 'Allocate', lastAudit: '2024-07-20' },
-    { id: 'WH-003', sku: 'VH-SKU-303', name: 'سيارة نقل تويوتا هايلكس', category: 'مركبات', qty: 1, minQty: 1, location: 'G-01-01', status: 'صيانة', stage: 'Audit', lastAudit: '2024-09-01' },
-    { id: 'WH-004', sku: 'IT-SKU-104', name: 'طابعة HP LaserJet Pro', category: 'أصول تقنية', qty: 25, minQty: 10, location: 'A-02-05', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-28' },
-    { id: 'WH-005', sku: 'OF-SKU-205', name: 'كرسي مكتبي مريح', category: 'أثاث ومعدات', qty: 0, minQty: 5, location: 'B-03-02', status: 'نفاد', stage: 'Receive', lastAudit: '2024-06-10' },
-    { id: 'WH-006', sku: 'IT-SKU-106', name: 'شاشة عرض تفاعلية 65 بوصة', category: 'أصول تقنية', qty: 4, minQty: 2, location: 'C-01-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-10' },
-    { id: 'WH-007', sku: 'VH-SKU-307', name: 'رافعة شوكية كاتربيلر', category: 'مركبات', qty: 2, minQty: 1, location: 'G-02-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-05' },
-    { id: 'WH-008', sku: 'OF-SKU-208', name: 'مكيف مركزي سبليت', category: 'أثاث ومعدات', qty: 8, minQty: 3, location: 'D-01-04', status: 'تالف', stage: 'Retire', lastAudit: '2024-05-20' },
-  ]);
+  const [warehouseItems, setWarehouseItems] = useState(() => {
+    const deletedWhIds = JSON.parse(localStorage.getItem('deletedWarehouseIds') || '[]');
+    const saved = localStorage.getItem('warehouseItems');
+    if (saved) {
+      try {
+        return JSON.parse(saved).filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+      } catch(e) {}
+    }
+    const defaults = [
+      { id: 'WH-001', sku: 'IT-SKU-101', name: 'لابتوب ديل XPS 15', category: 'أصول تقنية', qty: 12, minQty: 5, location: 'A-01-03', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-15' },
+      { id: 'WH-002', sku: 'OF-SKU-202', name: 'مكتب إداري فاخر', category: 'أثاث ومعدات', qty: 3, minQty: 2, location: 'B-02-01', status: 'مخصص', stage: 'Allocate', lastAudit: '2024-07-20' },
+      { id: 'WH-003', sku: 'VH-SKU-303', name: 'سيارة نقل تويوتا هايلكس', category: 'مركبات', qty: 1, minQty: 1, location: 'G-01-01', status: 'صيانة', stage: 'Audit', lastAudit: '2024-09-01' },
+      { id: 'WH-004', sku: 'IT-SKU-104', name: 'طابعة HP LaserJet Pro', category: 'أصول تقنية', qty: 25, minQty: 10, location: 'A-02-05', status: 'متاح', stage: 'Deploy', lastAudit: '2024-08-28' },
+      { id: 'WH-005', sku: 'OF-SKU-205', name: 'كرسي مكتبي مريح', category: 'أثاث ومعدات', qty: 0, minQty: 5, location: 'B-03-02', status: 'نفاد', stage: 'Receive', lastAudit: '2024-06-10' },
+      { id: 'WH-006', sku: 'IT-SKU-106', name: 'شاشة عرض تفاعلية 65 بوصة', category: 'أصول تقنية', qty: 4, minQty: 2, location: 'C-01-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-10' },
+      { id: 'WH-007', sku: 'VH-SKU-307', name: 'رافعة شوكية كاتربيلر', category: 'مركبات', qty: 2, minQty: 1, location: 'G-02-01', status: 'متاح', stage: 'Deploy', lastAudit: '2024-09-05' },
+      { id: 'WH-008', sku: 'OF-SKU-208', name: 'مكيف مركزي سبليت', category: 'أثاث ومعدات', qty: 8, minQty: 3, location: 'D-01-04', status: 'تالف', stage: 'Retire', lastAudit: '2024-05-20' },
+    ];
+    return defaults.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+  });
   const [warehouseFilter, setWarehouseFilter] = useState('الكل');
   const [viewAsset, setViewAsset] = useState(null);
   const [viewWarehouse, setViewWarehouse] = useState(null);
@@ -436,11 +446,12 @@ const App = () => {
   const [promptDialog, setPromptDialog] = useState(null);
   const [confirmDialog, setConfirmDialog] = useState(null);
   const [warehouseRequests, setWarehouseRequests] = useState(() => {
+    const deletedReqIds = JSON.parse(localStorage.getItem('deletedWarehouseReqIds') || '[]');
     const saved = localStorage.getItem('warehouseRequests');
     if (saved) {
-      try { return JSON.parse(saved); } catch(e) {}
+      try { return JSON.parse(saved).filter(r => !deletedReqIds.includes(r.id)); } catch(e) {}
     }
-    return [
+    const defaults = [
       {
         id: 'REQ-2026-001',
         itemId: 'WH-001',
@@ -482,6 +493,7 @@ const App = () => {
         notes: 'تم فحص سلامة المكتب قبل التسليم والصرف'
       }
     ];
+    return defaults.filter(r => !deletedReqIds.includes(r.id));
   });
 
   useEffect(() => {
@@ -527,20 +539,193 @@ const App = () => {
   const deleteAsset = (assetId, dbId) => {
     setConfirmDialog({
       title: 'تأكيد حذف الأصل نهائياً',
-      message: 'هل أنت متأكد من رغبتك في حذف هذا الأصل نهائياً من السجل؟ هذا الإجراء لا يمكن التراجع عنه.',
+      message: 'هل أنت متأكد من رغبتك في حذف هذا الأصل نهائياً من السجل؟ هذا الإجراء لا يمكن التراجع عنه وسيتم مسح كافة البيانات المرتبطة به بشكل قطعي.',
       confirmText: 'نعم، حذف نهائي',
       confirmColor: 'var(--danger, #ef4444)',
       onConfirm: async () => {
-        // Delete from Supabase
-        if (dbId) {
-          const { error } = await supabase.from('assets').delete().eq('id', dbId);
-          if (error) {
-            showToast('❌ حدث خطأ أثناء الحذف: ' + error.message);
-            return;
+        // 1. Blacklist immediately in localStorage so it NEVER returns upon page refresh
+        try {
+          const deletedList = JSON.parse(localStorage.getItem('deletedAssetIds') || '[]');
+          if (assetId && !deletedList.includes(assetId)) deletedList.push(assetId);
+          if (dbId && !deletedList.includes(dbId)) deletedList.push(dbId);
+          localStorage.setItem('deletedAssetIds', JSON.stringify(deletedList));
+        } catch(e) {}
+
+        // 2. Remove immediately from React state
+        setAssets(prev => prev.filter(a => a.id !== assetId && a.db_id !== dbId));
+
+        // 3. Delete from Supabase with safe cascade
+        try {
+          if (dbId) {
+            await supabase.from('journal_entries').update({ linked_entity_id: null }).eq('linked_entity_id', dbId);
+            await supabase.from('transfers').delete().eq('asset_id', dbId);
+            await supabase.from('inventory_records').delete().eq('asset_id', dbId);
+            await supabase.from('maintenance_logs').delete().eq('asset_id', dbId);
+            await supabase.from('warranties').delete().eq('asset_id', dbId);
+            await supabase.from('disposals').delete().eq('asset_id', dbId);
+            await supabase.from('assets').delete().eq('id', dbId);
           }
+          if (assetId) {
+            await supabase.from('assets').delete().eq('asset_no', assetId);
+          }
+        } catch(err) {
+          console.warn('Database delete asset warning:', err);
         }
-        setAssets(prev => prev.filter(a => a.id !== assetId));
-        showToast('🗑️ تم حذف الأصل بنجاح');
+
+        showToast('🗑️ تم حذف الأصل نهائياً ولن يظهر مجدداً');
+      }
+    });
+  };
+
+  const deleteWarehouseItem = (item) => {
+    setConfirmDialog({
+      title: 'تأكيد حذف الصنف من المستودع',
+      message: `هل أنت متأكد من حذف الصنف "${item.name}" نهائياً من سجل المستودع؟`,
+      confirmText: 'نعم، حذف نهائي',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: async () => {
+        // 1. Blacklist in localStorage
+        try {
+          const deletedList = JSON.parse(localStorage.getItem('deletedWarehouseIds') || '[]');
+          if (item.id && !deletedList.includes(item.id)) deletedList.push(item.id);
+          if (item.sku && !deletedList.includes(item.sku)) deletedList.push(item.sku);
+          localStorage.setItem('deletedWarehouseIds', JSON.stringify(deletedList));
+        } catch(e) {}
+
+        // 2. Remove immediately from state and localStorage
+        setWarehouseItems(prev => {
+          const updated = prev.filter(w => w.id !== item.id && w.sku !== item.sku);
+          localStorage.setItem('warehouseItems', JSON.stringify(updated));
+          return updated;
+        });
+
+        // 3. Delete from Supabase
+        try {
+          if (item.id && String(item.id).length > 20) {
+            await supabase.from('warehouse_items').delete().eq('id', item.id);
+          }
+          if (item.sku) {
+            await supabase.from('warehouse_items').delete().eq('sku', item.sku);
+          }
+        } catch(err) {
+          console.warn('Database delete warehouse item warning:', err);
+        }
+
+        showToast('🗑️ تم حذف الصنف نهائياً من المستودع');
+      }
+    });
+  };
+
+  const deleteWarehouseRequest = (req) => {
+    setConfirmDialog({
+      title: 'تأكيد حذف طلب الصرف',
+      message: `هل أنت متأكد من حذف طلب الصرف "${req.id}" للصنف "${req.itemName}" نهائياً؟`,
+      confirmText: 'نعم، حذف الطلب',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: async () => {
+        try {
+          const deletedReqs = JSON.parse(localStorage.getItem('deletedWarehouseReqIds') || '[]');
+          if (req.id && !deletedReqs.includes(req.id)) deletedReqs.push(req.id);
+          localStorage.setItem('deletedWarehouseReqIds', JSON.stringify(deletedReqs));
+        } catch(e) {}
+
+        setWarehouseRequests(prev => {
+          const updated = prev.filter(r => r.id !== req.id);
+          localStorage.setItem('warehouseRequests', JSON.stringify(updated));
+          return updated;
+        });
+
+        try {
+          await supabase.from('warehouse_requests').delete().eq('id', req.id);
+        } catch(e) {}
+
+        showToast('🗑️ تم حذف طلب الصرف نهائياً');
+      }
+    });
+  };
+
+  const deleteJournal = (j) => {
+    setConfirmDialog({
+      title: 'تأكيد حذف القيد المحاسبي',
+      message: `هل أنت متأكد من حذف القيد رقم "${j.id}" نهائياً؟ سيتم مسح كافة الأسطر المحاسبية التابعة له.`,
+      confirmText: 'نعم، حذف القيد',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: async () => {
+        try {
+          const deletedList = JSON.parse(localStorage.getItem('deletedJournalIds') || '[]');
+          if (j.id && !deletedList.includes(j.id)) deletedList.push(j.id);
+          if (j.db_id && !deletedList.includes(j.db_id)) deletedList.push(j.db_id);
+          localStorage.setItem('deletedJournalIds', JSON.stringify(deletedList));
+        } catch(e) {}
+
+        setJournals(prev => prev.filter(item => item.id !== j.id && item.db_id !== j.db_id));
+
+        try {
+          if (j.db_id) {
+            await supabase.from('journal_lines').delete().eq('journal_id', j.db_id);
+            await supabase.from('journal_entries').delete().eq('id', j.db_id);
+          }
+          if (j.id) {
+            await supabase.from('journal_entries').delete().eq('journal_no', j.id);
+          }
+        } catch(err) {
+          console.warn('Database delete journal warning:', err);
+        }
+
+        showToast('🗑️ تم حذف القيد المحاسبي نهائياً');
+      }
+    });
+  };
+
+  const deleteEmployee = (emp) => {
+    setConfirmDialog({
+      title: 'تأكيد حذف الموظف',
+      message: `هل أنت متأكد من حذف الموظف "${emp.full_name}" (${emp.employee_id}) نهائياً من سجل الموظفين والصلاحيات؟`,
+      confirmText: 'نعم، حذف الموظف',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: async () => {
+        try {
+          const deletedList = JSON.parse(localStorage.getItem('deletedEmployeeIds') || '[]');
+          if (emp.id && !deletedList.includes(emp.id)) deletedList.push(emp.id);
+          if (emp.employee_id && !deletedList.includes(emp.employee_id)) deletedList.push(emp.employee_id);
+          localStorage.setItem('deletedEmployeeIds', JSON.stringify(deletedList));
+        } catch(e) {}
+
+        setEmployeesList(prev => prev.filter(e => e.id !== emp.id && e.employee_id !== emp.employee_id));
+
+        try {
+          if (emp.id) {
+            await supabase.from('employees').delete().eq('id', emp.id);
+          }
+          if (emp.employee_id) {
+            await supabase.from('employees').delete().eq('employee_id', emp.employee_id);
+          }
+        } catch(err) {
+          console.warn('Database delete employee warning:', err);
+        }
+
+        showToast('🗑️ تم حذف الموظف نهائياً');
+      }
+    });
+  };
+
+  const deleteTransfer = (t) => {
+    setConfirmDialog({
+      title: 'تأكيد حذف طلب التحويل',
+      message: `هل أنت متأكد من حذف حركة التحويل "${t.id}" للأصل "${t.asset}"؟`,
+      confirmText: 'نعم، حذف التحويل',
+      confirmColor: 'var(--danger, #ef4444)',
+      onConfirm: async () => {
+        setTransfers(prev => prev.filter(item => item.id !== t.id && item.db_id !== t.db_id));
+        try {
+          if (t.db_id) {
+            await supabase.from('transfers').delete().eq('id', t.db_id);
+          }
+          if (t.id) {
+            await supabase.from('transfers').delete().eq('transfer_no', t.id);
+          }
+        } catch(e) {}
+        showToast('🗑️ تم حذف حركة التحويل بنجاح');
       }
     });
   };
@@ -602,12 +787,14 @@ const App = () => {
   const fetchInitialData = async () => {
     // جلب الأصول
     const { data: setData } = await supabase.from('system_settings').select('lookups').limit(1).single();
-      if (setData?.lookups) {
-        setSystemLookups(setData.lookups);
-      }
-      const { data: asData, error: asErr } = await supabase.from('assets').select('*');
+    if (setData?.lookups) {
+      setSystemLookups(setData.lookups);
+    }
+    const { data: asData, error: asErr } = await supabase.from('assets').select('*');
+    const deletedAssetIds = JSON.parse(localStorage.getItem('deletedAssetIds') || '[]');
     if (!asErr && asData) {
-      const mappedAssets = asData.map(item => ({
+      const filteredAssets = asData.filter(item => !deletedAssetIds.includes(item.id) && !deletedAssetIds.includes(item.asset_no));
+      const mappedAssets = filteredAssets.map(item => ({
           id: item.asset_no,
           db_id: item.id,
           code: item.serial_number || item.qr_code || 'N/A',
@@ -641,25 +828,30 @@ const App = () => {
       setAssets([]);
     }
 
-    // جلب التحويلات (لو الجدول موجود)
+    // جلب التحويلات
     const { data: trData, error: trErr } = await supabase.from('transfers').select('*');
+    const deletedTransferIds = JSON.parse(localStorage.getItem('deletedTransferIds') || '[]');
     if (!trErr && trData && trData.length > 0) {
-      // سنقوم بمسح البيانات الافتراضية إذا كان الجدول يعمل
-      setTransfers(trData.map(t => ({
+      const filteredTr = trData.filter(t => !deletedTransferIds.includes(t.id) && !deletedTransferIds.includes(t.transfer_no));
+      setTransfers(filteredTr.map(t => ({
         id: t.transfer_no,
         db_id: t.id,
-        asset: t.asset_id, // يحتاج إلى ربط بالاسم لاحقاً
+        asset: t.asset_id,
         from: t.from_department_id || 'الإدارة',
         to: t.to_department_id || 'المستودع',
         date: t.transfer_date,
         status: t.status
       })));
+    } else {
+      setTransfers(prev => prev.filter(t => !deletedTransferIds.includes(t.id) && !deletedTransferIds.includes(t.db_id)));
     }
 
     // جلب المستودعات
     const { data: whData, error: whErr } = await supabase.from('warehouse_items').select('*');
+    const deletedWhIds = JSON.parse(localStorage.getItem('deletedWarehouseIds') || '[]');
     if (!whErr && whData && whData.length > 0) {
-      setWarehouseItems(whData.map(w => {
+      const filteredWh = whData.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
+      const mappedWh = filteredWh.map(w => {
         let keeper = 'فيصل العتيبي (أمين المستودع)';
         let warehouseBranch = 'المستودع المركزي الرئيسي';
         let storageCondition = 'عادي / جاف (درجة حرارة الغرفة)';
@@ -698,12 +890,27 @@ const App = () => {
           description: notes,
           notes: notes
         };
-      }));
+      });
+      setWarehouseItems(mappedWh);
+      localStorage.setItem('warehouseItems', JSON.stringify(mappedWh));
+    } else {
+      const saved = localStorage.getItem('warehouseItems');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          setWarehouseItems(parsed.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku)));
+        } catch(e) {
+          setWarehouseItems([]);
+        }
+      }
     }
 
-    // جلب قائمة الموظفين مسبقاً للاستخدام في قوائم أمناء المستودعات ومستلمي العهد
+    // جلب قائمة الموظفين
     const { data: empData } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
-    if (empData) setEmployeesList(empData);
+    const deletedEmpIds = JSON.parse(localStorage.getItem('deletedEmployeeIds') || '[]');
+    if (empData) {
+      setEmployeesList(empData.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id)));
+    }
 
     const { data: invData } = await supabase.from('inventory_campaigns').select('*').order('created_at', { ascending: false });
     if (invData) setInventoryCampaigns(invData);
@@ -724,7 +931,7 @@ const App = () => {
       accountMap[a.id] = `${a.account_code} - ${a.account_name}`;
     });
 
-    // جلب قيود اليومية المركزية وسطورها المحاسبية
+    // جلب قيود اليومية المركزية
     const { data: jeData, error: jeErr } = await supabase
       .from('journal_entries')
       .select(`
@@ -746,8 +953,10 @@ const App = () => {
       `)
       .order('created_at', { ascending: false });
 
+    const deletedJournalIds = JSON.parse(localStorage.getItem('deletedJournalIds') || '[]');
     if (!jeErr && jeData) {
-      const mappedJournals = jeData.map(entry => {
+      const filteredJe = jeData.filter(e => !deletedJournalIds.includes(e.id) && !deletedJournalIds.includes(e.journal_no));
+      const mappedJournals = filteredJe.map(entry => {
         const lines = (entry.journal_lines || []).map(l => ({
           ...l,
           account_label: accountMap[l.account_id] || l.description || 'حساب فرعي',
@@ -771,21 +980,27 @@ const App = () => {
         };
       });
       setJournals(mappedJournals);
+    } else {
+      setJournals(prev => prev.filter(j => !deletedJournalIds.includes(j.id) && !deletedJournalIds.includes(j.db_id)));
     }
   };
 
-  const [journals, setJournals] = useState([
-    { id: 'JV-2024-001', date: '2024-01-31', desc: 'إثبات إهلاك شهر يناير', debit: 45200, credit: null, status: 'مرحل' },
-    { id: 'JV-2024-001', date: '2024-01-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45200, status: 'مرحل' },
-    { id: 'JV-2024-015', date: '2024-02-28', desc: 'إثبات إهلاك شهر فبراير', debit: 45850, credit: null, status: 'مرحل' },
-    { id: 'JV-2024-015', date: '2024-02-28', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45850, status: 'مرحل' },
-    { id: 'JV-2024-032', date: '2024-03-31', desc: 'إثبات إهلاك شهر مارس', debit: 46100, credit: null, status: 'مرحل' },
-    { id: 'JV-2024-032', date: '2024-03-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 46100, status: 'مرحل' },
-    { id: 'JV-2024-048', date: '2024-04-30', desc: 'إثبات إهلاك شهر أبريل', debit: 46100, credit: null, status: 'مسودة' },
-    { id: 'JV-2024-048', date: '2024-04-30', desc: 'مجمع إهلاك الأصول', debit: null, credit: 46100, status: 'مسودة' },
-    { id: 'JV-2024-051', date: '2024-05-05', desc: 'تسوية بيع خردة (سيارة تالفة)', debit: 15000, credit: null, status: 'مسودة' },
-    { id: 'JV-2024-051', date: '2024-05-05', desc: 'أرباح بيع أصول ثابتة', debit: null, credit: 15000, status: 'مسودة' },
-  ]);
+  const [journals, setJournals] = useState(() => {
+    const deletedJournalIds = JSON.parse(localStorage.getItem('deletedJournalIds') || '[]');
+    const defaults = [
+      { id: 'JV-2024-001', date: '2024-01-31', desc: 'إثبات إهلاك شهر يناير', debit: 45200, credit: null, status: 'مرحل' },
+      { id: 'JV-2024-001', date: '2024-01-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45200, status: 'مرحل' },
+      { id: 'JV-2024-015', date: '2024-02-28', desc: 'إثبات إهلاك شهر فبراير', debit: 45850, credit: null, status: 'مرحل' },
+      { id: 'JV-2024-015', date: '2024-02-28', desc: 'مجمع إهلاك الأصول', debit: null, credit: 45850, status: 'مرحل' },
+      { id: 'JV-2024-032', date: '2024-03-31', desc: 'إثبات إهلاك شهر مارس', debit: 46100, credit: null, status: 'مرحل' },
+      { id: 'JV-2024-032', date: '2024-03-31', desc: 'مجمع إهلاك الأصول', debit: null, credit: 46100, status: 'مرحل' },
+      { id: 'JV-2024-048', date: '2024-04-30', desc: 'إثبات إهلاك شهر أبريل', debit: 46100, credit: null, status: 'مسودة' },
+      { id: 'JV-2024-048', date: '2024-04-30', desc: 'مجمع إهلاك الأصول', debit: null, credit: 46100, status: 'مسودة' },
+      { id: 'JV-2024-051', date: '2024-05-05', desc: 'تسوية بيع خردة (سيارة تالفة)', debit: 15000, credit: null, status: 'مسودة' },
+      { id: 'JV-2024-051', date: '2024-05-05', desc: 'أرباح بيع أصول ثابتة', debit: null, credit: 15000, status: 'مسودة' },
+    ];
+    return defaults.filter(j => !deletedJournalIds.includes(j.id));
+  });
 
   const [transfers, setTransfers] = useState([
     { id: 'TR-092', asset: 'تجهيزات المكتب الرئيسي', from: 'الإدارة', to: 'الموارد البشرية', date: '2024-01-15', status: 'مكتمل' },
@@ -1757,6 +1972,16 @@ const App = () => {
                                 <RotateCcw size={12} /> فك الاعتماد
                               </button>
                             )}
+
+                            {/* زر حذف القيد نهائياً */}
+                            <button 
+                              className="btn btn-ghost"
+                              style={{padding:'0.4rem 0.6rem', border:'1px solid var(--border)', fontSize:'0.75rem', color:'var(--danger)'}}
+                              title="حذف القيد المحاسبي نهائياً"
+                              onClick={() => deleteJournal(j)}
+                            >
+                              <Trash2 size={13} />
+                            </button>
                           </div>
                         </td>
                       </tr>
@@ -1830,6 +2055,7 @@ const App = () => {
                 <th style={{padding:'1rem', textAlign:'right'}}>مسار التحويل (Logistics)</th>
                 <th style={{padding:'1rem', textAlign:'right'}}>التاريخ</th>
                 <th style={{padding:'1rem', textAlign:'center'}}>الحالة</th>
+                <th style={{padding:'1rem', textAlign:'center'}}>إجراءات</th>
               </tr>
             </thead>
             <tbody>
@@ -1855,6 +2081,16 @@ const App = () => {
                       <span className="badge" style={{background:'#fef3c7', color:'#92400e', padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><Activity size={12}/> قيد المراجعة</span> :
                       <span className="badge" style={{background:'#fee2e2', color:'#b91c1c', padding:'0.4rem 1rem', display:'inline-flex', alignItems:'center', gap:'0.25rem'}}><X size={12}/> مرفوض</span>
                     }
+                  </td>
+                  <td style={{padding:'1rem', textAlign:'center'}}>
+                    <button 
+                      className="btn btn-ghost" 
+                      style={{padding:'0.4rem 0.6rem', color:'var(--danger)'}} 
+                      title="حذف حركة التحويل" 
+                      onClick={() => deleteTransfer(t)}
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -2903,9 +3139,14 @@ const renderDepreciation = () => {
                       <span style={{color:'var(--danger)', fontSize:'0.85rem', fontWeight:600}}>موقوف</span>}
                   </td>
                   <td style={{padding:'1rem', textAlign:'center'}}>
-                    <button className="btn btn-ghost" style={{padding:'0.5rem', color:'var(--brand-teal)'}} onClick={() => setEmployeeModal(emp)}>
-                      <Settings size={16} />
-                    </button>
+                    <div style={{display:'flex', gap:'0.4rem', justifyContent:'center'}}>
+                      <button className="btn btn-ghost" style={{padding:'0.5rem', color:'var(--brand-teal)'}} title="تعديل الموظف والصلاحيات" onClick={() => setEmployeeModal(emp)}>
+                        <Settings size={16} />
+                      </button>
+                      <button className="btn btn-ghost" style={{padding:'0.5rem', color:'var(--danger)'}} title="حذف الموظف نهائياً" onClick={() => deleteEmployee(emp)}>
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -3647,6 +3888,14 @@ const renderDepreciation = () => {
                         >
                           <Edit size={15} color="var(--text-muted)" />
                         </button>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{padding:'0.35rem', borderRadius:'8px', background:'var(--thead-bg)', color:'var(--danger)'}} 
+                          title="حذف الصنف نهائياً" 
+                          onClick={() => deleteWarehouseItem(item)}
+                        >
+                          <Trash2 size={15} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -3778,6 +4027,15 @@ const renderDepreciation = () => {
                           {isRejected && (
                             <span style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>مغلق</span>
                           )}
+
+                          <button 
+                            className="btn btn-ghost" 
+                            style={{padding:'0.35rem 0.5rem', color:'var(--danger)', border:'1px solid var(--border)', borderRadius:'6px'}} 
+                            title="حذف هذا الطلب نهائياً" 
+                            onClick={() => deleteWarehouseRequest(req)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </div>
                       </td>
                     </tr>
@@ -5102,6 +5360,17 @@ const renderDepreciation = () => {
                 )}
                 <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={() => showToast('🖨️ جاري تجهيز وطباعة سند القيد...')}>
                   <Printer size={16} /> طباعة السند
+                </button>
+                <button 
+                  className="btn btn-ghost" 
+                  style={{border:'1px solid var(--border)', color:'var(--danger)'}} 
+                  onClick={() => {
+                    const toDel = selectedJournal;
+                    setSelectedJournal(null);
+                    deleteJournal(toDel);
+                  }}
+                >
+                  <Trash2 size={16} style={{marginLeft:'0.3rem'}} /> حذف القيد نهائياً
                 </button>
               </div>
 
