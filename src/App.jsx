@@ -591,6 +591,25 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
   );
 };
 
+// Master clean & restore logic: wipes any dirty test data, dummy entries, or deleted blacklists
+// and guarantees 100% authentic Traouf Charity datasets on every device.
+try {
+  const MASTER_KEY = 'traouf_master_clean_v5';
+  if (typeof window !== 'undefined' && localStorage.getItem(MASTER_KEY) !== 'true') {
+    localStorage.removeItem('traouf_assets');
+    localStorage.removeItem('traouf_employees');
+    localStorage.removeItem('traouf_journals');
+    localStorage.removeItem('warehouseItems');
+    localStorage.removeItem('warehouseRequests');
+    localStorage.removeItem('deletedAssetIds');
+    localStorage.removeItem('deletedEmployeeIds');
+    localStorage.removeItem('deletedWarehouseIds');
+    localStorage.removeItem('deletedJournalIds');
+    localStorage.removeItem('deletedTransferIds');
+    localStorage.removeItem('deletedWarehouseReqIds');
+    localStorage.setItem(MASTER_KEY, 'true');
+  }
+} catch(e) {}
 
 const App = () => {
   const [session, setSession] = useState(() => {
@@ -722,18 +741,12 @@ const App = () => {
   
   const [warehouseModal, setWarehouseModal] = useState(null);
   const [warehouseItems, setWarehouseItems] = useState(() => {
-    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
-      try {
-        localStorage.removeItem('warehouseItems');
-        localStorage.removeItem('deletedWarehouseIds');
-      } catch(e) {}
-    }
     const deletedWhIds = JSON.parse(localStorage.getItem('deletedWarehouseIds') || '[]');
     const saved = localStorage.getItem('warehouseItems');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.length > 0 && !parsed.some(w => w.id === 'WH-001' && w.name === 'لابتوب ديل XPS 15')) {
+        if (parsed && parsed.length > 0 && !parsed.some(w => w.id === 'WH-001' && (w.name || '').includes('XPS'))) {
           return parsed.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
         }
       } catch(e) {}
@@ -760,39 +773,44 @@ const App = () => {
     const deletedReqIds = JSON.parse(localStorage.getItem('deletedWarehouseReqIds') || '[]');
     const saved = localStorage.getItem('warehouseRequests');
     if (saved) {
-      try { return JSON.parse(saved).filter(r => !deletedReqIds.includes(r.id)); } catch(e) {}
+      try { 
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.length > 0 && !parsed.some(r => (r.itemName || '').includes('XPS'))) {
+          return parsed.filter(r => !deletedReqIds.includes(r.id));
+        }
+      } catch(e) {}
     }
     const defaults = [
       {
         id: 'REQ-2026-001',
-        itemId: 'WH-001',
-        itemSku: 'IT-SKU-101',
-        itemName: 'لابتوب ديل XPS 15',
+        itemId: 'WH-003',
+        itemSku: 'TRAOUF-SKU-103',
+        itemName: 'جهاز لابتوب محمول Core i7',
         qty: 1,
         unit: 'حبة',
         binLocation: 'A-01-03',
         warehouseBranch: 'المستودع المركزي الرئيسي',
-        requester: 'أحمد الشمري',
-        recipient: 'أحمد الشمري (قسم المحاسبة والمالية)',
-        reason: 'تسليم عهدة عمل لموظف جديد في الإدارة المالية',
+        requester: 'سعد بن ناصر الشمري',
+        recipient: 'سعد بن ناصر الشمري (قسم المحاسبة والمالية)',
+        reason: 'تسليم عهدة عمل رسمية لموظف الجمعية',
         isCustody: true,
-        status: 'بانتظار الموافقة',
+        status: 'معتمد ومصروف',
         requestedAt: '2026-10-10T09:30:00Z',
         keeper: 'فيصل العتيبي (أمين المستودع)',
-        approvedBy: null,
-        approvedAt: null,
-        notes: 'مطلوب بصورة عاجلة للبدء في إعداد القوائم الختامية'
+        approvedBy: 'المدير المالي والتقني',
+        approvedAt: '2026-10-10T11:00:00Z',
+        notes: 'تم تسليم الجهاز وتوثيقه بسجل العهد'
       },
       {
         id: 'REQ-2026-002',
-        itemId: 'OF-SKU-202',
-        itemSku: 'OF-SKU-202',
-        itemName: 'مكتب إداري فاخر',
+        itemId: 'WH-006',
+        itemSku: 'TRAOUF-SKU-106',
+        itemName: 'مكتب موظف إداري خشب زان فاخر',
         qty: 1,
         unit: 'طقم',
         binLocation: 'B-02-01',
         warehouseBranch: 'مستودع الأثاث والمعدات',
-        requester: 'خالد المطيري',
+        requester: 'فهد عبدالله التميمي',
         recipient: 'الإدارة العامة - مكتب المدير التنفيذي',
         reason: 'تجهيز مكتب إداري تنفيذي',
         isCustody: true,
@@ -1119,19 +1137,13 @@ const App = () => {
   };
 
   const [assets, setAssets] = useState(() => {
-    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
-      try {
-        localStorage.removeItem('traouf_assets');
-        localStorage.removeItem('deletedAssetIds');
-      } catch(e) {}
-    }
     const deletedAssetIds = JSON.parse(localStorage.getItem('deletedAssetIds') || '[]');
     const saved = localStorage.getItem('traouf_assets');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.length > 0 && !parsed.some(a => a.id === 'AST-001' && a.name === 'لابتوب ديل XPS 15')) {
-          return parsed.filter(a => !deletedAssetIds.includes(a.id) && !deletedAssetIds.includes(a.db_id));
+        if (parsed && parsed.length > 0 && !parsed.some(a => a.id === 'AST-001' && (a.name || '').includes('XPS'))) {
+          return parsed.filter(a => !deletedAssetIds.includes(a.id) && !deletedAssetIds.includes(a.db_id) && !deletedAssetIds.includes(a.code));
         }
       } catch(e) {}
     }
@@ -1142,7 +1154,6 @@ const App = () => {
   useEffect(() => {
     try {
       localStorage.setItem('traouf_assets', JSON.stringify(assets));
-      localStorage.setItem('traouf_real_dataset_v1', 'true');
     } catch(e) {}
   }, [assets]);
 
@@ -1194,15 +1205,13 @@ const App = () => {
           isExpense: false
         }));
         setAssets(mappedAssets);
+      } else {
+        const allReal = [...realAssetsData, ...realCustodyData];
+        setAssets(allReal.filter(a => !deletedAssetIds.includes(a.id) && !deletedAssetIds.includes(a.code)));
       }
     } else {
-      setAssets(prev => {
-        if (prev && prev.length > 0 && !prev.some(a => a.id === 'AST-001' && a.name === 'لابتوب ديل XPS 15')) {
-          return prev;
-        }
-        const allReal = [...realAssetsData, ...realCustodyData];
-        return allReal.filter(a => !deletedAssetIds.includes(a.id));
-      });
+      const allReal = [...realAssetsData, ...realCustodyData];
+      setAssets(allReal.filter(a => !deletedAssetIds.includes(a.id) && !deletedAssetIds.includes(a.code)));
     }
 
     // جلب التحويلات
@@ -1271,19 +1280,16 @@ const App = () => {
       setWarehouseItems(mappedWh);
       localStorage.setItem('warehouseItems', JSON.stringify(mappedWh));
     } else {
-      setWarehouseItems(prev => {
-        if (prev && prev.length > 0 && !prev.some(w => w.id === 'WH-001' && w.name === 'لابتوب ديل XPS 15')) {
-          return prev;
-        }
-        return realWarehouseData.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
-      });
+      setWarehouseItems(realWarehouseData.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku)));
     }
 
     // جلب قائمة الموظفين
     const { data: empData } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
     const deletedEmpIds = JSON.parse(localStorage.getItem('deletedEmployeeIds') || '[]');
-    if (empData) {
+    if (empData && empData.length > 0) {
       setEmployeesList(empData.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id)));
+    } else {
+      setEmployeesList(realEmployeesData.filter(e => !deletedEmpIds.includes(e.id) && !deletedEmpIds.includes(e.employee_id)));
     }
 
     const { data: invData } = await supabase.from('inventory_campaigns').select('*').order('created_at', { ascending: false });
@@ -1376,20 +1382,11 @@ const App = () => {
       const mergedJournals = [...mappedJournals, ...realJournalsData.filter(rj => !existingIds.has(rj.id) && !deletedJournalIds.includes(rj.id))];
       setJournals(mergedJournals);
     } else {
-      setJournals(prev => {
-        if (prev && prev.length > 0) return prev;
-        return realJournalsData.filter(j => !deletedJournalIds.includes(j.id));
-      });
+      setJournals(realJournalsData.filter(j => !deletedJournalIds.includes(j.id)));
     }
   };
 
   const [journals, setJournals] = useState(() => {
-    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
-      try {
-        localStorage.removeItem('traouf_journals');
-        localStorage.removeItem('deletedJournalIds');
-      } catch(e) {}
-    }
     const deletedJournalIds = JSON.parse(localStorage.getItem('deletedJournalIds') || '[]');
     const saved = localStorage.getItem('traouf_journals');
     if (saved) {
@@ -1410,11 +1407,11 @@ const App = () => {
   }, [journals]);
 
   const [transfers, setTransfers] = useState([
-    { id: 'TR-092', asset: 'تجهيزات المكتب الرئيسي', from: 'الإدارة', to: 'الموارد البشرية', date: '2024-01-15', status: 'مكتمل' },
-    { id: 'TR-093', asset: 'آلة تغليف صناعية', from: 'المستودع', to: 'الإنتاج', date: '2024-02-20', status: 'قيد المراجعة' },
-    { id: 'TR-094', asset: 'باص نقل موظفين 30 راكب', from: 'الإنتاج', to: 'المستودع', date: '2024-03-05', status: 'مرفوض' },
-    { id: 'TR-095', asset: 'أجهزة حاسب آلي للإدارة', from: 'قسم تقنية المعلومات', to: 'الموارد البشرية', date: '2024-04-12', status: 'مكتمل' },
-    { id: 'TR-096', asset: 'طابعة مكتبية ليزرية', from: 'الإدارة', to: 'المبيعات', date: '2024-05-02', status: 'قيد المراجعة' },
+    { id: 'TR-2026-001', asset: 'جهاز حاسب آلي مكتبي HP', from: 'المستودع المركزي', to: 'إدارة الرعاية والتمكين', date: '2026-02-15', status: 'مكتمل' },
+    { id: 'TR-2026-002', asset: 'طابعة ليزرية متعددة الوظائف HP', from: 'الإدارة العامة', to: 'مركز رعاية الأيتام', date: '2026-03-01', status: 'مكتمل' },
+    { id: 'TR-2026-003', asset: 'سيارة تويوتا هايس 15 راكب', from: 'الخدمات المساندة', to: 'نادي تراؤف للبنين', date: '2026-03-18', status: 'قيد المراجعة' },
+    { id: 'TR-2026-004', asset: 'شاشة عرض تفاعلية ذكية', from: 'المستودع المركزي', to: 'نادي تراؤف للبنات', date: '2026-04-05', status: 'مكتمل' },
+    { id: 'TR-2026-005', asset: 'أجهزة اتصال لاسلكي ميداني', from: 'إدارة الأمن والسلامة', to: 'المقر الرئيسي / الجمعية', date: '2026-04-12', status: 'قيد المراجعة' },
   ]);
 
   const accountingEngine = useMemo(() => {
@@ -1831,9 +1828,9 @@ const App = () => {
               <h3 style={{fontSize:'0.95rem', fontWeight:800, marginBottom:'0.85rem'}}>آخر التحديثات اللحظية المباشرة</h3>
               <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
                 {[
-                  {icon: <Shuffle size={14}/>, text: 'تحويل أصل: طابعة ليزر -> المبيعات', time: 'منذ 5 د', color: '#6366f1'},
-                  {icon: <FileText size={14}/>, text: 'ترحيل قيد إهلاك: قيد دوري معتمد', time: 'منذ ساعة', color: '#10b981'},
-                  {icon: <Box size={14}/>, text: 'تسجيل أصل: لابتوب ديل XPS 15', time: 'منذ ساعتين', color: '#f59e0b'},
+                  {icon: <Shuffle size={14}/>, text: 'تحويل عهدة: جهاز حاسب آلي مكتبي -> مركز رعاية الأيتام', time: 'منذ 5 د', color: '#6366f1'},
+                  {icon: <FileText size={14}/>, text: 'ترحيل قيد إهلاك الأصول لشهر أكتوبر 2026', time: 'منذ ساعة', color: '#10b981'},
+                  {icon: <Box size={14}/>, text: 'تسجيل عهدة: جهاز أي ماك Apple - العلاقات والإعلام', time: 'منذ ساعتين', color: '#0d9488'},
                 ].map((act, idx) => (
                   <div key={idx} style={{display:'flex', gap:'0.75rem', alignItems:'center', paddingBottom:'0.6rem', borderBottom: idx < 2 ? '1px solid #f1f5f9' : 'none'}}>
                     <div style={{background: act.color + '15', color: act.color, padding:'0.45rem', borderRadius:'8px'}}>{act.icon}</div>
@@ -2133,7 +2130,7 @@ const App = () => {
           <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(220px, 1fr))', gap:'1rem', marginBottom:'1.5rem', padding:'1.5rem', background:'var(--card-bg)', borderRadius:'12px', border:'1px solid var(--border)', animation:'slideDown 0.3s ease-out', boxShadow:'0 4px 6px -1px rgba(0,0,0,0.1)'}}>
             <div>
                <label style={{fontSize:'0.75rem', fontWeight:700, color:'var(--text-muted)', marginBottom:'0.5rem', display:'block'}}>البحث الذكي (الاسم، الرمز، المعرف)</label>
-               <input list="register_search_datalist" type="text" placeholder="مثال: لابتوب، ديل، AST-..." value={filterParams.query} onChange={e => { setFilterParams({...filterParams, query: e.target.value}); setRegisterPage(1); }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
+               <input list="register_search_datalist" type="text" placeholder="مثال: مكيف، سيارة، جهاز حاسب، AST-..." value={filterParams.query} onChange={e => { setFilterParams({...filterParams, query: e.target.value}); setRegisterPage(1); }} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'transparent', color:'var(--text)'}} />
                <datalist id="register_search_datalist">
                  {realLookupsData.itemsList.map((it, idx) => <option key={idx} value={it} />)}
                </datalist>
@@ -3463,9 +3460,9 @@ const renderMaintenance = () => (
         <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>الضمانات النشطة</h3>
         <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
            {[
-             { asset: 'لابتوب ديل XPS 15', provider: 'مكتبة جرير', end: '2025-01-15', remaining: 470 },
-             { asset: 'مبنى الإدارة', provider: 'المقاول الرئيسي', end: '2025-01-01', remaining: 450 },
-             { asset: 'سيارة كامري', provider: 'عبداللطيف جميل', end: '2024-06-20', remaining: 260, alert: true }
+             { asset: 'خادم شبكة مركزي Dell PowerEdge', provider: 'شركة التقنيات الحديثة', end: '2027-01-15', remaining: 470 },
+             { asset: 'مبنى الإدارة الرئيسي', provider: 'المقاول الرئيسي المعتمد', end: '2028-01-01', remaining: 450 },
+             { asset: 'سيارة تويوتا هايس 15 راكب', provider: 'عبداللطيف جميل', end: '2027-06-20', remaining: 260, alert: false }
            ].map((w, idx) => (
              <div key={idx} style={{padding:'1rem', borderRadius:'8px', border:`1px solid ${w.alert ? '#fecaca' : 'var(--border)'}`, background: w.alert ? '#fef2f2' : 'var(--card-bg)'}}>
                <div style={{fontWeight:700, marginBottom:'0.25rem', color: w.alert ? '#991b1b' : 'var(--text)'}}>{w.asset}</div>
@@ -3890,12 +3887,6 @@ const renderDepreciation = () => {
       
   
   const [employeesList, setEmployeesList] = useState(() => {
-    if (localStorage.getItem('traouf_real_dataset_v1') !== 'true') {
-      try {
-        localStorage.removeItem('traouf_employees');
-        localStorage.removeItem('deletedEmployeeIds');
-      } catch(e) {}
-    }
     const deletedEmpIds = JSON.parse(localStorage.getItem('deletedEmployeeIds') || '[]');
     const saved = localStorage.getItem('traouf_employees');
     if (saved) {
@@ -5011,6 +5002,79 @@ const renderDepreciation = () => {
     );
   };
 
+  const restoreAllRealData = () => {
+    try {
+      localStorage.removeItem('traouf_assets');
+      localStorage.removeItem('traouf_employees');
+      localStorage.removeItem('traouf_journals');
+      localStorage.removeItem('warehouseItems');
+      localStorage.removeItem('warehouseRequests');
+      localStorage.removeItem('deletedAssetIds');
+      localStorage.removeItem('deletedEmployeeIds');
+      localStorage.removeItem('deletedWarehouseIds');
+      localStorage.removeItem('deletedJournalIds');
+      localStorage.removeItem('deletedTransferIds');
+      localStorage.removeItem('deletedWarehouseReqIds');
+      localStorage.setItem('traouf_master_clean_v5', 'true');
+    } catch(e) {}
+
+    const allReal = [...realAssetsData, ...realCustodyData];
+    setAssets(allReal);
+    setEmployeesList(realEmployeesData);
+    setJournals(realJournalsData);
+    setWarehouseItems(realWarehouseData);
+    setTransfers([
+      { id: 'TR-2026-001', asset: 'جهاز حاسب آلي مكتبي HP', from: 'المستودع المركزي', to: 'إدارة الرعاية والتمكين', date: '2026-02-15', status: 'مكتمل' },
+      { id: 'TR-2026-002', asset: 'طابعة ليزرية متعددة الوظائف HP', from: 'الإدارة العامة', to: 'مركز رعاية الأيتام', date: '2026-03-01', status: 'مكتمل' },
+      { id: 'TR-2026-003', asset: 'سيارة تويوتا هايس 15 راكب', from: 'الخدمات المساندة', to: 'نادي تراؤف للبنين', date: '2026-03-18', status: 'قيد المراجعة' },
+      { id: 'TR-2026-004', asset: 'شاشة عرض تفاعلية ذكية', from: 'المستودع المركزي', to: 'نادي تراؤف للبنات', date: '2026-04-05', status: 'مكتمل' },
+      { id: 'TR-2026-005', asset: 'أجهزة اتصال لاسلكي ميداني', from: 'إدارة الأمن والسلامة', to: 'المقر الرئيسي / الجمعية', date: '2026-04-12', status: 'قيد المراجعة' },
+    ]);
+    setWarehouseRequests([
+      {
+        id: 'REQ-2026-001',
+        itemId: 'WH-003',
+        itemSku: 'TRAOUF-SKU-103',
+        itemName: 'جهاز لابتوب محمول Core i7',
+        qty: 1,
+        unit: 'حبة',
+        binLocation: 'A-01-03',
+        warehouseBranch: 'المستودع المركزي الرئيسي',
+        requester: 'سعد بن ناصر الشمري',
+        recipient: 'سعد بن ناصر الشمري (قسم المحاسبة والمالية)',
+        reason: 'تسليم عهدة عمل رسمية لموظف الجمعية',
+        isCustody: true,
+        status: 'معتمد ومصروف',
+        requestedAt: '2026-10-10T09:30:00Z',
+        keeper: 'فيصل العتيبي (أمين المستودع)',
+        approvedBy: 'المدير المالي والتقني',
+        approvedAt: '2026-10-10T11:00:00Z',
+        notes: 'تم تسليم الجهاز وتوثيقه بسجل العهد'
+      },
+      {
+        id: 'REQ-2026-002',
+        itemId: 'WH-006',
+        itemSku: 'TRAOUF-SKU-106',
+        itemName: 'مكتب موظف إداري خشب زان فاخر',
+        qty: 1,
+        unit: 'طقم',
+        binLocation: 'B-02-01',
+        warehouseBranch: 'مستودع الأثاث والمعدات',
+        requester: 'فهد عبدالله التميمي',
+        recipient: 'الإدارة العامة - مكتب المدير التنفيذي',
+        reason: 'تجهيز مكتب إداري تنفيذي',
+        isCustody: true,
+        status: 'معتمد ومصروف',
+        requestedAt: '2026-10-08T11:00:00Z',
+        keeper: 'فيصل العتيبي (أمين المستودع)',
+        approvedBy: 'المدير المالي والتقني',
+        approvedAt: '2026-10-08T14:20:00Z',
+        notes: 'تم فحص سلامة المكتب قبل التسليم والصرف'
+      }
+    ]);
+    showToast('✨ تم استعادة كامل البيانات الحقيقية وتصفير كافة البيانات المدخلة بنجاح!');
+  };
+
   if (!session) {
     return <Login onLogin={setSession} />;
   }
@@ -5221,6 +5285,38 @@ const renderDepreciation = () => {
               onClick={() => { sfx.playClick(); setShowScenarioModal(true); }}
             >
               <Sparkles size={14} /> محاكي السيناريوهات
+            </button>
+
+            {/* Restore Real Data Button */}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                border: '1px solid rgba(16, 185, 129, 0.5)',
+                background: 'rgba(16, 185, 129, 0.12)',
+                color: '#10b981',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                padding: '0.35rem 0.85rem',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem',
+                boxShadow: '0 2px 6px rgba(16, 185, 129, 0.15)'
+              }}
+              title="استعادة كافة البيانات الرسمية لجمعية تراؤف وحذف أي بيانات مدخلة أو تجريبية"
+              onClick={() => {
+                sfx.playClick();
+                setConfirmDialog({
+                  title: 'استعادة البيانات الحقيقية المعتمدة',
+                  message: 'هل ترغب في استعادة كامل البيانات الرسمية لجمعية تراؤف (3,961 أصل وعهدة، 262 موظف، 20 صنف مستودعي، القيود المعتمدة) ومسح أي بيانات مدخلة أو تجريبية؟',
+                  confirmText: 'نعم، استعادة البيانات الرسمية',
+                  confirmColor: '#10b981',
+                  onConfirm: () => restoreAllRealData()
+                });
+              }}
+            >
+              <RefreshCw size={14} /> استعادة البيانات الحقيقية
             </button>
 
             {/* Live Camera Scanner Button */}
