@@ -24,7 +24,7 @@ const puppeteer = require('puppeteer');
     }
   });
   
-  await page.waitForTimeout(3000); // wait for 3s to see if it crashes
+  await new Promise(r => setTimeout(r, 3000)); // wait for 3s to see if it crashes
   
   const content = await page.content();
   if (content.includes('Something went wrong!')) {
