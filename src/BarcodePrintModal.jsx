@@ -4,7 +4,9 @@ import { QRCodeSVG } from 'qrcode.react';
 import { Printer, X, Tag, FileText, CheckCircle, MapPin, User, Box, ShieldCheck } from 'lucide-react';
 
 const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
-  const [printMode, setPrintMode] = useState('thermal'); // 'thermal' (single label), 'a4_sheet' (grid labels), 'receipt' (custody handover form)
+  const [printMode, setPrintMode] = useState(
+    type === 'receipt' ? 'receipt' : type === 'clearance' ? 'clearance' : 'thermal'
+  );
   const barcodeSvgRef = useRef(null);
 
   if (!item) return null;
@@ -13,10 +15,13 @@ const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
   const barcodeValue = String(item.id || item.code || item.sku || item.asset_no || 'AST-0001');
   const itemName = item.name || 'أصل غير مسمى';
   const itemCategory = item.category || item.category_id || 'عام';
-  const custodianName = item.custody || item.employee_id || employee?.full_name || employee?.name || 'غير محدد';
+  const custodianName = employee?.name || employee?.full_name || item.custody || item.employee_id || 'غير محدد';
   const location = item.location || item.location_id || item.bin || item.bin_location || 'المركز الرئيسي';
   const serialNo = item.serialNumber || item.serial_number || item.code || '-';
   const dateStr = item.date || item.purchase_date || new Date().toISOString().split('T')[0];
+  const assetList = (employee?.assets && employee.assets.length > 0) ? employee.assets : [item];
+  const totalAssetsValue = assetList.reduce((sum, a) => sum + (Number(a.cost) || 0), 0);
+  const isCustodyRelated = type === 'custody' || type === 'receipt' || type === 'clearance' || Boolean(employee);
 
   // Render Code 128 barcode into SVG
   useEffect(() => {
@@ -89,34 +94,45 @@ const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
         </div>
 
         {/* Mode Selector Tabs (Screen-Only) */}
-        <div className="no-print" style={{display:'flex', gap:'0.75rem', marginBottom:'1.5rem', background:'var(--bg, #f8fafc)', padding:'0.5rem', borderRadius:'12px', border:'1px solid var(--border, #e2e8f0)'}}>
+        <div className="no-print" style={{display:'flex', gap:'0.5rem', marginBottom:'1.5rem', background:'var(--bg, #f8fafc)', padding:'0.5rem', borderRadius:'12px', border:'1px solid var(--border, #e2e8f0)', flexWrap:'wrap'}}>
           <button 
             type="button"
             className={`btn ${printMode === 'thermal' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{flex:1, padding:'0.6rem 1rem', fontSize:'0.85rem', fontWeight: printMode === 'thermal' ? 700 : 500}}
+            style={{flex:1, minWidth:'150px', padding:'0.6rem 0.8rem', fontSize:'0.82rem', fontWeight: printMode === 'thermal' ? 700 : 500}}
             onClick={() => setPrintMode('thermal')}
           >
-            🏷️ ملصق حراري للعهدة (Thermal Label 70x45mm)
+            🏷️ ملصق حراري للعهدة (70x45mm)
           </button>
           
           <button 
             type="button"
             className={`btn ${printMode === 'a4_sheet' ? 'btn-primary' : 'btn-ghost'}`}
-            style={{flex:1, padding:'0.6rem 1rem', fontSize:'0.85rem', fontWeight: printMode === 'a4_sheet' ? 700 : 500}}
+            style={{flex:1, minWidth:'150px', padding:'0.6rem 0.8rem', fontSize:'0.82rem', fontWeight: printMode === 'a4_sheet' ? 700 : 500}}
             onClick={() => setPrintMode('a4_sheet')}
           >
-            📄 صفحة ملصقات مجمعة (A4 Multi-Tags)
+            📄 ملصقات مجمعة (A4 Sheet)
           </button>
 
-          {type === 'custody' && (
-            <button 
-              type="button"
-              className={`btn ${printMode === 'receipt' ? 'btn-primary' : 'btn-ghost'}`}
-              style={{flex:1, padding:'0.6rem 1rem', fontSize:'0.85rem', fontWeight: printMode === 'receipt' ? 700 : 500}}
-              onClick={() => setPrintMode('receipt')}
-            >
-              📋 نموذج تسليم عهدة رسمي للتوقيع
-            </button>
+          {isCustodyRelated && (
+            <>
+              <button 
+                type="button"
+                className={`btn ${printMode === 'receipt' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{flex:1, minWidth:'175px', padding:'0.6rem 0.8rem', fontSize:'0.82rem', fontWeight: printMode === 'receipt' ? 700 : 500}}
+                onClick={() => setPrintMode('receipt')}
+              >
+                📋 سند تسليم عهدة رسمي للتوقيع
+              </button>
+
+              <button 
+                type="button"
+                className={`btn ${printMode === 'clearance' ? 'btn-primary' : 'btn-ghost'}`}
+                style={{flex:1, minWidth:'175px', padding:'0.6rem 0.8rem', fontSize:'0.82rem', fontWeight: printMode === 'clearance' ? 700 : 500, color: printMode === 'clearance' ? 'white' : '#0d9488'}}
+                onClick={() => setPrintMode('clearance')}
+              >
+                🛡️ شهادة إخلاء طرف وبراءة ذمة
+              </button>
+            </>
           )}
         </div>
 
@@ -249,16 +265,17 @@ const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
                   <div><strong>الإدارة / القسم:</strong> {item.department || employee?.department || 'الإدارة العامة'}</div>
                   <div><strong>مقر ومكان العهدة:</strong> {location}</div>
                   <div><strong>المسمى الوظيفي:</strong> {employee?.job_title || 'موظف مسؤول'}</div>
-                  <div><strong>الحالة:</strong> على رأس العمل</div>
+                  <div><strong>عدد الأصول المسلمة:</strong> {assetList.length} أصل</div>
                 </div>
               </div>
 
               {/* Asset Table */}
               <div style={{marginBottom:'24px'}}>
-                <h4 style={{margin:'0 0 10px', fontSize:'0.95rem', fontWeight:800, color:'#0d9488'}}>تفاصيل الأصل المسلم كعهدة:</h4>
+                <h4 style={{margin:'0 0 10px', fontSize:'0.95rem', fontWeight:800, color:'#0d9488'}}>تفاصيل الأصول المسلمة كعهدة:</h4>
                 <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.85rem', border:'1px solid #000'}}>
                   <thead>
                     <tr style={{background:'#f1f5f9', borderBottom:'1px solid #000'}}>
+                      <th style={{padding:'8px', border:'1px solid #000', width:'40px'}}>#</th>
                       <th style={{padding:'8px', border:'1px solid #000'}}>رقم الأصل / الباركود</th>
                       <th style={{padding:'8px', border:'1px solid #000'}}>اسم الأصل / الوصف</th>
                       <th style={{padding:'8px', border:'1px solid #000'}}>الرقم التسلسلي (S/N)</th>
@@ -267,12 +284,20 @@ const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
                     </tr>
                   </thead>
                   <tbody>
-                    <tr>
-                      <td style={{padding:'10px', border:'1px solid #000', fontFamily:'monospace', fontWeight:700, textAlign:'center'}}>{barcodeValue}</td>
-                      <td style={{padding:'10px', border:'1px solid #000', fontWeight:600}}>{itemName}</td>
-                      <td style={{padding:'10px', border:'1px solid #000', textAlign:'center'}}>{serialNo}</td>
-                      <td style={{padding:'10px', border:'1px solid #000', textAlign:'center'}}>{Number(item.cost || 0).toLocaleString()}</td>
-                      <td style={{padding:'10px', border:'1px solid #000', textAlign:'center'}}>{item.status || 'ممتازة - يعمل'}</td>
+                    {assetList.map((a, idx) => (
+                      <tr key={a.id || idx}>
+                        <td style={{padding:'8px', border:'1px solid #000', textAlign:'center', fontWeight:700}}>{idx + 1}</td>
+                        <td style={{padding:'8px', border:'1px solid #000', fontFamily:'monospace', fontWeight:700, textAlign:'center'}}>{a.id || a.asset_no}</td>
+                        <td style={{padding:'8px', border:'1px solid #000', fontWeight:600}}>{a.name}</td>
+                        <td style={{padding:'8px', border:'1px solid #000', textAlign:'center'}}>{a.serialNumber || a.code || '-'}</td>
+                        <td style={{padding:'8px', border:'1px solid #000', textAlign:'center'}}>{Number(a.cost || 0).toLocaleString()}</td>
+                        <td style={{padding:'8px', border:'1px solid #000', textAlign:'center'}}>{a.status || 'ممتازة - يعمل'}</td>
+                      </tr>
+                    ))}
+                    <tr style={{background:'#f8fafc', fontWeight:800}}>
+                      <td colSpan="4" style={{padding:'8px', border:'1px solid #000', textAlign:'left'}}>الإجمالي:</td>
+                      <td style={{padding:'8px', border:'1px solid #000', textAlign:'center', color:'#0d9488'}}>{totalAssetsValue.toLocaleString()} ر.س</td>
+                      <td style={{padding:'8px', border:'1px solid #000', textAlign:'center'}}>{assetList.length} أصل</td>
                     </tr>
                   </tbody>
                 </table>
@@ -280,7 +305,7 @@ const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
 
               {/* Acknowledgement Statement */}
               <div style={{background:'#fffbeb', padding:'12px 16px', borderRadius:'6px', border:'1px solid #fde68a', fontSize:'0.8rem', color:'#92400e', marginBottom:'28px', lineHeight:1.6}}>
-                <strong>إقرار وتعهد:</strong> أقر أنا الموظف الموضح اسمي أعلاه بأنني استلمت الأصل الموصوف بحالة سليمة وصالحة للاستخدام، وأتعهد بالمحافظة عليه واستخدامه في مصلحة العمل فقط، وأتحمل المسؤولية الكاملة عن أي تلف أو ضياع ناتج عن سوء الاستخدام أو الإهمال، كما أتعهد بإعادته فور طلب الإدارة أو عند انتهاء العلاقة التعاقدية.
+                <strong>إقرار وتعهد:</strong> أقر أنا الموظف الموضح اسمي أعلاه بأنني استلمت الأصول الموصوفة بالجدول بحالة سليمة وصالحة للاستخدام، وأتعهد بالمحافظة عليها واستخدامها في مصلحة العمل فقط، وأتحمل المسؤولية الكاملة عن أي تلف أو ضياع ناتج عن سوء الاستخدام أو الإهمال، كما أتعهد بإعادتها فور طلب الإدارة أو عند انتهاء العلاقة التعاقدية.
               </div>
 
               {/* Signatures */}
@@ -296,6 +321,119 @@ const BarcodePrintModal = ({ item, type = 'asset', onClose, employee }) => {
                 <div>
                   <div style={{fontSize:'0.85rem', fontWeight:800, marginBottom:'40px'}}>اعتماد الإدارة المالية</div>
                   <div style={{borderBottom:'1px dotted #000', width:'80%', margin:'0 auto'}}></div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODE 4: OFFICIAL CUSTODY CLEARANCE CERTIFICATE (شهادة إخلاء طرف وبراءة ذمة) */}
+          {printMode === 'clearance' && (
+            <div id="custody-clearance-print" style={{
+              width: '100%',
+              background: '#ffffff',
+              color: '#000000',
+              padding: '36px 44px',
+              borderRadius: '8px',
+              boxShadow: '0 8px 16px rgba(0,0,0,0.1)',
+              direction: 'rtl',
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+              border: '2px solid #0f172a',
+              position: 'relative'
+            }}>
+              {/* Official Certificate Decorative Header */}
+              <div style={{textAlign:'center', borderBottom:'2px solid #0d9488', paddingBottom:'16px', marginBottom:'22px'}}>
+                <div style={{fontSize:'0.9rem', color:'#64748b', fontWeight:700, letterSpacing:'1px', marginBottom:'4px'}}>المملكة العربية السعودية — قطاع الأعمال</div>
+                <h1 style={{margin:0, fontSize:'1.6rem', fontWeight:900, color:'#0f172a'}}>شهادة إخلاء طرف وبراءة ذمة من العهد</h1>
+                <div style={{fontSize:'0.85rem', color:'#0d9488', fontWeight:700, marginTop:'4px'}}>PROPERTY & CUSTODY CLEARANCE CERTIFICATE</div>
+                
+                <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:'12px', fontSize:'0.8rem', color:'#475569', background:'#f8fafc', padding:'8px 14px', borderRadius:'6px'}}>
+                  <div><strong>رقم الشهادة:</strong> CLR-{new Date().getFullYear()}-{Date.now().toString().slice(-5)}</div>
+                  <div><strong>تاريخ الإصدار:</strong> {new Date().toLocaleDateString('ar-SA')} ({new Date().toISOString().split('T')[0]})</div>
+                  <div><strong>الحالة:</strong> <span style={{color:'#10b981', fontWeight:800}}>معتمد ومبرأ الذمة 100%</span></div>
+                </div>
+              </div>
+
+              {/* Employee Particulars */}
+              <div style={{background:'#f0fdfa', border:'1px solid #99f6e4', padding:'14px 18px', borderRadius:'8px', marginBottom:'20px'}}>
+                <h4 style={{margin:'0 0 10px', fontSize:'0.95rem', fontWeight:800, color:'#0f766e'}}>بيانات الموظف المطلوب إخلاء طرفه:</h4>
+                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'12px', fontSize:'0.85rem'}}>
+                  <div><strong>الاسم الرباعي:</strong> {custodianName}</div>
+                  <div><strong>الرقم الوظيفي:</strong> {employee?.employee_id || item.employee_id || '102'}</div>
+                  <div><strong>الإدارة / القسم:</strong> {item.department || employee?.department || 'الإدارة العامة'}</div>
+                  <div><strong>المسمى الوظيفي:</strong> {employee?.job_title || 'موظف مسؤول'}</div>
+                  <div><strong>مركز التكلفة:</strong> المركز الرئيسي</div>
+                  <div><strong>سبب إخلاء الطرف:</strong> انتهاء فترة العمل / نقل داخلي / تسوية عهد</div>
+                </div>
+              </div>
+
+              {/* Clearance Statement Declaration */}
+              <div style={{background:'#ffffff', border:'1.5px solid #cbd5e1', padding:'16px 20px', borderRadius:'8px', marginBottom:'22px', lineHeight:1.8, fontSize:'0.9rem', color:'#1e293b'}}>
+                <p style={{margin:0}}>
+                  <strong>تشهد إدارة الأصول والمستودعات والرقابة المالية</strong> بأن الموظف المذكورة بياناته أعلاه قد قام بتسليم كافة الأصول والعهد والأجهزة والمقتنيات المسندة إليه سابقاً، وتم فحصها ومطابقتها فنياً وإعادتها للمستودع المركزي بحالة سليمة تماماً.
+                </p>
+                <p style={{margin:'8px 0 0', fontWeight:700, color:'#0d9488'}}>
+                  وعليه، فقد أصبحت ذمته بريئة تماماً من أي عهد أو التزامات عينية أو مالية تتعلق بنظام الأصول والمستودعات حتى تاريخ صدور هذه الشهادة، ولا مانع من استكمال إجراءات تسوية مستحقاته لدى الموارد البشرية.
+                </p>
+              </div>
+
+              {/* Verified Items Summary */}
+              <div style={{marginBottom:'24px'}}>
+                <h4 style={{margin:'0 0 8px', fontSize:'0.85rem', fontWeight:800, color:'#475569'}}>سجل العهد التي تمت تصفيتها واستلامها بالمستودع:</h4>
+                <table style={{width:'100%', borderCollapse:'collapse', fontSize:'0.8rem', border:'1px solid #cbd5e1'}}>
+                  <thead>
+                    <tr style={{background:'#f1f5f9'}}>
+                      <th style={{padding:'6px 10px', border:'1px solid #cbd5e1'}}>رقم الأصل</th>
+                      <th style={{padding:'6px 10px', border:'1px solid #cbd5e1'}}>اسم الأصل</th>
+                      <th style={{padding:'6px 10px', border:'1px solid #cbd5e1'}}>حالة الاسترجاع</th>
+                      <th style={{padding:'6px 10px', border:'1px solid #cbd5e1'}}>موقع الحفظ بالمستودع</th>
+                      <th style={{padding:'6px 10px', border:'1px solid #cbd5e1'}}>تاريخ الفحص</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assetList.map((a, idx) => (
+                      <tr key={a.id || idx}>
+                        <td style={{padding:'6px 10px', border:'1px solid #cbd5e1', fontFamily:'monospace', textAlign:'center'}}>{a.id || a.asset_no}</td>
+                        <td style={{padding:'6px 10px', border:'1px solid #cbd5e1', fontWeight:600}}>{a.name}</td>
+                        <td style={{padding:'6px 10px', border:'1px solid #cbd5e1', textAlign:'center', color:'#10b981', fontWeight:700}}>✅ تم الاستلام سليم</td>
+                        <td style={{padding:'6px 10px', border:'1px solid #cbd5e1', textAlign:'center'}}>المستودع الرئيسي (A-01)</td>
+                        <td style={{padding:'6px 10px', border:'1px solid #cbd5e1', textAlign:'center'}}>{dateStr}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Official Seal and Signatures Block */}
+              <div style={{display:'grid', gridTemplateColumns:'2.5fr 1fr', gap:'20px', alignItems:'center', borderTop:'2px solid #0f172a', paddingTop:'20px'}}>
+                {/* 3 Signatures */}
+                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'15px', textAlign:'center'}}>
+                  <div>
+                    <div style={{fontSize:'0.82rem', fontWeight:800, marginBottom:'35px'}}>الموظف صاحب الإخلاء</div>
+                    <div style={{borderBottom:'1px dotted #000', width:'85%', margin:'0 auto'}}></div>
+                    <div style={{fontSize:'0.72rem', color:'#64748b', marginTop:'4px'}}>التوقيع والتاريخ</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:'0.82rem', fontWeight:800, marginBottom:'35px'}}>أمين المستودع والعهد</div>
+                    <div style={{borderBottom:'1px dotted #000', width:'85%', margin:'0 auto'}}></div>
+                    <div style={{fontSize:'0.72rem', color:'#64748b', marginTop:'4px'}}>التوقيع والاعتماد</div>
+                  </div>
+                  <div>
+                    <div style={{fontSize:'0.82rem', fontWeight:800, marginBottom:'35px'}}>المدير المالي والرقابي</div>
+                    <div style={{borderBottom:'1px dotted #000', width:'85%', margin:'0 auto'}}></div>
+                    <div style={{fontSize:'0.72rem', color:'#64748b', marginTop:'4px'}}>الختم والتصديق</div>
+                  </div>
+                </div>
+
+                {/* QR Code and Official Digital Stamp */}
+                <div style={{display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', borderRight:'1px solid #cbd5e1', paddingRight:'15px'}}>
+                  <div style={{border:'2px dashed #0d9488', borderRadius:'50%', width:'76px', height:'76px', display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', color:'#0d9488', padding:'4px', marginBottom:'6px'}}>
+                    <ShieldCheck size={20} />
+                    <div style={{fontSize:'0.55rem', fontWeight:900, lineHeight:1.1}}>معتمد رسمياً<br/>براءة ذمة</div>
+                  </div>
+                  <div style={{fontSize:'0.65rem', color:'#64748b', textAlign:'center'}}>
+                    رمز التحقق الإلكتروني (QR)
+                  </div>
+                  <QRCodeSVG value={`CLEARANCE_VERIFIED|EMP:${custodianName}|ID:${employee?.employee_id || item.employee_id || '102'}|DATE:${dateStr}`} size={48} />
                 </div>
               </div>
             </div>

@@ -26,6 +26,7 @@ import {
 } from './assetExcel';
 import BarcodePrintModal from './BarcodePrintModal';
 import MaterialIssuePrintModal from './MaterialIssuePrintModal';
+import CommandPalette from './CommandPalette';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -503,6 +504,19 @@ const App = () => {
   }, [warehouseRequests]);
 
   const [globalSearch, setGlobalSearch] = useState('');
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setShowCommandPalette(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const [showNotifications, setShowNotifications] = useState(false);
   const [journalFilter, setJournalFilter] = useState('all');
   const [selectedJournal, setSelectedJournal] = useState(null);
@@ -1109,168 +1123,366 @@ const App = () => {
     }]
   };
 
-  const renderDashboard = () => (
-    <div className="view-anim">
-      <div style={{background:'linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%)', padding:'1.5rem', borderRadius:'16px', color:'white', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'2rem', boxShadow:'0 10px 25px -5px rgba(59, 130, 246, 0.4)'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
-          <div style={{background:'rgba(255,255,255,0.2)', padding:'0.75rem', borderRadius:'50%'}}>
-            <Sparkles size={28} />
+  const renderDashboard = () => {
+    // Dynamic KPI and Health calculations
+    const activeAssetsCount = assets.filter(a => a.status === 'نشط' || !a.status).length;
+    const activeRate = assets.length ? Math.round((activeAssetsCount / assets.length) * 100) : 100;
+    
+    const lowStockItems = warehouseItems.filter(item => (Number(item.qty) || 0) <= (Number(item.minQty) || 0));
+    const pendingWarehouseReqs = warehouseRequests.filter(r => r.status === 'بانتظار الموافقة' || r.status === 'معلق');
+    const pendingJournals = journals ? journals.filter(j => j.status === 'بانتظار الاعتماد' || j.status === 'مسودة' || j.status === 'جديد') : [];
+    
+    const nowTime = new Date();
+    const in30Days = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const expiringWarranties = assets.filter(a => {
+      if (!a.warranty) return false;
+      const d = new Date(a.warranty);
+      return d >= nowTime && d <= in30Days;
+    });
+
+    const totalWarehouseUnits = warehouseItems.reduce((acc, it) => acc + (Number(it.qty) || 0), 0);
+    const assignedCustodiesCount = assets.filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص').length;
+    const totalCustodiansCount = new Set(assets.filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص').map(a => a.custody)).size;
+    
+    // Overall Health Score (0-100)
+    const assetHealthScore = Math.min(100, Math.max(72, Math.round(
+      (activeRate * 0.4) + 
+      ((totals.cost > 0 ? (totals.nbv / totals.cost) * 100 : 80) * 0.3) + 
+      (lowStockItems.length === 0 ? 30 : Math.max(10, 30 - lowStockItems.length * 4))
+    )));
+
+    const hasEarlyWarnings = lowStockItems.length > 0 || pendingWarehouseReqs.length > 0 || pendingJournals.length > 0 || expiringWarranties.length > 0;
+
+    return (
+      <div className="view-anim">
+        {/* Executive Hero Command Strip */}
+        <div style={{background:'linear-gradient(90deg, var(--accent) 0%, #8b5cf6 100%)', padding:'1.75rem', borderRadius:'20px', color:'white', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', boxShadow:'0 12px 30px -6px rgba(59, 130, 246, 0.4)', flexWrap:'wrap', gap:'1rem'}}>
+          <div style={{display:'flex', alignItems:'center', gap:'1.25rem'}}>
+            <div style={{background:'rgba(255,255,255,0.22)', padding:'0.85rem', borderRadius:'16px', display:'flex', alignItems:'center', justifyContent:'center'}}>
+              <Sparkles size={32} />
+            </div>
+            <div>
+              <div style={{fontWeight:800, fontSize:'1.35rem', marginBottom:'0.3rem', display:'flex', alignItems:'center', gap:'0.6rem'}}>
+                المركز القيادي المالي والرقابي (Executive Command Center)
+                <span style={{fontSize:'0.75rem', background:'rgba(255,255,255,0.25)', padding:'3px 10px', borderRadius:'12px', fontWeight:700}}>Traouf V5.0</span>
+              </div>
+              <div style={{fontSize:'0.92rem', opacity:0.95}}>
+                تم فحص وتحليل {accountingEngine.length} أصل رأسمالي بقيمة تتجاوز {Math.floor(totals.cost / 1000000)} مليون ريال، مع ربط حي بالمستودعات والعهد الميدانية.
+              </div>
+            </div>
           </div>
-          <div>
-            <div style={{fontWeight:700, fontSize:'1.25rem', marginBottom:'0.25rem'}}>محرك الذكاء الاصطناعي نشط (Traouf AI Engine)</div>
-            <div style={{fontSize:'0.9rem', opacity:0.9}}>تم فحص وتحليل {accountingEngine.length} أصل رأسمالي بقيمة إجمالية تتجاوز {Math.floor(totals.cost / 1000000)} مليون ريال بنجاح.</div>
+          <div style={{display:'flex', gap:'0.75rem', alignItems:'center'}}>
+            <div style={{background:'rgba(255,255,255,0.2)', padding:'0.6rem 1.1rem', borderRadius:'12px', fontSize:'0.85rem', fontWeight:700, display:'flex', alignItems:'center', gap:'0.5rem'}}>
+              <span style={{width:'10px', height:'10px', borderRadius:'50%', background:'#4ade80', display:'inline-block', boxShadow:'0 0 8px #4ade80'}}></span>
+              اتصال مباشر نشط 100%
+            </div>
           </div>
         </div>
-        <div style={{background:'rgba(255,255,255,0.2)', padding:'0.5rem 1rem', borderRadius:'8px', fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.5rem'}}>
-          <Activity size={16} /> تحديث مباشر اللحظة
-        </div>
-      </div>
 
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginBottom:'1.5rem'}}>
-        <div>
-          <h2 style={{fontSize:'1.5rem', marginBottom:'0.5rem'}}>لوحة القيادة الاستراتيجية</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.85rem'}}>مؤشرات الأداء الرئيسية، تقييم المخاطر المباشرة، والعائد على المحافظ الرأسمالية.</p>
+        {/* Executive Quick Actions Dock */}
+        <div style={{
+          background: 'var(--card-bg, #ffffff)',
+          border: '1px solid var(--border)',
+          borderRadius: '16px',
+          padding: '1rem 1.25rem',
+          marginBottom: '1.5rem',
+          boxShadow: '0 4px 15px -2px rgba(0,0,0,0.04)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '0.75rem'
+        }}>
+          <div style={{fontSize: '0.9rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+            <Zap size={18} color="var(--brand-teal)" />
+            الإجراءات السريعة الفائقة:
+          </div>
+          <div style={{display: 'flex', gap: '0.6rem', flexWrap: 'wrap', flex: 1, justifyContent: 'flex-end'}}>
+            <button 
+              className="btn btn-primary" 
+              style={{padding: '0.55rem 1rem', fontSize: '0.85rem', borderRadius: '10px'}}
+              onClick={() => { setEditingAsset(null); setView('new-asset'); }}
+            >
+              <Plus size={16} /> أصل جديد
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{border: '1px solid var(--border)', padding: '0.55rem 1rem', fontSize: '0.85rem', borderRadius: '10px'}}
+              onClick={() => { setView('warehouse'); setWarehouseActiveTab('requests'); }}
+            >
+              <PackagePlus size={16} color="#3b82f6" /> طلب صرف مستودع
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{border: '1px solid var(--border)', padding: '0.55rem 1rem', fontSize: '0.85rem', borderRadius: '10px'}}
+              onClick={() => setView('journal')}
+            >
+              <FilePlus size={16} color="#10b981" /> قيد محاسبي
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{border: '1px solid var(--border)', padding: '0.55rem 1rem', fontSize: '0.85rem', borderRadius: '10px'}}
+              onClick={() => setView('custody')}
+            >
+              <Users size={16} color="#f59e0b" /> تسليم عهدة
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{border: '1px solid var(--border)', padding: '0.55rem 1rem', fontSize: '0.85rem', borderRadius: '10px', background: 'rgba(139, 92, 246, 0.08)', color: '#8b5cf6'}}
+              onClick={() => setShowCommandPalette(true)}
+            >
+              <Search size={16} /> البحث الذكي (Ctrl+K)
+            </button>
+            <button 
+              className="btn btn-ghost" 
+              style={{border: '1px solid var(--border)', padding: '0.55rem 1rem', fontSize: '0.85rem', borderRadius: '10px'}}
+              onClick={exportCSV}
+            >
+              <Download size={16} /> تصدير السجل
+            </button>
+          </div>
         </div>
-        <div style={{display:'flex', gap:'0.5rem'}}>
-           <button className="btn btn-ghost" style={{border:'1px solid var(--border)'}} onClick={exportCSV}><Download size={16} /> تقرير الأداء</button>
-           <button className="btn btn-primary" onClick={() => setView('new-asset')}><Plus size={16} /> أصل جديد</button>
-        </div>
-      </div>
 
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
-        <div className="card" style={{position:'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#0f172a'}}></div>
-          <div className="stat-icon" style={{background: '#f1f5f9'}}><Database size={20} color="#0f172a" /></div>
-          <div className="val-sub">إجمالي المحفظة الرأسمالية</div>
-          <div className="val-big" style={{fontSize:'1.4rem'}}>{totals.cost.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400}}>ر.س</span></div>
-          <div className="val-sub" style={{color: '#10b981', fontWeight:700}}><TrendingUp size={12} /> +12.4% نمو سنوي</div>
-        </div>
-        <div className="card" style={{position:'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#0d9488'}}></div>
-          <div className="stat-icon" style={{background: '#f0fdfa'}}><ShieldCheck size={20} color="#0d9488" /></div>
-          <div className="val-sub">صافي ثروة الأصول (NBV)</div>
-          <div className="val-big" style={{fontSize:'1.4rem'}}>{totals.nbv.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400}}>ر.س</span></div>
-          <div className="val-sub">نسبة السيولة الرأسمالية: 68%</div>
-        </div>
-        <div className="card" style={{position:'relative', overflow:'hidden'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#ef4444'}}></div>
-          <div className="stat-icon" style={{background: '#fef2f2'}}><Activity size={20} color="#ef4444" /></div>
-          <div className="val-sub">مجمع الإهلاك المتراكم</div>
-          <div className="val-big" style={{fontSize:'1.4rem', color:'#ef4444'}}>{totals.dep.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400}}>ر.س</span></div>
-          <div className="val-sub" style={{color:'#ef4444', fontWeight:600}}>معدل التآكل: {((totals.dep/totals.cost)*100).toFixed(1)}%</div>
-        </div>
-        <div className="card" style={{position:'relative', overflow:'hidden', background:'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)', borderColor:'#c7d2fe'}}>
-          <div style={{position:'absolute', top:0, left:0, width:'4px', height:'100%', background:'#8b5cf6'}}></div>
-          <div className="stat-icon" style={{background: '#f3e8ff'}}><BrainCircuit size={20} color="#8b5cf6" /></div>
-          <div className="val-sub" style={{fontWeight:700, color:'#4f46e5'}}>نقاط القوة الاستراتيجية</div>
-          <div className="val-big" style={{color:'#8b5cf6'}}>92 / 100</div>
-          <div className="val-sub">تصنيف: مؤسسة رائدة مالياً</div>
-        </div>
-      </div>
+        {/* Operational Radar Early Warning Alerts */}
+        {hasEarlyWarnings && (
+          <div style={{
+            background: 'linear-gradient(90deg, #fffbeb 0%, #fef3c7 100%)',
+            border: '1px solid #fde68a',
+            borderRadius: '16px',
+            padding: '1rem 1.4rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            flexWrap: 'wrap',
+            gap: '1rem'
+          }}>
+            <div style={{display: 'flex', alignItems: 'center', gap: '0.8rem'}}>
+              <div style={{background: '#f59e0b', color: 'white', padding: '0.5rem', borderRadius: '10px'}}>
+                <AlertTriangle size={20} />
+              </div>
+              <div>
+                <div style={{fontWeight: 800, fontSize: '0.95rem', color: '#92400e'}}>تنبيهات الرادار والرقابة المبكرة:</div>
+                <div style={{fontSize: '0.82rem', color: '#b45309'}}>يتطلب النظام اتخاذ إجراءات على البنود والطلبات التالية:</div>
+              </div>
+            </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
-        <div className="card">
-           <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
-              <h3 style={{fontSize:'1.1rem'}}>تحليل القيمة مقابل الاستهلاك (أهم الأصول)</h3>
+            <div style={{display: 'flex', gap: '0.6rem', flexWrap: 'wrap'}}>
+              {lowStockItems.length > 0 && (
+                <div 
+                  style={{background: '#fee2e2', color: '#b91c1c', border: '1px solid #fecaca', padding: '0.45rem 0.9rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'}}
+                  onClick={() => setView('warehouse')}
+                >
+                  <Warehouse size={14} /> {lowStockItems.length} أصناف وصلت لنقطة إعادة الطلب
+                </div>
+              )}
+              {pendingWarehouseReqs.length > 0 && (
+                <div 
+                  style={{background: '#e0f2fe', color: '#0369a1', border: '1px solid #bae6fd', padding: '0.45rem 0.9rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'}}
+                  onClick={() => { setView('warehouse'); setWarehouseActiveTab('requests'); }}
+                >
+                  <PackageCheck size={14} /> {pendingWarehouseReqs.length} طلبات صرف بانتظار الاعتماد
+                </div>
+              )}
+              {pendingJournals.length > 0 && (
+                <div 
+                  style={{background: '#dcfce7', color: '#15803d', border: '1px solid #bbf7d0', padding: '0.45rem 0.9rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'}}
+                  onClick={() => { setView('journal'); setJournalFilter('pending'); }}
+                >
+                  <FileText size={14} /> {pendingJournals.length} قيود محاسبية تحتاج مراجعة واعتماد
+                </div>
+              )}
+              {expiringWarranties.length > 0 && (
+                <div 
+                  style={{background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', padding: '0.45rem 0.9rem', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.4rem'}}
+                  onClick={() => setView('maintenance')}
+                >
+                  <ShieldCheck size={14} /> {expiringWarranties.length} أصول ينتهي ضمانها خلال شهر
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Primary Executive KPI Cards */}
+        <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', gap:'1.25rem', marginBottom:'1.5rem'}}>
+          <div className="card" style={{position:'relative', overflow:'hidden', borderRight:'4px solid #0f172a'}}>
+            <div className="stat-icon" style={{background: '#f1f5f9'}}><Database size={20} color="#0f172a" /></div>
+            <div className="val-sub">إجمالي المحفظة الرأسمالية (GBV)</div>
+            <div className="val-big" style={{fontSize:'1.45rem'}}>{totals.cost.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400}}>ر.س</span></div>
+            <div className="val-sub" style={{color: '#10b981', fontWeight:700, display:'flex', alignItems:'center', gap:'0.3rem'}}>
+              <TrendingUp size={14} /> +12.4% نمو سنوي للمحفظة
+            </div>
+          </div>
+
+          <div className="card" style={{position:'relative', overflow:'hidden', borderRight:'4px solid #0d9488'}}>
+            <div className="stat-icon" style={{background: '#f0fdfa'}}><ShieldCheck size={20} color="#0d9488" /></div>
+            <div className="val-sub">صافي القيمة الدفترية للأصول (NBV)</div>
+            <div className="val-big" style={{fontSize:'1.45rem', color:'var(--brand-teal)'}}>{totals.nbv.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400}}>ر.س</span></div>
+            <div className="val-sub">نسبة استرداد القيمة: {totals.cost > 0 ? ((totals.nbv/totals.cost)*100).toFixed(1) : 0}%</div>
+          </div>
+
+          <div className="card" style={{position:'relative', overflow:'hidden', borderRight:'4px solid #ef4444'}}>
+            <div className="stat-icon" style={{background: '#fef2f2'}}><Activity size={20} color="#ef4444" /></div>
+            <div className="val-sub">مجمع الإهلاك المتراكم للأصول</div>
+            <div className="val-big" style={{fontSize:'1.45rem', color:'#ef4444'}}>{totals.dep.toLocaleString()} <span style={{fontSize:'0.8rem', fontWeight:400}}>ر.س</span></div>
+            <div className="val-sub" style={{color:'#ef4444', fontWeight:600}}>
+              معدل التآكل الرأسمالي: {totals.cost > 0 ? ((totals.dep/totals.cost)*100).toFixed(1) : 0}%
+            </div>
+          </div>
+
+          <div className="card" style={{position:'relative', overflow:'hidden', borderRight:'4px solid #8b5cf6', background:'linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%)'}}>
+            <div className="stat-icon" style={{background: '#f3e8ff'}}><Warehouse size={20} color="#8b5cf6" /></div>
+            <div className="val-sub" style={{fontWeight:700, color:'#4f46e5'}}>العهد والمخزون الميداني</div>
+            <div className="val-big" style={{fontSize:'1.45rem', color:'#8b5cf6'}}>
+              {assignedCustodiesCount} <span style={{fontSize:'0.85rem', fontWeight:600}}>عهدة</span>
+            </div>
+            <div className="val-sub">
+              {totalCustodiansCount} موظف مسلّم | {totalWarehouseUnits} وحدة بالمستودع
+            </div>
+          </div>
+        </div>
+
+        {/* Main Charts & Asset Health Index Grid */}
+        <div style={{display:'grid', gridTemplateColumns:'2fr 1fr', gap:'1.5rem', marginBottom:'1.5rem'}}>
+          <div className="card">
+            <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem'}}>
+              <div>
+                <h3 style={{fontSize:'1.15rem', fontWeight:800, margin:0}}>تحليل القيمة مقابل الاستهلاك الرأسمالي</h3>
+                <p style={{fontSize:'0.8rem', color:'var(--text-muted)', margin:'0.2rem 0 0'}}>تتبع تكلفة الشراء التاريخية وصافي القيمة الدفترية لأهم الأصول</p>
+              </div>
               <div style={{display:'flex', gap:'0.5rem'}}>
-                 <button className={`btn ${chartMode === 'hist' ? 'btn-primary' : 'btn-ghost'}`} style={{fontSize:'0.7rem', padding:'0.3rem 0.6rem'}} onClick={() => setChartMode('hist')}>تاريخي</button>
-                 <button className={`btn ${chartMode === 'fore' ? 'btn-primary' : 'btn-ghost'}`} style={{fontSize:'0.7rem', padding:'0.3rem 0.6rem'}} onClick={() => setChartMode('fore')}>توقعي</button>
+                <button className={`btn ${chartMode === 'hist' ? 'btn-primary' : 'btn-ghost'}`} style={{fontSize:'0.75rem', padding:'0.35rem 0.75rem'}} onClick={() => setChartMode('hist')}>تاريخي</button>
+                <button className={`btn ${chartMode === 'fore' ? 'btn-primary' : 'btn-ghost'}`} style={{fontSize:'0.75rem', padding:'0.35rem 0.75rem'}} onClick={() => setChartMode('fore')}>توقعي</button>
               </div>
-           </div>
-           <div style={{height:'350px'}}>
+            </div>
+            <div style={{height:'350px'}}>
               <Bar data={chartData} options={{ responsive: true, maintainAspectRatio: false }} />
-           </div>
+            </div>
+          </div>
+
+          {/* Asset Health & Reliability Score Gauge */}
+          <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
+            <div className="card" style={{background:'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)', color:'white', border:'none', boxShadow:'0 12px 25px -4px rgba(15, 23, 42, 0.35)'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'0.75rem', marginBottom:'1rem'}}>
+                <h3 style={{fontSize:'1rem', fontWeight:800, margin:0}}>مؤشر صحة وموثوقية الأصول</h3>
+                <span style={{fontSize:'0.72rem', background:'rgba(16, 185, 129, 0.2)', color:'#34d399', padding:'2px 8px', borderRadius:'10px', fontWeight:700}}>تصنيف A+</span>
+              </div>
+
+              {/* Circular Gauge Centerpiece */}
+              <div style={{display:'flex', alignItems:'center', justifyContent:'center', padding:'0.5rem 0 1rem'}}>
+                <div style={{position:'relative', width:'110px', height:'110px', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <svg width="110" height="110" viewBox="0 0 110 110">
+                    <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="9" />
+                    <circle 
+                      cx="55" 
+                      cy="55" 
+                      r="46" 
+                      fill="none" 
+                      stroke="#10b981" 
+                      strokeWidth="9" 
+                      strokeDasharray="289" 
+                      strokeDashoffset={289 - (289 * assetHealthScore) / 100}
+                      strokeLinecap="round" 
+                      transform="rotate(-90 55 55)" 
+                    />
+                  </svg>
+                  <div style={{position:'absolute', textAlign:'center'}}>
+                    <div style={{fontSize:'1.5rem', fontWeight:900, lineHeight:1}}>{assetHealthScore}%</div>
+                    <div style={{fontSize:'0.65rem', color:'#6ee7b7', fontWeight:700, marginTop:'2px'}}>مؤشر الجاهزية</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Sub Progress Bars */}
+              <div style={{display:'flex', flexDirection:'column', gap:'0.85rem'}}>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:'0.35rem'}}>
+                    <span>كفاءة تشغيل الأصول</span>
+                    <span style={{color:'#10b981', fontWeight:700}}>{activeRate}%</span>
+                  </div>
+                  <div style={{height:'5px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
+                    <div style={{width:`${activeRate}%`, background:'#10b981', height:'100%'}}></div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:'0.35rem'}}>
+                    <span>الامتثال لمعايير الجرد الدوري</span>
+                    <span style={{color:'#3b82f6', fontWeight:700}}>96%</span>
+                  </div>
+                  <div style={{height:'5px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
+                    <div style={{width:'96%', background:'#3b82f6', height:'100%'}}></div>
+                  </div>
+                </div>
+                <div>
+                  <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:'0.35rem'}}>
+                    <span>سلامة وتغطية المخزون</span>
+                    <span style={{color:'#f59e0b', fontWeight:700}}>{lowStockItems.length === 0 ? '100%' : '88%'}</span>
+                  </div>
+                  <div style={{height:'5px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
+                    <div style={{width: lowStockItems.length === 0 ? '100%' : '88%', background:'#f59e0b', height:'100%'}}></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="card">
+              <h3 style={{fontSize:'0.95rem', fontWeight:800, marginBottom:'0.85rem'}}>آخر التحديثات اللحظية المباشرة</h3>
+              <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
+                {[
+                  {icon: <Shuffle size={14}/>, text: 'تحويل أصل: طابعة ليزر -> المبيعات', time: 'منذ 5 د', color: '#6366f1'},
+                  {icon: <FileText size={14}/>, text: 'ترحيل قيد إهلاك: قيد دوري معتمد', time: 'منذ ساعة', color: '#10b981'},
+                  {icon: <Box size={14}/>, text: 'تسجيل أصل: لابتوب ديل XPS 15', time: 'منذ ساعتين', color: '#f59e0b'},
+                ].map((act, idx) => (
+                  <div key={idx} style={{display:'flex', gap:'0.75rem', alignItems:'center', paddingBottom:'0.6rem', borderBottom: idx < 2 ? '1px solid #f1f5f9' : 'none'}}>
+                    <div style={{background: act.color + '15', color: act.color, padding:'0.45rem', borderRadius:'8px'}}>{act.icon}</div>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:'0.8rem', fontWeight:600, color:'var(--text)'}}>{act.text}</div>
+                      <div style={{fontSize:'0.65rem', color:'var(--text-muted)'}}>{act.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div style={{display:'flex', flexDirection:'column', gap:'1.5rem'}}>
-           <div className="card" style={{background:'linear-gradient(135deg, #1e293b 0%, #334155 100%)', color:'white', border:'none', boxShadow:'0 10px 15px -3px rgba(0,0,0,0.1)'}}>
-              <h3 style={{fontSize:'1rem', marginBottom:'1.25rem', borderBottom:'1px solid rgba(255,255,255,0.1)', paddingBottom:'0.75rem'}}>النبض المؤسسي للأصول</h3>
-              <div style={{display:'flex', flexDirection:'column', gap:'1.25rem'}}>
-                 <div>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'0.5rem'}}>
-                       <span>كفاءة استخدام الأصول</span>
-                       <span style={{color:'#10b981', fontWeight:700}}>88%</span>
-                    </div>
-                    <div style={{height:'6px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
-                       <div style={{width:'88%', background:'#10b981', height:'100%'}}></div>
-                    </div>
-                 </div>
-                 <div>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'0.5rem'}}>
-                       <span>الامتثال لمعايير الجرد</span>
-                       <span style={{color:'#3b82f6', fontWeight:700}}>94%</span>
-                    </div>
-                    <div style={{height:'6px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
-                       <div style={{width:'94%', background:'#3b82f6', height:'100%'}}></div>
-                    </div>
-                 </div>
-                 <div>
-                    <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.85rem', marginBottom:'0.5rem'}}>
-                       <span>جاهزية خطة الإحلال</span>
-                       <span style={{color:'#f59e0b', fontWeight:700}}>72%</span>
-                    </div>
-                    <div style={{height:'6px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
-                       <div style={{width:'72%', background:'#f59e0b', height:'100%'}}></div>
-                    </div>
-                 </div>
-              </div>
-           </div>
-           
-           <div className="card">
-              <h3 style={{fontSize:'1rem', marginBottom:'1rem'}}>آخر التحديثات اللحظية</h3>
-              <div style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
-                 {[
-                   {icon: <Shuffle size={14}/>, text: 'تحويل أصل: طابعة ليزر -> المبيعات', time: 'منذ 5 د', color: '#6366f1'},
-                   {icon: <FileText size={14}/>, text: 'ترحيل قيد إهلاك: يونيو 2024', time: 'منذ ساعة', color: '#10b981'},
-                   {icon: <Box size={14}/>, text: 'تسجيل أصل: لابتوب ديل XPS', time: 'منذ ساعتين', color: '#f59e0b'},
-                 ].map((act, idx) => (
-                   <div key={idx} style={{display:'flex', gap:'0.75rem', alignItems:'center', paddingBottom:'0.75rem', borderBottom: idx < 2 ? '1px solid #f1f5f9' : 'none'}}>
-                      <div style={{background: act.color + '15', color: act.color, padding:'0.5rem', borderRadius:'10px'}}>{act.icon}</div>
-                      <div style={{flex:1}}>
-                         <div style={{fontSize:'0.8rem', fontWeight:600, color:'#1e293b'}}>{act.text}</div>
-                         <div style={{fontSize:'0.65rem', color:'var(--text-muted)'}}>{act.time}</div>
-                      </div>
-                   </div>
-                 ))}
-              </div>
-           </div>
-        </div>
-      </div>
-
-      <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem'}}>
-         <div className="card">
-            <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>توزيع المحفظة (فئات)</h3>
+        {/* Secondary Analytics Grid */}
+        <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem'}}>
+          <div className="card">
+            <h3 style={{fontSize:'1.1rem', fontWeight:800, marginBottom:'1.5rem'}}>توزيع المحفظة (فئات الأصول)</h3>
             <div style={{height:'250px'}}>
-               <Doughnut data={categoryData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }} />
+              <Doughnut data={categoryData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } } }} />
             </div>
-         </div>
-         <div className="card" style={{display:'flex', gap:'2rem'}}>
-            <div style={{flex:1}}>
-               <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>تقييم المخاطر (AI Radar)</h3>
-               <div style={{height:'250px'}}>
-                  <Radar data={{
-                    labels: ['العمر الافتراضي', 'تكلفة الصيانة', 'معدل الاستخدام', 'مخاطر السوق', 'القيمة الاستردادية'],
-                    datasets: [{
-                      label: 'تحليل المخاطر',
-                      data: [42, 35, 60, 20, 80],
-                      backgroundColor: 'rgba(139, 92, 246, 0.2)',
-                      borderColor: '#8b5cf6',
-                      pointBackgroundColor: '#8b5cf6'
-                    }]
-                  }} options={{ responsive: true, maintainAspectRatio: false }} />
-               </div>
+          </div>
+          <div className="card" style={{display:'flex', gap:'2rem', flexWrap:'wrap'}}>
+            <div style={{flex:1, minWidth:'280px'}}>
+              <h3 style={{fontSize:'1.1rem', fontWeight:800, marginBottom:'1.5rem'}}>تقييم المخاطر (AI Radar)</h3>
+              <div style={{height:'250px'}}>
+                <Radar data={{
+                  labels: ['العمر الافتراضي', 'تكلفة الصيانة', 'معدل الاستخدام', 'مخاطر السوق', 'القيمة الاستردادية'],
+                  datasets: [{
+                    label: 'تحليل المخاطر الرأسمالية',
+                    data: [42, 35, 60, 20, 80],
+                    backgroundColor: 'rgba(139, 92, 246, 0.2)',
+                    borderColor: '#8b5cf6',
+                    pointBackgroundColor: '#8b5cf6'
+                  }]
+                }} options={{ responsive: true, maintainAspectRatio: false }} />
+              </div>
             </div>
-            <div style={{flex:1, borderRight:'1px solid var(--border)', paddingRight:'2rem', display:'flex', flexDirection:'column', justifyContent:'center'}}>
-               <div style={{background:'#fdf2f8', color:'#9d174d', padding:'1.5rem', borderRadius:'16px', fontSize:'0.9rem', border:'1px solid #fbcfe8', position:'relative'}}>
-                  <Sparkles size={24} style={{position:'absolute', top:'-12px', right:'-12px', background:'white', borderRadius:'50%', padding:'4px', boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}} />
-                  <h4 style={{fontWeight:800, marginBottom:'0.75rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><AlertTriangle size={18} /> نصيحة Traouf AI الاستراتيجية</h4>
-                  <p style={{lineHeight:1.6}}>يلاحظ وجود تآكل متسارع في قيمة "الأصول التقنية" مقارنة بنظيراتها في السوق. نوصي بتفعيل **عقود الضمان الممتد** فوراً وإعادة تقييم العمر الإنتاجي للخوادم المركزية لتجنب خسائر رأسمالية غير متوقعة بنهاية السنة المالية.</p>
-               </div>
+            <div style={{flex:1, minWidth:'280px', borderRight:'1px solid var(--border)', paddingRight:'1.5rem', display:'flex', flexDirection:'column', justifyContent:'center'}}>
+              <div style={{background:'#fdf2f8', color:'#9d174d', padding:'1.5rem', borderRadius:'16px', fontSize:'0.9rem', border:'1px solid #fbcfe8', position:'relative'}}>
+                <Sparkles size={24} style={{position:'absolute', top:'-12px', right:'-12px', background:'white', borderRadius:'50%', padding:'4px', boxShadow:'0 2px 4px rgba(0,0,0,0.1)'}} />
+                <h4 style={{fontWeight:800, marginBottom:'0.75rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><AlertTriangle size={18} /> نصيحة Traouf AI الاستراتيجية</h4>
+                <p style={{lineHeight:1.6}}>يلاحظ وجود تآكل متسارع في قيمة "الأصول التقنية" مقارنة بنظيراتها في السوق. نوصي بتفعيل **عقود الضمان الممتد** فوراً وإعادة تقييم العمر الإنتاجي للخوادم المركزية لتجنب خسائر رأسمالية غير متوقعة بنهاية السنة المالية.</p>
+              </div>
             </div>
-         </div>
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const exportCSV = () => {
     showToast('جاري تحضير ملف Excel...');
@@ -2998,20 +3210,36 @@ const renderDepreciation = () => {
                   ))}
                 </div>
 
-                {/* Handover Receipt & Batch Action */}
+                {/* Handover Receipt & Clearance Certificate Actions */}
                 {!isUnassigned && (
-                  <button 
-                    className="btn btn-ghost" 
-                    style={{width:'100%', marginTop:'auto', border:'1px solid var(--border)', fontSize:'0.82rem', fontWeight:600, display:'flex', alignItems:'center', justifyContent:'center', gap:'0.4rem', color:'var(--brand-teal)'}}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setBarcodeModalItem(empAssets[0]);
-                      setSelectedEmployee({ name: emp, assets: empAssets, totalValue });
-                      setBarcodeModalType('receipt');
-                    }}
-                  >
-                    <FileText size={15} /> طباعة سند تسليم واستلام عهدة رسمي
-                  </button>
+                  <div style={{marginTop:'auto', display:'flex', gap:'0.5rem', paddingTop:'0.5rem', borderTop:'1px solid var(--border)'}}>
+                    <button 
+                      className="btn btn-ghost" 
+                      style={{flex:1, border:'1px solid var(--border)', fontSize:'0.78rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:'0.3rem', color:'var(--brand-teal)', padding:'0.5rem 0.3rem'}}
+                      title="طباعة سند تسليم واستلام العهد المعتمد"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBarcodeModalItem(empAssets[0]);
+                        setSelectedEmployee({ name: emp, assets: empAssets, totalValue });
+                        setBarcodeModalType('receipt');
+                      }}
+                    >
+                      <FileText size={14} /> سند تسليم عهدة
+                    </button>
+                    <button 
+                      className="btn btn-ghost" 
+                      style={{flex:1, border:'1px solid rgba(13, 148, 136, 0.3)', background:'rgba(13, 148, 136, 0.05)', fontSize:'0.78rem', fontWeight:700, display:'flex', alignItems:'center', justifyContent:'center', gap:'0.3rem', color:'#0d9488', padding:'0.5rem 0.3rem'}}
+                      title="إصدار وطباعة شهادة إخلاء طرف وبراءة ذمة رسمية"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setBarcodeModalItem(empAssets[0]);
+                        setSelectedEmployee({ name: emp, assets: empAssets, totalValue });
+                        setBarcodeModalType('clearance');
+                      }}
+                    >
+                      <ShieldCheck size={14} /> شهادة إخلاء طرف
+                    </button>
+                  </div>
                 )}
               </div>
             );
@@ -4158,10 +4386,10 @@ const renderDepreciation = () => {
         <div className="nav-group">
           <div className="nav-label">الذكاء الاصطناعي</div>
           <div className={`nav-item ${view === 'ai-insights' ? 'active' : ''}`} onClick={() => setView('ai-insights')}>
-            <div className="nav-icon-box"><Sparkles size={18} /></div>
+            <div className="nav-icon-box"><Sparkles size={18} /></div> التحليلات التنبؤية
+          </div>
           <div className={`nav-item ${view === 'ai-studio' ? 'active' : ''}`} onClick={() => setView('ai-studio')}>
             <div className="nav-icon-box"><BrainCircuit size={18} /></div> استوديو الذكاء الاصطناعي
-          </div> التحليلات التنبؤية
           </div>
         </div>
 
@@ -4188,9 +4416,37 @@ const renderDepreciation = () => {
       <main className="main-content">
         <header className="top-bar">
           <div style={{display:'flex', alignItems:'center', gap:'1rem'}}>
-            <div style={{display:'flex', background:'var(--thead-bg)', padding:'0.5rem 1rem', borderRadius:'20px', gap:'0.5rem', alignItems:'center'}}>
-              <Search size={16} color="var(--text-muted)" />
-              <input type="text" value={globalSearch} onChange={e => setGlobalSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && globalSearch.trim()) { setFilterParams({ query: globalSearch.trim(), category: 'الكل' }); setShowFilter(true); setView('register'); } }} placeholder="بحث سريع في الأصول والمستودعات... (Enter)" style={{border:'none', background:'transparent', outline:'none', fontSize:'0.85rem', width:'250px', color:'var(--text)'}} />
+            <div 
+              style={{
+                display:'flex', 
+                background:'var(--thead-bg)', 
+                padding:'0.45rem 1rem', 
+                borderRadius:'20px', 
+                gap:'0.6rem', 
+                alignItems:'center',
+                cursor:'pointer',
+                border:'1px solid var(--border)',
+                transition:'all 0.2s ease'
+              }}
+              onClick={() => setShowCommandPalette(true)}
+              title="اضغط للبحث الذكي الشامل (Ctrl + K)"
+            >
+              <Search size={16} color="var(--brand-teal)" />
+              <span style={{fontSize:'0.85rem', color:'var(--text-muted)', width:'220px'}}>
+                بحث ذكي شامل في النظام...
+              </span>
+              <kbd style={{
+                background:'var(--card-bg)', 
+                border:'1px solid var(--border)', 
+                borderRadius:'6px', 
+                padding:'2px 7px', 
+                fontSize:'0.7rem', 
+                fontWeight:700, 
+                color:'var(--brand-teal)',
+                boxShadow:'0 1px 2px rgba(0,0,0,0.05)'
+              }}>
+                Ctrl + K
+              </kbd>
             </div>
           </div>
           <div style={{display:'flex', alignItems:'center', gap:'1.5rem', position:'relative'}}>
@@ -5479,7 +5735,30 @@ const renderDepreciation = () => {
           </div>
         </div>
       )}
-  
+
+      {/* البحث الذكي الشامل الفوري (Command Palette Ctrl + K) */}
+      <CommandPalette
+        isOpen={showCommandPalette}
+        onClose={() => setShowCommandPalette(false)}
+        assets={assets}
+        warehouseItems={warehouseItems}
+        journals={journals}
+        onSelectAsset={(asset) => {
+          setSelectedAsset(asset);
+          setView('register');
+        }}
+        onSelectWarehouse={(item) => {
+          setView('warehouse');
+          setViewWarehouse(item);
+        }}
+        onSelectJournal={(j) => {
+          setView('journal');
+          setSelectedJournal(j);
+        }}
+        onSelectView={(v) => {
+          setView(v);
+        }}
+      />
     </div>
   );
 };
