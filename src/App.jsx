@@ -601,6 +601,15 @@ const App = () => {
     return () => subscription.unsubscribe();
   }, []);
 
+  const handleLogout = async () => {
+    sfx.playClick();
+    localStorage.setItem('has_logged_out', 'true');
+    try {
+      await supabase.auth.signOut();
+    } catch(e) {}
+    setSession(null);
+  };
+
   const [view, setView] = useState('dashboard');
   const [toastMessage, setToastMessage] = useState(null);
   const [selectedAsset, setSelectedAsset] = useState(null);
