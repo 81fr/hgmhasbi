@@ -10,6 +10,14 @@
     <!-- Global error handler with instant reload button -->
     <script>
       window.addEventListener('error', function(e) {
+        if (!e.message) return;
+        var msg = (e.message || '').toLowerCase();
+        if (msg.includes('resizeobserver') || msg.includes('speech') || msg.includes('canceled') || msg.includes('script error')) return;
+        var isChunkError = msg.includes('fetch') || msg.includes('dynamically imported') || msg.includes('loading chunk');
+        if (!isChunkError) {
+          console.error('App Error:', e);
+          return;
+        }
         if (document.getElementById('global-err-box')) return;
         var errDiv = document.createElement('div');
         errDiv.id = 'global-err-box';
@@ -18,7 +26,7 @@
         errDiv.style.right = '15px';
         errDiv.style.left = '15px';
         errDiv.style.padding = '18px 24px';
-        errDiv.style.backgroundColor = '#991b1b';
+        errDiv.style.backgroundColor = '#00a59b';
         errDiv.style.color = 'white';
         errDiv.style.zIndex = '999999';
         errDiv.style.borderRadius = '14px';
@@ -26,28 +34,18 @@
         errDiv.style.fontFamily = 'system-ui, sans-serif';
         errDiv.style.direction = 'rtl';
         errDiv.innerHTML = '<div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">' +
-          '<div><strong style="font-size:1.1rem;">⚠️ تم تحديث ملفات النظام:</strong><div style="font-size:0.85rem; margin-top:4px; opacity:0.9;">' + e.message + '</div></div>' +
+          '<div><strong style="font-size:1.1rem;">🔄 تم إصدار تحديث جديد للمنظومة:</strong><div style="font-size:0.85rem; margin-top:4px; opacity:0.9;">يرجى تحديث الصفحة لتحميل أحدث ملفات النظام.</div></div>' +
           '<div style="display:flex; gap:8px;">' +
-            '<button onclick="window.location.reload(true)" style="background:#fff; color:#991b1b; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">🔄 تحديث الصفحة الآن</button>' +
+            '<button onclick="window.location.reload(true)" style="background:#fff; color:#00a59b; border:none; padding:8px 16px; border-radius:8px; font-weight:bold; cursor:pointer;">🔄 تحديث الصفحة الآن</button>' +
             '<button onclick="this.parentElement.parentElement.parentElement.remove()" style="background:rgba(255,255,255,0.2); color:#fff; border:none; padding:8px 12px; border-radius:8px; cursor:pointer;">إغلاق</button>' +
           '</div></div>';
         document.body.appendChild(errDiv);
       });
       window.addEventListener('unhandledrejection', function(e) {
-        var errDiv = document.createElement('div');
-        errDiv.style.position = 'fixed';
-        errDiv.style.top = '0';
-        errDiv.style.left = '0';
-        errDiv.style.width = '100%';
-        errDiv.style.padding = '20px';
-        errDiv.style.backgroundColor = 'darkred';
-        errDiv.style.color = 'white';
-        errDiv.style.zIndex = '999999';
-        errDiv.innerHTML = '<h3>Promise Error:</h3><pre>' + e.reason + '</pre>';
-        document.body.appendChild(errDiv);
+        console.warn('Unhandled Promise Rejection:', e.reason);
       });
     </script>
-    <script type="module" crossorigin src="/hgmhasbi/assets/index-IgktwctX.js"></script>
+    <script type="module" crossorigin src="/hgmhasbi/assets/index-TznXnOSE.js"></script>
     <link rel="stylesheet" crossorigin href="/hgmhasbi/assets/index-B5p8CLmD.css">
   </head>
   <body>
