@@ -753,6 +753,13 @@ const App = () => {
     }
     return realWarehouseData.filter(w => !deletedWhIds.includes(w.id) && !deletedWhIds.includes(w.sku));
   });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('warehouseItems', JSON.stringify(warehouseItems));
+    } catch(e) {}
+  }, [warehouseItems]);
+
   const [warehouseFilter, setWarehouseFilter] = useState('الكل');
   const [viewAsset, setViewAsset] = useState(null);
   const [viewWarehouse, setViewWarehouse] = useState(null);
