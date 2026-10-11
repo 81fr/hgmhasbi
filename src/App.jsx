@@ -27,6 +27,9 @@ import {
 import BarcodePrintModal from './BarcodePrintModal';
 import MaterialIssuePrintModal from './MaterialIssuePrintModal';
 import CommandPalette from './CommandPalette';
+import AssetDigitalTwinModal from './AssetDigitalTwinModal';
+import WarehouseRackMap from './WarehouseRackMap';
+import FinancialScenarioSimulatorModal from './FinancialScenarioSimulatorModal';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -522,6 +525,17 @@ const App = () => {
   const [selectedJournal, setSelectedJournal] = useState(null);
   const [accountsList, setAccountsList] = useState([]);
   const [fiscalYear, setFiscalYear] = useState('2026');
+  const [currency, setCurrency] = useState('SAR');
+  const [showScenarioModal, setShowScenarioModal] = useState(false);
+
+  const currencyConfig = {
+    SAR: { symbol: 'ر.س', rate: 1, name: 'ريال سعودي' },
+    USD: { symbol: '$', rate: 0.267, name: 'دولار أمريكي' },
+    EUR: { symbol: '€', rate: 0.245, name: 'يورو أوروبي' },
+    AED: { symbol: 'د.إ', rate: 0.979, name: 'درهم إماراتي' },
+  };
+
+  const currentCurrency = currencyConfig[currency] || currencyConfig.SAR;
   const [erpConnected, setErpConnected] = useState(true);
   const [chartMode, setChartMode] = useState('hist');
   const [aiProvider, setAiProvider] = useState(localStorage.getItem('aiProvider') || 'groq');
@@ -3962,6 +3976,15 @@ const renderDepreciation = () => {
           >
             <Target size={18} /> منهجية RADAR والتحليلات
           </button>
+
+          <button 
+            type="button"
+            className={`btn ${warehouseActiveTab === 'map' ? 'btn-primary' : 'btn-ghost'}`} 
+            style={{padding:'0.65rem 1.25rem', fontSize:'0.9rem', fontWeight: warehouseActiveTab === 'map' ? 700 : 500, display:'flex', alignItems:'center', gap:'0.4rem', background: warehouseActiveTab === 'map' ? undefined : 'rgba(13, 148, 136, 0.08)', color: warehouseActiveTab === 'map' ? undefined : 'var(--brand-teal)'}}
+            onClick={() => setWarehouseActiveTab('map')}
+          >
+            <MapPin size={18} /> خريطة الرفوف التفاعلية (WMS 4.0)
+          </button>
         </div>
 
         {/* Global Warehouse Action Buttons */}
@@ -4321,6 +4344,15 @@ const renderDepreciation = () => {
         </div>
       )}
 
+      {/* TAB 4: VISUAL RACKS MAP (WMS 4.0) */}
+      {warehouseActiveTab === 'map' && (
+        <WarehouseRackMap
+          warehouseItems={warehouseItems}
+          onSelectRackItem={(item) => setViewWarehouse(item)}
+          onRequestIssue={(item) => setIssueModalItem(item)}
+        />
+      )}
+
     </div>
     );
   };
@@ -4464,11 +4496,54 @@ const renderDepreciation = () => {
               </div>
             )}
             <div style={{height:'30px', width:'1px', background:'var(--border)'}}></div>
-            <div style={{display:'flex', alignItems:'center', gap:'0.5rem', cursor:'pointer'}}>
-              <select value={fiscalYear} onChange={e => { setFiscalYear(e.target.value); showToast(`📅 تم التحويل إلى السنة المالية ${e.target.value}`); }} style={{border:'none', background:'transparent', fontSize:'0.85rem', fontWeight:600, color:'var(--text)', cursor:'pointer', outline:'none'}}>
+            
+            {/* Currency Switcher */}
+            <div style={{display:'flex', alignItems:'center', gap:'0.4rem', background:'var(--thead-bg)', padding:'3px 10px', borderRadius:'10px', border:'1px solid var(--border)'}} title="تغيير عملة العرض وفق معايير IAS 21">
+              <span style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>العملة:</span>
+              <select 
+                value={currency} 
+                onChange={e => {
+                  setCurrency(e.target.value);
+                  const curr = currencyConfig[e.target.value];
+                  showToast(`💱 تم التحويل إلى عملة ${curr.name} (${curr.symbol})`);
+                }}
+                style={{border:'none', background:'transparent', fontSize:'0.82rem', fontWeight:800, color:'var(--brand-teal)', cursor:'pointer', outline:'none'}}
+              >
+                <option value="SAR">🇸🇦 ر.س (SAR)</option>
+                <option value="USD">🇺🇸 $ (USD)</option>
+                <option value="EUR">🇪🇺 € (EUR)</option>
+                <option value="AED">🇦🇪 د.إ (AED)</option>
+              </select>
+            </div>
+
+            {/* Fiscal Year */}
+            <div style={{display:'flex', alignItems:'center', gap:'0.4rem', cursor:'pointer'}}>
+              <select value={fiscalYear} onChange={e => { setFiscalYear(e.target.value); showToast(`📅 تم التحويل إلى السنة المالية ${e.target.value}`); }} style={{border:'none', background:'transparent', fontSize:'0.85rem', fontWeight:700, color:'var(--text)', cursor:'pointer', outline:'none'}}>
                 {['2026', '2025', '2024', '2023'].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
+
+            {/* Scenario Simulator Button */}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                border: '1px solid rgba(79, 70, 229, 0.3)',
+                background: 'rgba(79, 70, 229, 0.08)',
+                color: '#4f46e5',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                padding: '0.35rem 0.8rem',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="مختبر محاكاة الأثر المالي والاستثماري"
+              onClick={() => setShowScenarioModal(true)}
+            >
+              <Sparkles size={14} /> محاكي السيناريوهات
+            </button>
           </div>
         </header>
 
@@ -4496,134 +4571,24 @@ const renderDepreciation = () => {
 
       
       {selectedAsset && (
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'800px', maxHeight:'90vh', overflowY:'auto', background:'var(--bg)', padding:0, border:'1px solid var(--border)', display:'flex', flexDirection:'column'}}>
-            
-            {/* Header */}
-            <div style={{padding:'1.5rem 2rem', background:'var(--card-bg)', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center', position:'sticky', top:0, zIndex:10}}>
-              <div>
-                <h2 style={{margin:0, fontSize:'1.5rem', color:'var(--text)', display:'flex', alignItems:'center', gap:'0.75rem'}}>
-                  بطاقة الأصل الثابت <span style={{fontSize:'1rem', color:'var(--text-muted)', fontWeight:400}}>({selectedAsset.id})</span>
-                </h2>
-                <div style={{fontSize:'0.85rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>الرقم التسلسلي: {selectedAsset.code || '-'} | الموديل: {selectedAsset.model || '-'}</div>
-              </div>
-              <div style={{display:'flex', gap:'0.5rem'}}>
-                <button className="btn btn-ghost" style={{color:'var(--danger)'}} title="استبعاد الأصل" onClick={() => { setDisposalModal(selectedAsset); setSelectedAsset(null); }}><Trash2 size={18} /></button>
-                <button className="btn btn-ghost" title="طباعة باركود/QR" onClick={() => setQrModalAsset(selectedAsset)}><QrCode size={18} /></button>
-                <button className="btn btn-ghost" title="تصدير PDF"><FileText size={18} /></button>
-                <button className="btn btn-ghost" onClick={() => setSelectedAsset(null)}><X size={18} /></button>
-              </div>
-            </div>
-
-            {/* Body */}
-            <div style={{padding:'2rem', display:'flex', flexDirection:'column', gap:'2rem'}}>
-              
-              {/* Group 1: التعريف */}
-              <div>
-                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>التعريف بالأصل</h3>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem'}}>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>رقم الأصل:</strong> {selectedAsset.id}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>وصف الأصل:</strong> {selectedAsset.name}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>فئة الأصل:</strong> {selectedAsset.category}</div>
-                </div>
-              </div>
-
-              {/* Group 2: الموقع والعهدة */}
-              <div>
-                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>الموقع والعهدة</h3>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem'}}>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>الموقع:</strong> {selectedAsset.location || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>الإدارة:</strong> {selectedAsset.department || '-'}</div>
-                  {selectedAsset.category !== 'أراضي' && selectedAsset.category !== 'مباني' && (
-                    <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>صاحب العهدة:</strong> {selectedAsset.custody || '-'}</div>
-                  )}
-                </div>
-              </div>
-
-              {/* Group 3: الشراء والتشغيل */}
-              <div>
-                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>الشراء والتشغيل</h3>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem'}}>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>المورد:</strong> {selectedAsset.supplier || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ الشراء:</strong> {selectedAsset.date || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ الاستلام:</strong> {selectedAsset.date || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ جاهزية الاستخدام:</strong> {selectedAsset.readyDate || selectedAsset.date || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>رقم أمر الشراء (PO):</strong> {selectedAsset.poNumber || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>رقم الفاتورة:</strong> {selectedAsset.invoiceNumber || '-'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>الضمان:</strong> {selectedAsset.warranty || 'سنتين'}</div>
-                </div>
-              </div>
-
-              {/* Group 4: البيانات المالية والإهلاك */}
-              <div>
-                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>البيانات المالية والإهلاك</h3>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1.5rem', background:'var(--card-bg)', padding:'1.5rem', borderRadius:'12px', border:'1px solid var(--border)'}}>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تكلفة الأصل:</strong> {(Number(selectedAsset.cost)||0).toLocaleString()} ر.س</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>مصدر التمويل:</strong> {selectedAsset.fundingSource || 'إيرادات ذاتية'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>طريقة الإهلاك:</strong> {selectedAsset.method === 'SL' ? 'القسط الثابت' : 'القسط المتناقص'}</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>العمر الإنتاجي:</strong> {selectedAsset.life} سنوات</div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>القيمة التخريدية:</strong> {(Number(selectedAsset.salvage)||0).toLocaleString()} ر.س</div>
-                  
-                  {/* Auto calculated */}
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>إهلاك الفترة (سنوي):</strong> {(Number(selectedAsset.annualDep)||0).toLocaleString()} ر.س</div>
-                  <div><strong style={{color:'var(--danger)', fontSize:'0.85rem', display:'block'}}>مجمع الإهلاك:</strong> {(Number(selectedAsset.accumulatedDep)||0).toLocaleString()} ر.س</div>
-                  <div><strong style={{color:'var(--success)', fontSize:'0.85rem', display:'block'}}>القيمة الدفترية (NBV):</strong> {(Number(selectedAsset.netBookValue)||0).toLocaleString()} ر.س</div>
-                </div>
-              </div>
-
-              {/* Group 5: الجرد والاستبعاد */}
-              <div>
-                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>الجرد والاستبعاد</h3>
-                <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.5rem'}}>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>حالة الأصل:</strong> <span style={{fontWeight:800}}>{selectedAsset.status}</span></div>
-                  <div><strong style={{color:'var(--text-muted)', fontSize:'0.85rem', display:'block'}}>تاريخ آخر جرد:</strong> {selectedAsset.lastInventory || '-'}</div>
-                  
-                  
-              {/* Group 6: Timeline (دورة حياة الأصل) */}
-              <div style={{gridColumn:'1/-1', marginTop:'1rem'}}>
-                <h3 style={{fontSize:'1.1rem', color:'var(--brand-teal)', borderBottom:'1px solid var(--border)', paddingBottom:'0.5rem', marginBottom:'1rem'}}>دورة حياة الأصل (Timeline)</h3>
-                <div style={{display:'flex', gap:'1rem', overflowX:'auto', paddingBottom:'1rem'}}>
-                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(59, 130, 246, 0.05)', borderLeft:'3px solid #3b82f6', borderRadius:'8px'}}>
-                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.date}</div>
-                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#1e3a8a'}}>شراء الأصل وتسجيله</div>
-                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>تم إنشاء البطاقة وإضافته لسجل الأصول</div>
-                  </div>
-                  {selectedAsset.readyDate && (
-                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(16, 185, 129, 0.05)', borderLeft:'3px solid #10b981', borderRadius:'8px'}}>
-                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.readyDate}</div>
-                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#064e3b'}}>جاهزية الأصل وبدء الإهلاك</div>
-                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>تم تفعيل الأصل محاسبياً</div>
-                  </div>
-                  )}
-                  {selectedAsset.custody && selectedAsset.custody !== 'غير محدد' && (
-                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(139, 92, 246, 0.05)', borderLeft:'3px solid #8b5cf6', borderRadius:'8px'}}>
-                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.readyDate}</div>
-                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#4c1d95'}}>تسليم عهدة للموظف</div>
-                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>المستلم: {selectedAsset.custody}</div>
-                  </div>
-                  )}
-                  {selectedAsset.status === 'مستبعد' && (
-                  <div style={{minWidth:'200px', padding:'1rem', background:'rgba(239, 68, 68, 0.05)', borderLeft:'3px solid #ef4444', borderRadius:'8px'}}>
-                    <div style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>{selectedAsset.disposalDate}</div>
-                    <div style={{fontWeight:700, fontSize:'0.9rem', color:'#7f1d1d'}}>استبعاد الأصل</div>
-                    <div style={{fontSize:'0.8rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>{selectedAsset.disposalReason}</div>
-                  </div>
-                  )}
-                </div>
-              </div>
-
-              {selectedAsset.status === 'مستبعد' && (
-                    <>
-                      <div><strong style={{color:'var(--danger)', fontSize:'0.85rem', display:'block'}}>تاريخ الاستبعاد:</strong> {selectedAsset.disposalDate || '-'}</div>
-                      <div style={{gridColumn:'1/-1'}}><strong style={{color:'var(--danger)', fontSize:'0.85rem', display:'block'}}>سبب الاستبعاد:</strong> {selectedAsset.disposalReason || '-'}</div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-            </div>
-          </div>
-        </div>
+        <AssetDigitalTwinModal
+          asset={selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+          onPrintBarcode={(asset) => {
+            setBarcodeModalItem(asset);
+            setBarcodeModalType('asset');
+          }}
+          onTransfer={(asset) => {
+            setSelectedAsset(null);
+            setView('transfers');
+          }}
+          onDisposal={(asset) => {
+            setDisposalModal(asset);
+            setSelectedAsset(null);
+          }}
+          currencySymbol={currentCurrency.symbol}
+          currencyRate={currentCurrency.rate}
+        />
       )}
 
       {showScanner && (
@@ -5758,6 +5723,13 @@ const renderDepreciation = () => {
         onSelectView={(v) => {
           setView(v);
         }}
+      />
+      {/* مختبر محاكاة الأثر المالي والاستثماري */}
+      <FinancialScenarioSimulatorModal
+        isOpen={showScenarioModal}
+        onClose={() => setShowScenarioModal(false)}
+        totals={totals}
+        currencySymbol={currentCurrency.symbol}
       />
     </div>
   );
