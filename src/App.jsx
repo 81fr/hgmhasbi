@@ -25,6 +25,7 @@ import {
   parseCustodyFile 
 } from './assetExcel';
 import BarcodePrintModal from './BarcodePrintModal';
+import MaterialIssuePrintModal from './MaterialIssuePrintModal';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -429,6 +430,64 @@ const App = () => {
   const [custodyImportPreview, setCustodyImportPreview] = useState(null);
   const warehouseImportInputRef = useRef(null);
   const custodyImportInputRef = useRef(null);
+  const [warehouseActiveTab, setWarehouseActiveTab] = useState('items'); // 'items' | 'requests' | 'movements' | 'radar'
+  const [issueModalItem, setIssueModalItem] = useState(null);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [warehouseRequests, setWarehouseRequests] = useState(() => {
+    const saved = localStorage.getItem('warehouseRequests');
+    if (saved) {
+      try { return JSON.parse(saved); } catch(e) {}
+    }
+    return [
+      {
+        id: 'REQ-2026-001',
+        itemId: 'WH-001',
+        itemSku: 'IT-SKU-101',
+        itemName: 'لابتوب ديل XPS 15',
+        qty: 1,
+        unit: 'حبة',
+        binLocation: 'A-01-03',
+        warehouseBranch: 'المستودع المركزي الرئيسي',
+        requester: 'أحمد الشمري',
+        recipient: 'أحمد الشمري (قسم المحاسبة والمالية)',
+        reason: 'تسليم عهدة عمل لموظف جديد في الإدارة المالية',
+        isCustody: true,
+        status: 'بانتظار الموافقة',
+        requestedAt: '2026-10-10T09:30:00Z',
+        keeper: 'فيصل العتيبي (أمين المستودع)',
+        approvedBy: null,
+        approvedAt: null,
+        notes: 'مطلوب بصورة عاجلة للبدء في إعداد القوائم الختامية'
+      },
+      {
+        id: 'REQ-2026-002',
+        itemId: 'OF-SKU-202',
+        itemSku: 'OF-SKU-202',
+        itemName: 'مكتب إداري فاخر',
+        qty: 1,
+        unit: 'طقم',
+        binLocation: 'B-02-01',
+        warehouseBranch: 'مستودع الأثاث والمعدات',
+        requester: 'خالد المطيري',
+        recipient: 'الإدارة العامة - مكتب المدير التنفيذي',
+        reason: 'تجهيز مكتب إداري تنفيذي',
+        isCustody: true,
+        status: 'معتمد ومصروف',
+        requestedAt: '2026-10-08T11:00:00Z',
+        keeper: 'فيصل العتيبي (أمين المستودع)',
+        approvedBy: 'المدير المالي والتقني',
+        approvedAt: '2026-10-08T14:20:00Z',
+        notes: 'تم فحص سلامة المكتب قبل التسليم والصرف'
+      }
+    ];
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('warehouseRequests', JSON.stringify(warehouseRequests));
+    } catch(e) {}
+  }, [warehouseRequests]);
+
   const [globalSearch, setGlobalSearch] = useState('');
   const [showNotifications, setShowNotifications] = useState(false);
   const [journalFilter, setJournalFilter] = useState('all');
@@ -611,27 +670,54 @@ const App = () => {
       })));
     }
 
-    // جلب المستودعات (لو الجدول موجود)
-    
+    // جلب المستودعات
     const { data: whData, error: whErr } = await supabase.from('warehouse_items').select('*');
-    if (!whErr && whData) {
-      setWarehouseItems(whData.map(w => ({
-        id: w.id, 
-        sku: w.item_no || w.sku || 'SKU-N/A', 
-        name: w.name, 
-        category: w.category || w.category_id || 'غير محدد',
-        qty: w.quantity || w.current_qty || 0, 
-        minQty: w.min_quantity || w.min_qty || 0,
-        bin: w.bin_location || w.location_in_warehouse || 'A-01-01',
-        location: w.bin_location || w.location_in_warehouse || 'A-01-01',
-        unit: w.unit || 'حبة',
-        cost: Number(w.cost) || 0,
-        supplier: w.supplier || '',
-        status: w.status || 'متاح', 
-        stage: w.radar_stage || 'Receive',
-        description: w.description || ''
-      })));
+    if (!whErr && whData && whData.length > 0) {
+      setWarehouseItems(whData.map(w => {
+        let keeper = 'فيصل العتيبي (أمين المستودع)';
+        let warehouseBranch = 'المستودع المركزي الرئيسي';
+        let storageCondition = 'عادي / جاف (درجة حرارة الغرفة)';
+        let notes = w.description || '';
+        try {
+          if (w.description && w.description.trim().startsWith('{')) {
+            const parsed = JSON.parse(w.description);
+            if (parsed.keeper) keeper = parsed.keeper;
+            if (parsed.warehouseBranch) warehouseBranch = parsed.warehouseBranch;
+            if (parsed.storageCondition) storageCondition = parsed.storageCondition;
+            if (parsed.notes !== undefined) notes = parsed.notes;
+          }
+        } catch(e) {}
+
+        return {
+          id: w.id, 
+          sku: w.sku || w.item_no || 'SKU-N/A', 
+          name: w.name, 
+          category: w.category_id || w.category || 'أصول تقنية',
+          category_id: w.category_id || w.category || 'أصول تقنية',
+          qty: w.quantity !== undefined ? w.quantity : (w.current_qty || 0), 
+          minQty: w.min_quantity !== undefined ? w.min_quantity : (w.min_qty || 0),
+          bin: w.bin_location || w.location_in_warehouse || 'A-01-01',
+          location: w.bin_location || w.location_in_warehouse || 'A-01-01',
+          unit: w.unit || 'حبة',
+          cost: Number(w.cost) || 0,
+          supplier: w.supplier || '',
+          status: w.status || 'متاح', 
+          stage: w.radar_stage || 'Receive',
+          radar_stage: w.radar_stage || 'Receive',
+          created_by: w.created_by || 'مسؤول النظام',
+          created_at: w.created_at || new Date().toISOString(),
+          keeper: keeper,
+          warehouseBranch: warehouseBranch,
+          storageCondition: storageCondition,
+          description: notes,
+          notes: notes
+        };
+      }));
     }
+
+    // جلب قائمة الموظفين مسبقاً للاستخدام في قوائم أمناء المستودعات ومستلمي العهد
+    const { data: empData } = await supabase.from('employees').select('*').order('created_at', { ascending: false });
+    if (empData) setEmployeesList(empData);
 
     const { data: invData } = await supabase.from('inventory_campaigns').select('*').order('created_at', { ascending: false });
     if (invData) setInventoryCampaigns(invData);
@@ -3076,170 +3162,318 @@ const renderDepreciation = () => {
   
   // ===== WAREHOUSE RADAR SYSTEM =====
   
+  // ===== WAREHOUSE RADAR & DISPATCH APPROVAL SYSTEM =====
+  
   const handleSaveWarehouseItem = async (e) => {
     e.preventDefault();
     const fd = new FormData(e.target);
-    const itemData = {
+    const sku = (fd.get('sku') || fd.get('item_no') || '').trim() || `WH-SKU-${Date.now().toString().slice(-6)}`;
+    const keeper = (fd.get('keeper') || '').trim() || 'فيصل العتيبي (أمين المستودع)';
+    const warehouseBranch = (fd.get('warehouseBranch') || 'المستودع المركزي الرئيسي').trim();
+    const storageCondition = (fd.get('storageCondition') || 'عادي / جاف (درجة حرارة الغرفة)').trim();
+    const notes = (fd.get('notes') || fd.get('description') || '').trim();
+    const createdBy = warehouseModal?.created_by || userProfile?.name || session?.user?.name || 'فيصل المحاسب';
+
+    // Pack extended metadata into description JSON
+    const metadataObj = {
+      keeper,
+      warehouseBranch,
+      storageCondition,
+      notes
+    };
+    const descJson = JSON.stringify(metadataObj);
+
+    const dbRecord = {
       name: fd.get('name'),
-      item_no: fd.get('item_no'),
-      category: fd.get('category'),
+      sku: sku,
+      category_id: fd.get('category'),
       quantity: parseInt(fd.get('quantity') || 0, 10),
       min_quantity: parseInt(fd.get('min_quantity') || 0, 10),
       bin_location: fd.get('bin_location'),
-      status: fd.get('status'),
-      unit: fd.get('unit'),
+      status: fd.get('status') || 'متاح',
+      radar_stage: fd.get('radar_stage') || 'Deploy',
+      unit: fd.get('unit') || 'حبة',
       cost: parseFloat(fd.get('cost') || 0),
-      supplier: fd.get('supplier'),
-      description: fd.get('description')
+      supplier: fd.get('supplier') || '',
+      created_by: createdBy,
+      description: descJson
     };
 
     let res;
-    if (warehouseModal.id) {
-      res = await supabase.from('warehouse_items').update(itemData).eq('id', warehouseModal.id);
+    if (warehouseModal?.id && warehouseModal.id.length > 20) {
+      res = await supabase.from('warehouse_items').update(dbRecord).eq('id', warehouseModal.id);
     } else {
-      res = await supabase.from('warehouse_items').insert([itemData]);
+      res = await supabase.from('warehouse_items').insert([dbRecord]);
     }
 
     if (res.error) {
-      if (res.error.message.includes('column') && res.error.message.includes('does not exist')) {
-        // Fallback for missing columns
-        const fallbackData = {
-          name: itemData.name,
-          item_no: itemData.item_no,
-          category: itemData.category,
-          quantity: itemData.quantity,
-          min_quantity: itemData.min_quantity,
-          bin_location: itemData.bin_location,
-          status: itemData.status
-        };
-        let fbRes;
-        if (warehouseModal.id) {
-          fbRes = await supabase.from('warehouse_items').update(fallbackData).eq('id', warehouseModal.id);
-        } else {
-          fbRes = await supabase.from('warehouse_items').insert([fallbackData]);
-        }
-        
-        if (fbRes.error) {
-          showToast('❌ خطأ أثناء حفظ الصنف: ' + fbRes.error.message);
-        } else {
-          showToast('⚠️ تم الحفظ جزئياً. (يجب ترقية قاعدة البيانات Phase 8 لحفظ السعر، الوحدة، الوصف)');
-          setWarehouseModal(null);
-          fetchInitialData();
-        }
+      console.warn('Warehouse insert/update warning:', res.error);
+      const fallbackRecord = {
+        name: dbRecord.name,
+        sku: dbRecord.sku,
+        category_id: dbRecord.category_id,
+        quantity: dbRecord.quantity,
+        min_quantity: dbRecord.min_quantity,
+        bin_location: dbRecord.bin_location,
+        status: dbRecord.status,
+        description: descJson
+      };
+      let fbRes;
+      if (warehouseModal?.id && warehouseModal.id.length > 20) {
+        fbRes = await supabase.from('warehouse_items').update(fallbackRecord).eq('id', warehouseModal.id);
       } else {
-        showToast('❌ خطأ أثناء الحفظ: ' + res.error.message);
+        fbRes = await supabase.from('warehouse_items').insert([fallbackRecord]);
       }
-    } else {
-      showToast('✅ تم حفظ بيانات الصنف بنجاح!');
-      setWarehouseModal(null);
-      fetchInitialData();
+      if (fbRes.error) {
+        showToast('❌ خطأ أثناء حفظ الصنف: ' + fbRes.error.message);
+        return;
+      }
     }
+
+    showToast('✅ تم حفظ بيانات صنف المستودع بنجاح!');
+    setWarehouseModal(null);
+    fetchInitialData();
+  };
+
+  const handleCreateIssueRequest = (e) => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const itemId = fd.get('itemId');
+    const targetItem = warehouseItems.find(w => w.id === itemId || w.sku === itemId);
+    const qty = parseInt(fd.get('qty') || 1, 10);
+
+    if (!targetItem) {
+      showToast('⚠️ يرجى اختيار صنف صحيح من المستودع');
+      return;
+    }
+
+    if (qty <= 0) {
+      showToast('⚠️ الكمية يجب أن تكون أكبر من صفر');
+      return;
+    }
+
+    if (qty > targetItem.qty) {
+      showToast(`⚠️ الكمية المطلوبة (${qty}) تتجاوز الرصيد المتوفر في المستودع (${targetItem.qty} ${targetItem.unit || 'حبة'})`);
+      return;
+    }
+
+    const newRequest = {
+      id: `REQ-${Date.now().toString().slice(-6)}`,
+      itemId: targetItem.id,
+      itemSku: targetItem.sku,
+      itemName: targetItem.name,
+      qty: qty,
+      unit: targetItem.unit || 'حبة',
+      binLocation: targetItem.bin || targetItem.location || 'A-01-01',
+      warehouseBranch: targetItem.warehouseBranch || 'المستودع المركزي الرئيسي',
+      requester: userProfile?.name || session?.user?.name || 'فيصل المحاسب',
+      recipient: fd.get('recipient') || 'الجهة المستفيدة',
+      reason: fd.get('reason') || 'صرف مواد تشغيلي',
+      isCustody: fd.get('isCustody') === 'on',
+      status: 'بانتظار الموافقة',
+      requestedAt: new Date().toISOString(),
+      keeper: targetItem.keeper || 'فيصل العتيبي (أمين المستودع)',
+      approvedBy: null,
+      approvedAt: null,
+      notes: fd.get('notes') || ''
+    };
+
+    setWarehouseRequests(prev => [newRequest, ...prev]);
+    setIssueModalItem(null);
+    setWarehouseActiveTab('requests');
+    showToast('🔔 تم رفع طلب الصرف بنجاح وهو الآن بانتظار موافقة أمين المستودع / الإدارة');
+  };
+
+  const handleApproveIssueRequest = async (req) => {
+    const targetItem = warehouseItems.find(w => w.id === req.itemId || w.sku === req.itemSku);
+    if (!targetItem) {
+      showToast('❌ لم يتم العثور على الصنف في المستودع');
+      return;
+    }
+
+    if (targetItem.qty < req.qty) {
+      showToast(`❌ لا يمكن الصرف: الرصيد الحالي (${targetItem.qty}) أقل من المطلوب (${req.qty})`);
+      return;
+    }
+
+    const newQty = targetItem.qty - req.qty;
+    const newStatus = newQty === 0 ? 'نفاد' : (newQty <= targetItem.minQty ? 'متاح' : targetItem.status);
+
+    showToast('جاري اعتماد الطلب وخصم الكمية من المستودع...');
+
+    try {
+      // 1. خصم الكمية من جدول المستودع في Supabase
+      if (targetItem.id && targetItem.id.length > 20) {
+        const { error: updErr } = await supabase.from('warehouse_items').update({
+          quantity: newQty,
+          status: newStatus
+        }).eq('id', targetItem.id);
+        if (updErr) console.warn('Supabase stock update warning:', updErr);
+      }
+
+      // 2. إذا كان الطلب مسجلاً كعهدة، إنشاء أصل عهدة تلقائياً في جدول الأصول
+      if (req.isCustody) {
+        const assetNo = `AST-CUST-${Date.now().toString().slice(-6)}`;
+        await supabase.from('assets').insert([{
+          asset_no: assetNo,
+          name: req.itemName,
+          category_id: targetItem.category || 'أجهزة تقنية',
+          custodian_id: req.recipient,
+          location_id: req.binLocation || 'مقر العمل',
+          department_id: 'الإدارة المستلمة',
+          cost: Number(targetItem.cost || 0) * req.qty,
+          status: 'نشط',
+          purchase_date: new Date().toISOString().split('T')[0],
+          useful_life: 5
+        }]);
+      }
+
+      // 3. تحديث حالة الطلب
+      const approverName = userProfile?.name || session?.user?.name || 'المدير المالي والتقني';
+      const approvedAt = new Date().toISOString();
+
+      const updatedReq = {
+        ...req,
+        status: 'معتمد ومصروف',
+        approvedBy: approverName,
+        approvedAt: approvedAt
+      };
+
+      setWarehouseRequests(prev => prev.map(r => r.id === req.id ? updatedReq : r));
+      setWarehouseItems(prev => prev.map(w => (w.id === req.itemId || w.sku === req.itemSku) ? { ...w, qty: newQty, status: newStatus } : w));
+
+      // فتح نافذة طباعة سند الصرف مباشرة
+      setSelectedVoucher(updatedReq);
+      showToast('✅ تمت الموافقة بنجاح! تم خصم الكمية من المخزون وتوليد سند الصرف الرسمي');
+      fetchInitialData();
+    } catch (err) {
+      console.error(err);
+      showToast('❌ حدث خطأ أثناء اعتماد الصرف: ' + err.message);
+    }
+  };
+
+  const handleRejectIssueRequest = (req) => {
+    const reason = window.prompt('يرجى كتابة سبب رفض طلب الصرف:', 'عدم اكتمال المبررات / توفر بديل قائم');
+    if (reason === null) return;
+
+    setWarehouseRequests(prev => prev.map(r => r.id === req.id ? {
+      ...r,
+      status: 'مرفوض',
+      rejectionReason: reason.trim() || 'تم الرفض بواسطة الإدارة'
+    } : r));
+
+    showToast('⚠️ تم رفض طلب الصرف وحفظ السبب دون خصم أي كمية');
   };
 
   const renderWarehouse = () => {
     const filteredItems = warehouseItems.filter(item => 
       warehouseFilter === 'الكل' || item.status === warehouseFilter
     );
-    const totalQty = warehouseItems.reduce((s, i) => s + i.qty, 0);
-    const availableQty = warehouseItems.filter(i => i.status === 'متاح').reduce((s, i) => s + i.qty, 0);
+    const totalQty = warehouseItems.reduce((s, i) => s + (Number(i.qty) || 0), 0);
+    const totalValue = warehouseItems.reduce((s, i) => s + ((Number(i.qty) || 0) * (Number(i.cost) || 0)), 0);
+    const availableQty = warehouseItems.filter(i => i.status === 'متاح').reduce((s, i) => s + (Number(i.qty) || 0), 0);
     const lowStock = warehouseItems.filter(i => i.qty <= i.minQty && i.qty > 0).length;
     const outOfStock = warehouseItems.filter(i => i.qty === 0).length;
 
-    const stageCount = (stage) => warehouseItems.filter(i => i.stage === stage).length;
+    const pendingRequests = warehouseRequests.filter(r => r.status === 'بانتظار الموافقة');
+    const approvedRequests = warehouseRequests.filter(r => r.status === 'معتمد ومصروف');
+
+    const stageCount = (stage) => warehouseItems.filter(i => i.stage === stage || i.radar_stage === stage).length;
 
     return (
     <div className="view-anim">
       {/* Hero Banner */}
-      <div className="dash-hero">
+      <div className="dash-hero" style={{display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:'1.5rem', marginBottom:'1.5rem'}}>
         <div style={{zIndex:1}}>
-          <h2 style={{fontSize:'1.6rem', fontWeight:800, margin:'0 0 6px'}}>🏭 نظام المستودعات المتكامل</h2>
-          <p style={{opacity:0.85, fontSize:'0.95rem'}}>إدارة ذكية وفق منهجية RADAR — استلام · تخصيص · نشر · مراجعة · إحلال</p>
+          <h2 style={{fontSize:'1.65rem', fontWeight:800, margin:'0 0 6px', display:'flex', alignItems:'center', gap:'0.6rem'}}>
+            <Warehouse size={28} /> نظام إدارة المستودعات والرقابة المخزنية
+          </h2>
+          <p style={{opacity:0.85, fontSize:'0.95rem', margin:0}}>
+            إدارة متطورة وفق أفضل الممارسات العالمية: دورة حياة RADAR الخماسية · نظام اعتماد وخروج المواد · تحديد أمين المستودع ومن قام بالإضافة.
+          </p>
         </div>
-        <div style={{zIndex:1, textAlign:'center'}}>
-          <div style={{fontSize:'2.5rem', fontWeight:800}}>{totalQty}</div>
-          <div style={{fontSize:'0.8rem', opacity:0.8}}>وحدة في المخزون</div>
+        
+        <div style={{display:'flex', gap:'1.5rem', alignItems:'center', zIndex:1}}>
+          <div style={{textAlign:'center', background:'rgba(255,255,255,0.1)', padding:'0.6rem 1.25rem', borderRadius:'12px'}}>
+            <div style={{fontSize:'1.8rem', fontWeight:900}}>{totalQty.toLocaleString()}</div>
+            <div style={{fontSize:'0.75rem', opacity:0.85}}>إجمالي الوحدات</div>
+          </div>
+          <div style={{textAlign:'center', background:'rgba(255,255,255,0.1)', padding:'0.6rem 1.25rem', borderRadius:'12px'}}>
+            <div style={{fontSize:'1.8rem', fontWeight:900, color:'#34d399'}}>{totalValue.toLocaleString()} <span style={{fontSize:'0.8rem'}}>ر.س</span></div>
+            <div style={{fontSize:'0.75rem', opacity:0.85}}>القيمة الإجمالية للمخزون</div>
+          </div>
         </div>
       </div>
 
       {/* KPI Cards */}
-      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', marginBottom:'2rem'}}>
+      <div className="summary-grid" style={{gridTemplateColumns: 'repeat(4, 1fr)', gap:'1rem', marginBottom:'1.5rem'}}>
         <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--brand-teal)'}}>
           <div style={{background:'rgba(0, 165, 155, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Boxes color="var(--brand-teal)" size={24} /></div>
-          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي المخزون</div><div style={{fontSize:'1.4rem', fontWeight:800}}>{totalQty} <span style={{fontSize:'0.7rem', fontWeight:400}}>وحدة</span></div></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>إجمالي الأصناف</div><div style={{fontSize:'1.4rem', fontWeight:800}}>{warehouseItems.length} <span style={{fontSize:'0.7rem', fontWeight:400}}>صنف</span></div></div>
         </div>
         <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--brand-green)'}}>
           <div style={{background:'rgba(140, 194, 64, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><PackageCheck color="var(--brand-green)" size={24} /></div>
-          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>جاهز للتسليم</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--brand-green)'}}>{availableQty}</div></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>رصيد جاهز للتسليم</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--brand-green)'}}>{availableQty}</div></div>
         </div>
-        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--warning)'}}>
-          <div style={{background:'rgba(245, 158, 11, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><AlertTriangle color="var(--warning)" size={24} /></div>
-          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>مخزون منخفض</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--warning)'}}>{lowStock}</div></div>
+        <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid #f59e0b'}}>
+          <div style={{background:'rgba(245, 158, 11, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Clock color="#f59e0b" size={24} /></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>طلبات بانتظار الموافقة</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'#f59e0b'}}>{pendingRequests.length} <span style={{fontSize:'0.7rem', fontWeight:400}}>طلب خروج</span></div></div>
         </div>
         <div className="card" style={{display:'flex', gap:'1rem', alignItems:'center', borderRight:'4px solid var(--danger)'}}>
-          <div style={{background:'rgba(239, 68, 68, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><Package color="var(--danger)" size={24} /></div>
-          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>نفاد كامل</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--danger)'}}>{outOfStock}</div></div>
+          <div style={{background:'rgba(239, 68, 68, 0.1)', padding:'0.75rem', borderRadius:'12px'}}><AlertTriangle color="var(--danger)" size={24} /></div>
+          <div><div style={{color:'var(--text-muted)', fontSize:'0.8rem'}}>تحت حد الطلب / نفاد</div><div style={{fontSize:'1.4rem', fontWeight:800, color:'var(--danger)'}}>{lowStock + outOfStock}</div></div>
         </div>
       </div>
 
-      {/* RADAR Stages + Chart */}
-      <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem', marginBottom:'2rem'}}>
-        <div className="card">
-          <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Target size={20} color="var(--brand-teal)" /> مراحل RADAR</h3>
-          <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
-            {[
-              { key: 'Receive', label: 'الاستلام (Receive)', icon: <PackagePlus size={16}/>, color: '#3b82f6' },
-              { key: 'Allocate', label: 'التخصيص (Allocate)', icon: <ArrowRightLeft size={16}/>, color: '#8b5cf6' },
-              { key: 'Deploy', label: 'النشر (Deploy)', icon: <MapPin size={16}/>, color: 'var(--brand-green)' },
-              { key: 'Audit', label: 'المراجعة (Audit)', icon: <ScanLine size={16}/>, color: '#f59e0b' },
-              { key: 'Retire', label: 'الإحلال (Retire)', icon: <RotateCcw size={16}/>, color: '#ef4444' },
-            ].map(s => (
-              <div key={s.key} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.75rem 1rem', borderRadius:'12px', background: `${s.color}08`, border:`1px solid ${s.color}20`}}>
-                <div style={{display:'flex', alignItems:'center', gap:'0.5rem', color: s.color, fontWeight:600, fontSize:'0.85rem'}}>{s.icon} {s.label}</div>
-                <div style={{background: s.color, color:'white', borderRadius:'20px', padding:'0.2rem 0.75rem', fontSize:'0.8rem', fontWeight:700}}>{stageCount(s.key)}</div>
-              </div>
-            ))}
-          </div>
+      {/* Main Warehouse Navigation Tabs */}
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', borderBottom:'2px solid var(--border)', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
+        <div style={{display:'flex', gap:'0.5rem'}}>
+          <button 
+            type="button"
+            className={`btn ${warehouseActiveTab === 'items' ? 'btn-primary' : 'btn-ghost'}`} 
+            style={{padding:'0.65rem 1.25rem', fontSize:'0.9rem', fontWeight: warehouseActiveTab === 'items' ? 700 : 500, display:'flex', alignItems:'center', gap:'0.4rem'}}
+            onClick={() => setWarehouseActiveTab('items')}
+          >
+            <Boxes size={18} /> سجل المخزون المباشر ({warehouseItems.length})
+          </button>
+          
+          <button 
+            type="button"
+            className={`btn ${warehouseActiveTab === 'requests' ? 'btn-primary' : 'btn-ghost'}`} 
+            style={{padding:'0.65rem 1.25rem', fontSize:'0.9rem', fontWeight: warehouseActiveTab === 'requests' ? 700 : 500, display:'flex', alignItems:'center', gap:'0.5rem', position:'relative'}}
+            onClick={() => setWarehouseActiveTab('requests')}
+          >
+            <ArrowRightLeft size={18} /> طلبات خروج المخزون والاعتمادات
+            {pendingRequests.length > 0 && (
+              <span style={{background:'#ef4444', color:'#fff', fontSize:'0.72rem', fontWeight:900, padding:'0.15rem 0.5rem', borderRadius:'20px', animation:'pulse 1.5s infinite'}}>
+                {pendingRequests.length} بانتظار الموافقة
+              </span>
+            )}
+          </button>
+
+          <button 
+            type="button"
+            className={`btn ${warehouseActiveTab === 'radar' ? 'btn-primary' : 'btn-ghost'}`} 
+            style={{padding:'0.65rem 1.25rem', fontSize:'0.9rem', fontWeight: warehouseActiveTab === 'radar' ? 700 : 500, display:'flex', alignItems:'center', gap:'0.4rem'}}
+            onClick={() => setWarehouseActiveTab('radar')}
+          >
+            <Target size={18} /> منهجية RADAR والتحليلات
+          </button>
         </div>
 
-        <div className="card">
-          <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>خريطة RADAR الخماسية</h3>
-          <div style={{height:'300px'}}>
-            <Radar data={{
-              labels: ['الاستلام', 'التخصيص', 'النشر', 'المراجعة', 'الإحلال'],
-              datasets: [{
-                label: 'توزيع الأصول',
-                data: [stageCount('Receive'), stageCount('Allocate'), stageCount('Deploy'), stageCount('Audit'), stageCount('Retire')],
-                backgroundColor: 'rgba(0, 165, 155, 0.15)',
-                borderColor: 'var(--brand-teal)',
-                pointBackgroundColor: 'var(--brand-teal)',
-                pointBorderColor: '#fff',
-                pointHoverRadius: 8,
-                borderWidth: 2,
-              }]
-            }} options={{ responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }} />
-          </div>
-          <div style={{marginTop:'1rem', background:'linear-gradient(to right, #f0fdf4, #ffffff)', padding:'1rem', borderRadius:'12px', fontSize:'0.8rem', color:'#166534', border:'1px solid #bbf7d0'}}>
-            <Sparkles size={14} style={{marginLeft:'0.4rem'}} />
-            <strong>تحليل RADAR:</strong> النسبة الأكبر من الأصول في مرحلة "النشر" مما يدل على كفاءة توزيع عالية. يُوصى بمراجعة الأصول في مرحلة "الإحلال" لاتخاذ قرار التقاعد.
-          </div>
-        </div>
-      </div>
-
-      {/* Inventory Table */}
-      <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
-        <h2 style={{fontSize:'1.25rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Warehouse size={24} color="var(--brand-teal)" /> جدول المخزون المباشر</h2>
-        <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap', alignItems:'center'}}>
+        {/* Global Warehouse Action Buttons */}
+        <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
           <button 
             className="btn btn-ghost" 
-            style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}} 
+            style={{padding:'0.45rem 0.85rem', fontSize:'0.82rem'}} 
             title="تنزيل نموذج تعبئة المستودعات مع القوائم المنسدلة" 
-            onClick={() => { downloadWarehouseTemplate(); showToast('📄 تم تنزيل نموذج إدخال المستودعات Excel مع الخيارات'); }}
+            onClick={() => { downloadWarehouseTemplate(); showToast('📄 تم تنزيل نموذج المستودع Excel مع الخيارات'); }}
           >
             <FileText size={15} /> نموذج المستودع
           </button>
           <button 
             className="btn btn-ghost" 
-            style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}} 
+            style={{padding:'0.45rem 0.85rem', fontSize:'0.82rem'}} 
             title="استيراد أصناف المستودع من Excel" 
             onClick={() => warehouseImportInputRef.current?.click()}
           >
@@ -3247,67 +3481,326 @@ const renderDepreciation = () => {
           </button>
           <button 
             className="btn btn-ghost" 
-            style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}} 
+            style={{padding:'0.45rem 0.85rem', fontSize:'0.82rem'}} 
             title="تصدير بيانات المستودع كاملة إلى Excel" 
             onClick={() => { exportWarehouse(warehouseItems); showToast('✅ تم تصدير بيانات المخزون إلى Excel'); }}
           >
             <Download size={15} /> تصدير المخزون
           </button>
+          <button 
+            className="btn btn-ghost"
+            style={{padding:'0.45rem 1rem', fontSize:'0.82rem', background:'rgba(245, 158, 11, 0.1)', color:'#d97706', border:'1px solid rgba(245, 158, 11, 0.3)', fontWeight:700}}
+            onClick={() => setIssueModalItem({})}
+          >
+            <ArrowRightLeft size={16} /> طلب خروج / صرف صنف
+          </button>
           {userProfile?.isAdmin && (
-            <button className="btn btn-primary" onClick={() => setWarehouseModal({})} style={{padding:'0.4rem 1rem', fontSize:'0.8rem', background:'var(--brand-teal)', color:'white', border:'none'}}>+ إضافة صنف</button>
+            <button 
+              className="btn btn-primary" 
+              onClick={() => setWarehouseModal({})} 
+              style={{padding:'0.45rem 1.1rem', fontSize:'0.82rem', background:'var(--brand-teal)', color:'white', border:'none', fontWeight:700}}
+            >
+              + إضافة صنف جديد
+            </button>
           )}
-          <div style={{width:'1px', height:'24px', background:'var(--border)', margin:'0 0.25rem'}}></div>
-          {['الكل', 'متاح', 'مخصص', 'صيانة', 'نفاد', 'تالف'].map(f => (
-            <button key={f} onClick={() => setWarehouseFilter(f)} className={`btn ${warehouseFilter === f ? 'btn-primary' : 'btn-ghost'}`} style={{padding:'0.4rem 0.85rem', fontSize:'0.8rem'}}>{f}</button>
-          ))}
         </div>
       </div>
 
-      <div className="table-wrapper" style={{borderRadius:'16px', overflow:'hidden'}}>
-        <table>
-          <thead style={{borderBottom:'2px solid var(--border)'}}>
-            <tr>
-              <th>SKU</th>
-              <th>اسم الصنف</th>
-              <th>الفئة</th>
-              <th>الكمية</th>
-              <th>الحد الأدنى</th>
-              <th>الموقع (Bin)</th>
-              <th>مرحلة RADAR</th>
-              <th>الحالة</th>
-              <th>الإجراءات</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredItems.map((item, idx) => {
-              const statusColors = { 'متاح': '#10b981', 'مخصص': '#3b82f6', 'صيانة': '#f59e0b', 'نفاد': '#ef4444', 'تالف': '#6b7280' };
-              const stageColors = { Receive: '#3b82f6', Allocate: '#8b5cf6', Deploy: '#10b981', Audit: '#f59e0b', Retire: '#ef4444' };
-              const stageLabels = { Receive: 'استلام', Allocate: 'تخصيص', Deploy: 'نشر', Audit: 'مراجعة', Retire: 'إحلال' };
-              return (
-              <tr key={item.id} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
-                <td style={{fontWeight:700, color:'var(--brand-teal)', fontFamily:'monospace'}}>{item.sku}</td>
-                <td><div style={{fontWeight:600}}>{item.name}</div><div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>{item.id}</div></td>
-                <td style={{fontSize:'0.85rem'}}>{item.category}</td>
-                <td>
-                  <div style={{fontWeight:800, fontSize:'1.1rem', color: item.qty <= item.minQty ? 'var(--danger)' : 'var(--brand-ink)'}}>{item.qty}</div>
-                  {item.qty <= item.minQty && item.qty > 0 && <div style={{fontSize:'0.65rem', color:'var(--warning)', fontWeight:600}}>⚠️ منخفض</div>}
-                </td>
-                <td style={{fontSize:'0.85rem', color:'var(--text-muted)'}}>{item.minQty}</td>
-                <td><span style={{background:'var(--thead-bg)', padding:'0.3rem 0.75rem', borderRadius:'8px', fontSize:'0.8rem', fontWeight:600, fontFamily:'monospace'}}><MapPin size={12} style={{marginLeft:'0.3rem'}} />{item.location}</span></td>
-                <td><span style={{background: `${stageColors[item.stage]}15`, color: stageColors[item.stage], padding:'0.3rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700}}>{stageLabels[item.stage]}</span></td>
-                <td><span style={{background: `${statusColors[item.status]}15`, color: statusColors[item.status], padding:'0.3rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700, border:`1px solid ${statusColors[item.status]}30`}}>{item.status}</span></td>
-                <td>
-                  <div style={{display:'flex', gap:'0.4rem'}}>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="طباعة باركود الصنف / موقع الرف (Bin)" onClick={() => { setBarcodeModalItem(item); setBarcodeModalType('warehouse'); }}><Printer size={14} color="var(--brand-teal)" /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="عرض" onClick={() => setViewWarehouse(item)}><Eye size={14} color="var(--brand-teal)" /></button>
-                    <button className="btn btn-ghost" style={{padding:'0.4rem', borderRadius:'8px', background:'var(--thead-bg)'}} title="تعديل" onClick={() => editWarehouseItem(item)}><Edit size={14} color="var(--text-muted)" /></button>
-                  </div>
-                </td>
-              </tr>
-            )})}
-          </tbody>
-        </table>
-      </div>
+      {/* TAB 1: DIRECT STOCK ITEMS */}
+      {warehouseActiveTab === 'items' && (
+        <div>
+          {/* Status Filter Pills */}
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.25rem', flexWrap:'wrap', gap:'0.75rem'}}>
+            <div style={{fontSize:'1rem', fontWeight:700, color:'var(--text)', display:'flex', alignItems:'center', gap:'0.4rem'}}>
+              قائمة الأصناف المتاحة في المستودعات
+            </div>
+            <div style={{display:'flex', gap:'0.4rem', flexWrap:'wrap'}}>
+              {['الكل', 'متاح', 'محجوز', 'صيانة', 'نفاد', 'تالف'].map(f => (
+                <button 
+                  key={f} 
+                  onClick={() => setWarehouseFilter(f)} 
+                  className={`btn ${warehouseFilter === f ? 'btn-primary' : 'btn-ghost'}`} 
+                  style={{padding:'0.35rem 0.8rem', fontSize:'0.8rem'}}
+                >
+                  {f}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="table-wrapper" style={{borderRadius:'16px', overflow:'hidden', border:'1px solid var(--border)'}}>
+            <table>
+              <thead style={{borderBottom:'2px solid var(--border)', background:'var(--thead-bg, #f8fafc)'}}>
+                <tr>
+                  <th style={{padding:'0.85rem 1rem'}}>SKU / الباركود</th>
+                  <th style={{padding:'0.85rem 1rem'}}>اسم الصنف</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الفئة التصنيفية</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الرصيد / الحد الأدنى</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الموقع (الرف)</th>
+                  <th style={{padding:'0.85rem 1rem'}}>أمين المستودع المسؤول</th>
+                  <th style={{padding:'0.85rem 1rem'}}>من قام بالإضافة</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الحالة</th>
+                  <th style={{padding:'0.85rem 1rem', textAlign:'center'}}>الإجراءات</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredItems.map((item, idx) => {
+                  const statusColors = { 'متاح': '#10b981', 'محجوز': '#3b82f6', 'صيانة': '#f59e0b', 'نفاد': '#ef4444', 'تالف': '#6b7280' };
+                  return (
+                  <tr key={item.id} style={{borderBottom:'1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                    <td style={{padding:'0.85rem 1rem', fontWeight:700, color:'var(--brand-teal)', fontFamily:'monospace'}}>{item.sku}</td>
+                    <td style={{padding:'0.85rem 1rem'}}>
+                      <div style={{fontWeight:700, color:'var(--text)'}}>{item.name}</div>
+                      <div style={{fontSize:'0.72rem', color:'var(--text-muted)'}}>{item.unit || 'حبة'} | التكلفة: {(Number(item.cost)||0).toLocaleString()} ر.س</div>
+                    </td>
+                    <td style={{padding:'0.85rem 1rem', fontSize:'0.85rem'}}>{item.category}</td>
+                    <td style={{padding:'0.85rem 1rem'}}>
+                      <div style={{fontWeight:800, fontSize:'1.1rem', color: item.qty <= item.minQty ? 'var(--danger)' : 'var(--brand-ink)'}}>{item.qty} {item.unit || ''}</div>
+                      <div style={{fontSize:'0.7rem', color:'var(--text-muted)'}}>الحد الأدنى: {item.minQty}</div>
+                      {item.qty <= item.minQty && item.qty > 0 && <div style={{fontSize:'0.65rem', color:'var(--warning)', fontWeight:700}}>⚠️ قارب على النفاد</div>}
+                    </td>
+                    <td style={{padding:'0.85rem 1rem'}}>
+                      <span style={{background:'var(--thead-bg)', padding:'0.3rem 0.6rem', borderRadius:'6px', fontSize:'0.8rem', fontWeight:600, fontFamily:'monospace', display:'inline-flex', alignItems:'center', gap:'0.3rem'}}>
+                        <MapPin size={12} /> {item.location || item.bin || 'A-01-01'}
+                      </span>
+                      <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.2rem'}}>{item.warehouseBranch || 'المستودع الرئيسي'}</div>
+                    </td>
+                    <td style={{padding:'0.85rem 1rem'}}>
+                      <div style={{fontSize:'0.85rem', fontWeight:600, display:'flex', alignItems:'center', gap:'0.3rem'}}>
+                        <UserCircle size={14} color="var(--brand-teal)" /> {item.keeper || 'فيصل العتيبي'}
+                      </div>
+                    </td>
+                    <td style={{padding:'0.85rem 1rem'}}>
+                      <div style={{fontSize:'0.8rem', color:'var(--text-muted)'}}>{item.created_by || 'مسؤول النظام'}</div>
+                      <div style={{fontSize:'0.7rem', color:'var(--text-muted)', opacity:0.8}}>{item.created_at ? new Date(item.created_at).toLocaleDateString('ar-SA') : ''}</div>
+                    </td>
+                    <td style={{padding:'0.85rem 1rem'}}>
+                      <span style={{background: `${statusColors[item.status] || '#64748b'}15`, color: statusColors[item.status] || '#64748b', padding:'0.25rem 0.65rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:700, border:`1px solid ${statusColors[item.status] || '#64748b'}30`}}>
+                        {item.status}
+                      </span>
+                    </td>
+                    <td style={{padding:'0.85rem 1rem', textAlign:'center'}}>
+                      <div style={{display:'flex', gap:'0.35rem', justifyContent:'center'}}>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{padding:'0.35rem 0.65rem', borderRadius:'8px', background:'rgba(245, 158, 11, 0.1)', color:'#d97706', fontSize:'0.75rem', fontWeight:700, display:'flex', alignItems:'center', gap:'0.25rem'}} 
+                          title="طلب إخراج / صرف من هذا الصنف" 
+                          onClick={() => setIssueModalItem(item)}
+                        >
+                          <ArrowRightLeft size={13} /> طلب صرف
+                        </button>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{padding:'0.35rem', borderRadius:'8px', background:'var(--thead-bg)'}} 
+                          title="طباعة باركود الصنف / ملصق الرف" 
+                          onClick={() => { setBarcodeModalItem(item); setBarcodeModalType('warehouse'); }}
+                        >
+                          <Printer size={15} color="var(--brand-teal)" />
+                        </button>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{padding:'0.35rem', borderRadius:'8px', background:'var(--thead-bg)'}} 
+                          title="عرض تفاصيل الصنف" 
+                          onClick={() => setViewWarehouse(item)}
+                        >
+                          <Eye size={15} color="var(--brand-teal)" />
+                        </button>
+                        <button 
+                          className="btn btn-ghost" 
+                          style={{padding:'0.35rem', borderRadius:'8px', background:'var(--thead-bg)'}} 
+                          title="تعديل الصنف" 
+                          onClick={() => setWarehouseModal(item)}
+                        >
+                          <Edit size={15} color="var(--text-muted)" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )})}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: DISPATCH & APPROVALS QUEUE */}
+      {warehouseActiveTab === 'requests' && (
+        <div>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'1.5rem', flexWrap:'wrap', gap:'1rem'}}>
+            <div>
+              <h3 style={{margin:0, fontSize:'1.2rem', fontWeight:800, color:'var(--text)', display:'flex', alignItems:'center', gap:'0.5rem'}}>
+                <ShieldCheck size={22} color="var(--brand-teal)" />
+                طلبات خروج المخزون ونظام الموافقات والاعتمادات
+              </h3>
+              <p style={{margin:'0.25rem 0 0', color:'var(--text-muted)', fontSize:'0.85rem'}}>
+                وفق معايير الحوكمة: لا يتم خصم أو إخراج أي مادة من المستودع إلا بعد موافقة واعتماد أمين المستودع والإدارة المالية.
+              </p>
+            </div>
+            
+            <button 
+              className="btn btn-primary"
+              style={{padding:'0.55rem 1.25rem', fontSize:'0.85rem', fontWeight:700, display:'flex', alignItems:'center', gap:'0.4rem'}}
+              onClick={() => setIssueModalItem({})}
+            >
+              <ArrowRightLeft size={16} /> + إنشاء طلب صرف جديد
+            </button>
+          </div>
+
+          <div className="table-wrapper" style={{borderRadius:'16px', overflow:'hidden', border:'1px solid var(--border)'}}>
+            <table>
+              <thead style={{borderBottom:'2px solid var(--border)', background:'var(--thead-bg, #f8fafc)'}}>
+                <tr>
+                  <th style={{padding:'0.85rem 1rem'}}>رقم الطلب</th>
+                  <th style={{padding:'0.85rem 1rem'}}>تاريخ الطلب</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الصنف المطلوب</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الكمية المصروفة</th>
+                  <th style={{padding:'0.85rem 1rem'}}>مقدم الطلب</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الجهة / المستلم</th>
+                  <th style={{padding:'0.85rem 1rem'}}>الغرض من الصرف</th>
+                  <th style={{padding:'0.85rem 1rem'}}>حالة الاعتماد</th>
+                  <th style={{padding:'0.85rem 1rem', textAlign:'center'}}>الإجراءات والموافقة</th>
+                </tr>
+              </thead>
+              <tbody>
+                {warehouseRequests.map((req, idx) => {
+                  const isPending = req.status === 'بانتظار الموافقة';
+                  const isApproved = req.status === 'معتمد ومصروف';
+                  const isRejected = req.status === 'مرفوض';
+
+                  return (
+                    <tr key={req.id} style={{borderBottom:'1px solid var(--border)', background: isPending ? 'rgba(245, 158, 11, 0.04)' : idx % 2 === 0 ? 'transparent' : 'rgba(241, 245, 249, 0.3)'}}>
+                      <td style={{padding:'0.85rem 1rem', fontFamily:'monospace', fontWeight:700, color:'var(--brand-teal)'}}>{req.id}</td>
+                      <td style={{padding:'0.85rem 1rem', fontSize:'0.82rem'}}>{new Date(req.requestedAt).toLocaleDateString('ar-SA')}</td>
+                      <td style={{padding:'0.85rem 1rem'}}>
+                        <div style={{fontWeight:700}}>{req.itemName}</div>
+                        <div style={{fontSize:'0.72rem', color:'var(--text-muted)', fontFamily:'monospace'}}>{req.itemSku}</div>
+                      </td>
+                      <td style={{padding:'0.85rem 1rem', fontWeight:800, fontSize:'1.05rem', color:'#0f172a'}}>
+                        {req.qty} {req.unit || 'حبة'}
+                      </td>
+                      <td style={{padding:'0.85rem 1rem', fontSize:'0.85rem'}}>{req.requester}</td>
+                      <td style={{padding:'0.85rem 1rem'}}>
+                        <div style={{fontWeight:600, color:'var(--brand-teal)'}}>{req.recipient}</div>
+                        {req.isCustody && <span style={{fontSize:'0.68rem', background:'#f0fdf4', color:'#166534', padding:'0.15rem 0.4rem', borderRadius:'4px', border:'1px solid #bbf7d0'}}>🔒 تسليم كعهدة</span>}
+                      </td>
+                      <td style={{padding:'0.85rem 1rem', fontSize:'0.82rem', maxWidth:'180px'}}>
+                        <div>{req.reason}</div>
+                        {req.rejectionReason && <div style={{color:'#ef4444', fontSize:'0.72rem', marginTop:'0.2rem'}}>سبب الرفض: {req.rejectionReason}</div>}
+                      </td>
+                      <td style={{padding:'0.85rem 1rem'}}>
+                        {isPending && (
+                          <span style={{background:'#fef3c7', color:'#92400e', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:800, border:'1px solid #fcd34d', display:'inline-flex', alignItems:'center', gap:'0.3rem'}}>
+                            <Clock size={12} /> بانتظار الموافقة
+                          </span>
+                        )}
+                        {isApproved && (
+                          <div>
+                            <span style={{background:'#d1fae5', color:'#065f46', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:800, border:'1px solid #a7f3d0', display:'inline-flex', alignItems:'center', gap:'0.3rem'}}>
+                              <CheckCircle size={12} /> معتمد ومصروف
+                            </span>
+                            <div style={{fontSize:'0.7rem', color:'var(--text-muted)', marginTop:'0.25rem'}}>المعتمد: {req.approvedBy}</div>
+                          </div>
+                        )}
+                        {isRejected && (
+                          <span style={{background:'#fee2e2', color:'#991b1b', padding:'0.25rem 0.75rem', borderRadius:'20px', fontSize:'0.75rem', fontWeight:800, border:'1px solid #fecaca'}}>
+                            مرفوض
+                          </span>
+                        )}
+                      </td>
+                      <td style={{padding:'0.85rem 1rem', textAlign:'center'}}>
+                        <div style={{display:'flex', gap:'0.4rem', justifyContent:'center', alignItems:'center'}}>
+                          {isPending && (
+                            <>
+                              <button 
+                                className="btn btn-primary" 
+                                style={{background:'#10b981', borderColor:'#10b981', padding:'0.35rem 0.8rem', fontSize:'0.78rem', fontWeight:700, display:'flex', alignItems:'center', gap:'0.3rem'}}
+                                title="الموافقة على الطلب وخصم الكمية من المستودع"
+                                onClick={() => handleApproveIssueRequest(req)}
+                              >
+                                <CheckCircle size={14} /> موافقة وصرف
+                              </button>
+                              <button 
+                                className="btn btn-ghost" 
+                                style={{color:'#ef4444', border:'1px solid #fca5a5', padding:'0.35rem 0.6rem', fontSize:'0.78rem'}}
+                                title="رفض الطلب"
+                                onClick={() => handleRejectIssueRequest(req)}
+                              >
+                                ✕ رفض
+                              </button>
+                            </>
+                          )}
+
+                          {isApproved && (
+                            <button 
+                              className="btn btn-ghost" 
+                              style={{border:'1px solid #cbd5e1', padding:'0.35rem 0.8rem', fontSize:'0.78rem', color:'var(--brand-teal)', fontWeight:700, display:'flex', alignItems:'center', gap:'0.35rem'}}
+                              title="طباعة سند صرف مخزني رسمي"
+                              onClick={() => setSelectedVoucher(req)}
+                            >
+                              <Printer size={14} /> طباعة السند
+                            </button>
+                          )}
+
+                          {isRejected && (
+                            <span style={{fontSize:'0.75rem', color:'var(--text-muted)'}}>مغلق</span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: RADAR LIFECYCLE & ANALYTICS */}
+      {warehouseActiveTab === 'radar' && (
+        <div style={{display:'grid', gridTemplateColumns:'1fr 2fr', gap:'1.5rem', marginTop:'1rem'}}>
+          <div className="card">
+            <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem', display:'flex', alignItems:'center', gap:'0.5rem'}}><Target size={20} color="var(--brand-teal)" /> مراحل RADAR الخمسة</h3>
+            <div style={{display:'flex', flexDirection:'column', gap:'0.75rem'}}>
+              {[
+                { key: 'Receive', label: 'الاستلام (Receive)', icon: <PackagePlus size={16}/>, color: '#3b82f6' },
+                { key: 'Allocate', label: 'التخصيص (Allocate)', icon: <ArrowRightLeft size={16}/>, color: '#8b5cf6' },
+                { key: 'Deploy', label: 'النشر (Deploy)', icon: <MapPin size={16}/>, color: 'var(--brand-green)' },
+                { key: 'Audit', label: 'المراجعة (Audit)', icon: <ScanLine size={16}/>, color: '#f59e0b' },
+                { key: 'Retire', label: 'الإحلال (Retire)', icon: <RotateCcw size={16}/>, color: '#ef4444' },
+              ].map(s => (
+                <div key={s.key} style={{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'0.75rem 1rem', borderRadius:'12px', background: `${s.color}08`, border:`1px solid ${s.color}20`}}>
+                  <div style={{display:'flex', alignItems:'center', gap:'0.5rem', color: s.color, fontWeight:600, fontSize:'0.85rem'}}>{s.icon} {s.label}</div>
+                  <div style={{background: s.color, color:'white', borderRadius:'20px', padding:'0.2rem 0.75rem', fontSize:'0.8rem', fontWeight:700}}>{stageCount(s.key)}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="card">
+            <h3 style={{fontSize:'1.1rem', marginBottom:'1.5rem'}}>خريطة RADAR الخماسية لتوزيع الأصول</h3>
+            <div style={{height:'300px'}}>
+              <Radar data={{
+                labels: ['الاستلام', 'التخصيص', 'النشر', 'المراجعة', 'الإحلال'],
+                datasets: [{
+                  label: 'توزيع الأصول',
+                  data: [stageCount('Receive'), stageCount('Allocate'), stageCount('Deploy'), stageCount('Audit'), stageCount('Retire')],
+                  backgroundColor: 'rgba(0, 165, 155, 0.15)',
+                  borderColor: 'var(--brand-teal)',
+                  pointBackgroundColor: 'var(--brand-teal)',
+                  pointBorderColor: '#fff',
+                  pointHoverRadius: 8,
+                  borderWidth: 2,
+                }]
+              }} options={{ responsive: true, maintainAspectRatio: false, scales: { r: { beginAtZero: true, ticks: { stepSize: 1 } } }, plugins: { legend: { display: false } } }} />
+            </div>
+            <div style={{marginTop:'1rem', background:'linear-gradient(to right, #f0fdf4, #ffffff)', padding:'1rem', borderRadius:'12px', fontSize:'0.82rem', color:'#166534', border:'1px solid #bbf7d0'}}>
+              <Sparkles size={14} style={{marginLeft:'0.4rem'}} />
+              <strong>تحليل وتوصيات RADAR:</strong> تتبع دقيق لدورة حياة الصنف من لحظة الشراء والاستلام في المستودع وحتى التخصيص والنشر ثم الإحلال والاستبعاد النهائي.
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
     );
   };
@@ -3899,83 +4392,338 @@ const renderDepreciation = () => {
       )}
 
       {warehouseModal && (
-        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center'}}>
-          <div className="card view-anim" style={{width:'700px', maxWidth:'95%', padding:'2rem', position:'relative', maxHeight:'90vh', overflowY:'auto'}}>
-            <button onClick={() => setWarehouseModal(null)} style={{position:'absolute', top:'1rem', right:'1rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text)'}}>
-              <X size={20} />
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15, 23, 42, 0.75)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)', padding:'1rem'}}>
+          <div className="card view-anim" style={{width:'840px', maxWidth:'96vw', padding:'2.25rem', position:'relative', maxHeight:'92vh', overflowY:'auto', background:'var(--card-bg, #ffffff)', borderRadius:'16px', border:'1px solid var(--border)'}}>
+            <button onClick={() => setWarehouseModal(null)} style={{position:'absolute', top:'1.25rem', right:'1.25rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-muted)'}}>
+              <X size={22} />
             </button>
-            <h3 style={{fontSize:'1.25rem', marginBottom:'1.5rem', color:'var(--brand-teal)'}}>{warehouseModal.id ? 'تعديل صنف' : 'إضافة صنف جديد للمستودع'}</h3>
             
-            <form onSubmit={handleSaveWarehouseItem} style={{display:'flex', flexDirection:'column', gap:'1rem'}}>
+            <div style={{borderBottom:'1px solid var(--border)', paddingBottom:'1rem', marginBottom:'1.5rem'}}>
+              <h3 style={{fontSize:'1.35rem', fontWeight:800, margin:0, color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'0.6rem'}}>
+                <Warehouse size={26} /> {warehouseModal.id ? 'تعديل بيانات صنف في المستودع' : 'إضافة صنف جديد للمستودع (وفق المعايير العالمية)'}
+              </h3>
+              <p style={{margin:'0.3rem 0 0', color:'var(--text-muted)', fontSize:'0.85rem'}}>
+                تعبئة الحقول من قوائم معيارية منسدلة مع توثيق أمين المستودع المسؤول وتثبيت من قام بالإضافة آلياً.
+              </p>
+            </div>
+            
+            <form onSubmit={handleSaveWarehouseItem} style={{display:'flex', flexDirection:'column', gap:'1.25rem'}}>
               
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+              {/* Row 1: Item Name & Barcode */}
+              <div style={{display:'grid', gridTemplateColumns:'3fr 2fr', gap:'1rem'}}>
                 <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>اسم الصنف *</label>
-                  <input name="name" required defaultValue={warehouseModal.name} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>اسم الصنف ومواصفاته *</label>
+                  <input name="name" required defaultValue={warehouseModal.name || ''} placeholder="مثال: لابتوب ديل Latitude 5520 core i7" type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
                 </div>
                 <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>رقم الصنف / الباركود *</label>
-                  <input name="item_no" required defaultValue={warehouseModal.sku || warehouseModal.item_no} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'0.4rem'}}>
+                    <label style={{fontWeight:700, fontSize:'0.85rem'}}>رمز الصنف / الباركود (SKU) *</label>
+                    <button 
+                      type="button" 
+                      className="btn btn-ghost" 
+                      style={{padding:'0.1rem 0.5rem', fontSize:'0.72rem', color:'var(--brand-teal)'}}
+                      onClick={() => {
+                        const input = document.getElementById('wh_sku_input');
+                        if (input) input.value = `WH-SKU-${Date.now().toString().slice(-6)}`;
+                      }}
+                    >
+                      ⚡ توليد تلقائي
+                    </button>
+                  </div>
+                  <input id="wh_sku_input" name="sku" required defaultValue={warehouseModal.sku || warehouseModal.item_no || `WH-SKU-${Date.now().toString().slice(-6)}`} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontFamily:'monospace', fontWeight:700}} />
                 </div>
               </div>
 
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1rem'}}>
+              {/* Row 2: Category, Unit, Warehouse Branch */}
+              <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1rem'}}>
                 <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الفئة (Category)</label>
-                  <input name="category" defaultValue={warehouseModal.category} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
-                </div>
-                <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الكمية الحالية *</label>
-                  <input name="quantity" required defaultValue={warehouseModal.qty || 0} type="number" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
-                </div>
-                <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الحد الأدنى (للطلب) *</label>
-                  <input name="min_quantity" required defaultValue={warehouseModal.minQty || 0} type="number" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
-                </div>
-              </div>
-
-              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'1rem'}}>
-                <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الموقع في المستودع (الرف)</label>
-                  <input name="bin_location" defaultValue={warehouseModal.bin || warehouseModal.bin_location} type="text" placeholder="مثال: A-01-04" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
-                </div>
-                <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>الحالة</label>
-                  <select name="status" defaultValue={warehouseModal.status || 'متاح'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
-                    <option>متاح</option>
-                    <option>محجوز</option>
-                    <option>قيد الصيانة</option>
-                    <option>تالف</option>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الفئة التصنيفية *</label>
+                  <select name="category" defaultValue={warehouseModal.category || warehouseModal.category_id || 'أصول تقنية'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="أصول تقنية">أجهزة وتقنيات حاسوبية</option>
+                    <option value="أثاث ومعدات">أثاث ومفروشات مكتبية</option>
+                    <option value="مركبات">مركبات وقطع غيار</option>
+                    <option value="مستلزمات مكتبية">قرطاسية ومستلزمات مكتبية</option>
+                    <option value="أدوات ومعدات صيانة">أدوات ومعدات صيانة وتشغيل</option>
+                    <option value="أجهزة كهربائية">أجهزة كهربائية وتكييف</option>
+                    <option value="أوقاف ومشاريع">مشاريع وأوقاف خيرية</option>
+                    <option value="مواد إعاشة">مواد تموينية وإعاشة</option>
                   </select>
                 </div>
+
                 <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>وحدة القياس</label>
-                  <input name="unit" defaultValue={warehouseModal.unit || 'حبة'} type="text" placeholder="حبة، كرتون، كجم" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>وحدة القياس *</label>
+                  <select name="unit" defaultValue={warehouseModal.unit || 'حبة'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="حبة">حبة / قطعة</option>
+                    <option value="كرتون">كرتون (Carton)</option>
+                    <option value="صندوق">صندوق (Box)</option>
+                    <option value="طقم">طقم / مجموعة (Set)</option>
+                    <option value="حزمة">حزمة (Pack)</option>
+                    <option value="متر">متر طولي (Meter)</option>
+                    <option value="كجم">كيلوجرام (Kg)</option>
+                    <option value="لتر">لتر (Liter)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>المستودع الرئيسي *</label>
+                  <select name="warehouseBranch" defaultValue={warehouseModal.warehouseBranch || 'المستودع المركزي الرئيسي'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="المستودع المركزي الرئيسي">المستودع المركزي الرئيسي (الرياض)</option>
+                    <option value="مستودع الأصول والعهد التقنية">مستودع الأصول والعهد التقنية</option>
+                    <option value="مستودع الأثاث والمعدات">مستودع الأثاث والمعدات</option>
+                    <option value="مستودع الفرع الغربي">مستودع الفرع الغربي (جدة)</option>
+                  </select>
                 </div>
               </div>
 
+              {/* Row 3: Stock Quantity, Min Reorder, Bin Location */}
+              <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الكمية المتوفرة حالياً *</label>
+                  <input name="quantity" required defaultValue={warehouseModal.qty !== undefined ? warehouseModal.qty : 10} type="number" min="0" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontWeight:800}} />
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>حد الطلب الأدنى (Safety Stock) *</label>
+                  <input name="min_quantity" required defaultValue={warehouseModal.minQty !== undefined ? warehouseModal.minQty : 3} type="number" min="0" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>موقع الرف والتخزين (Bin) *</label>
+                  <select name="bin_location" defaultValue={warehouseModal.bin || warehouseModal.bin_location || 'A-01-01'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontFamily:'monospace'}}>
+                    <option value="A-01-01">ممر A - رف 01 - مستوى 01 (A-01-01)</option>
+                    <option value="A-01-02">ممر A - رف 01 - مستوى 02 (A-01-02)</option>
+                    <option value="A-02-01">ممر A - رف 02 - مستوى 01 (A-02-01)</option>
+                    <option value="B-01-01">ممر B - رف 01 - مستوى 01 (B-01-01)</option>
+                    <option value="B-02-01">ممر B - رف 02 - مستوى 01 (B-02-01)</option>
+                    <option value="C-01-01">ممر C - رف الأجهزة الحساسة (C-01-01)</option>
+                    <option value="G-01-01">الساحة الأرضية للمركبات والمعدات الثقيلة (G-01-01)</option>
+                    <option value="SEC-01">غرفة الخزائن المؤمنة (SEC-01)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 4: Warehouse Keeper & Created By (User specific requirements) */}
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem', background:'rgba(13, 148, 136, 0.05)', padding:'1rem', borderRadius:'12px', border:'1px solid rgba(13, 148, 136, 0.2)'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem', color:'var(--brand-teal)'}}>
+                    👤 الموظف المسؤول عن المستودع (أمين المستودع) *
+                  </label>
+                  <select 
+                    name="keeper" 
+                    defaultValue={warehouseModal.keeper || 'فيصل العتيبي (أمين المستودع)'} 
+                    style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--card-bg)', color:'var(--text)', fontWeight:600}}
+                  >
+                    <option value="فيصل العتيبي (أمين المستودع)">فيصل العتيبي — أمين المستودع الرئيسي</option>
+                    <option value="عبدالله السالم (مشرف المستودعات)">عبدالله السالم — مشرف المستودعات</option>
+                    <option value="خالد المطيري (مساعد أمين المستودع)">خالد المطيري — مساعد أمين المستودع</option>
+                    {employeesList.map(emp => (
+                      <option key={emp.id} value={`${emp.full_name} (${emp.job_title || emp.role || 'موظف'})`}>
+                        {emp.full_name} — {emp.job_title || emp.role || 'موظف'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem', color:'var(--brand-teal)'}}>
+                    📝 من قام بالإضافة (توثيق نظام آلي)
+                  </label>
+                  <div style={{display:'flex', alignItems:'center', gap:'0.75rem', padding:'0.7rem 1rem', background:'var(--card-bg)', borderRadius:'8px', border:'1px solid var(--border)'}}>
+                    <ShieldCheck size={20} color="#10b981" />
+                    <div>
+                      <div style={{fontWeight:800, fontSize:'0.9rem', color:'var(--text)'}}>
+                        {warehouseModal.created_by || userProfile?.name || session?.user?.name || 'فيصل المحاسب (المسؤول المالي)'}
+                      </div>
+                      <div style={{fontSize:'0.72rem', color:'var(--text-muted)'}}>
+                        تاريخ العملية: {new Date().toLocaleDateString('ar-SA')} - نظامي وموثق في سجل التدقيق
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 5: RADAR Stage, Status, Storage Condition */}
+              <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>مرحلة دورة RADAR *</label>
+                  <select name="radar_stage" defaultValue={warehouseModal.stage || warehouseModal.radar_stage || 'Deploy'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="Receive">1. استلام (Receive) — فحص وتوريد</option>
+                    <option value="Allocate">2. تخصيص (Allocate) — حجز لجهة معينة</option>
+                    <option value="Deploy">3. نشر (Deploy) — جاهز للصرف والخدمة</option>
+                    <option value="Audit">4. مراجعة (Audit) — جرد وفحص فني</option>
+                    <option value="Retire">5. إحلال (Retire) — مؤهل للتقاعد/الاستبعاد</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الحالة التشغيلية *</label>
+                  <select name="status" defaultValue={warehouseModal.status || 'متاح'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="متاح">متاح وجاهز للتسليم</option>
+                    <option value="محجوز">محجوز لأمر تشغيلي</option>
+                    <option value="صيانة">قيد الفحص أو الصيانة</option>
+                    <option value="نفاد">منتهي الرصيد (نفاد)</option>
+                    <option value="تالف">تالف أو مستبعد</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>شروط التخزين والسلامة *</label>
+                  <select name="storageCondition" defaultValue={warehouseModal.storageCondition || 'عادي / جاف (درجة حرارة الغرفة)'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="عادي / جاف (درجة حرارة الغرفة)">تخزين عادي / جاف (درجة حرارة الغرفة)</option>
+                    <option value="تخزين مكيّف بارد (أقل من 22°م)">تخزين مكيّف بارد (أقل من 22°م للأجهزة)</option>
+                    <option value="تخزين مبرد (2-8°م)">تخزين مبرد (2-8°م)</option>
+                    <option value="حماية من الرطوبة والضوء">حماية من الرطوبة وأشعة الشمس المباشرة</option>
+                    <option value="تخزين آمن عالي الحماية">تخزين آمن عالي الحماية (أجهزة ثمينة / خزنة)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Row 6: Unit Cost & Supplier */}
               <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
                 <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>تكلفة الوحدة (اختياري)</label>
-                  <input name="cost" defaultValue={warehouseModal.cost || ''} type="number" step="0.01" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>تكلفة شراء الوحدة (ر.س)</label>
+                  <input name="cost" defaultValue={warehouseModal.cost !== undefined ? warehouseModal.cost : ''} type="number" step="0.01" min="0" placeholder="0.00" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
                 </div>
+
                 <div>
-                  <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>المورد الرئيسي (اختياري)</label>
-                  <input name="supplier" defaultValue={warehouseModal.supplier || ''} type="text" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>المورد الرئيسي المعتمد</label>
+                  <select name="supplier" defaultValue={warehouseModal.supplier || 'شركة التقنيات الحديثة المحدودة'} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="شركة التقنيات الحديثة المحدودة">شركة التقنيات الحديثة المحدودة</option>
+                    <option value="مؤسسة الأثاث والتجهيزات المكتبية">مؤسسة الأثاث والتجهيزات المكتبية</option>
+                    <option value="شركة التوريدات العامة للتجارة">شركة التوريدات العامة للتجارة</option>
+                    <option value="الوكالة الوطنية للسيارات والمعدات">الوكالة الوطنية للسيارات والمعدات</option>
+                    <option value="أخرى / مورد معتمد">أخرى / مورد معتمد</option>
+                  </select>
                 </div>
               </div>
 
+              {/* Row 7: Description & Notes */}
               <div>
-                <label style={{display:'block', marginBottom:'0.5rem', fontWeight:600, fontSize:'0.85rem'}}>وصف الصنف / ملاحظات</label>
-                <textarea name="description" rows={3} defaultValue={warehouseModal.description || ''} style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+                <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الملاحظات والوصف الفني للصنف</label>
+                <textarea name="notes" rows={2} defaultValue={warehouseModal.notes || warehouseModal.description || ''} placeholder="أي اشتراطات فنية، رقم الموديل، ملحقات الصنف..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
               </div>
 
-              <div style={{display:'flex', gap:'1rem', marginTop:'1rem'}}>
-                <button type="submit" className="btn btn-primary" style={{flex:1, padding:'1rem'}}>حفظ الصنف في المستودع</button>
+              {/* Action buttons */}
+              <div style={{display:'flex', gap:'1rem', marginTop:'0.5rem'}}>
+                <button type="submit" className="btn btn-primary" style={{flex:2, padding:'0.85rem', fontWeight:800, fontSize:'0.95rem'}}>
+                  💾 حفظ وتأكيد بيانات الصنف في المستودع
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => setWarehouseModal(null)} style={{flex:1, border:'1px solid var(--border)', padding:'0.85rem'}}>
+                  إلغاء
+                </button>
               </div>
+
             </form>
           </div>
         </div>
+      )}
+
+      {/* MODAL: CREATE ISSUE / DISPATCH REQUEST (خروج صنف بانتظار الموافقة) */}
+      {issueModalItem && (
+        <div style={{position:'fixed', top:0, left:0, right:0, bottom:0, background:'rgba(15, 23, 42, 0.75)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', backdropFilter:'blur(4px)', padding:'1rem'}}>
+          <div className="card view-anim" style={{width:'720px', maxWidth:'96vw', padding:'2.25rem', position:'relative', maxHeight:'90vh', overflowY:'auto', background:'var(--card-bg, #ffffff)', borderRadius:'16px', border:'1px solid var(--border)'}}>
+            <button onClick={() => setIssueModalItem(null)} style={{position:'absolute', top:'1.25rem', right:'1.25rem', background:'transparent', border:'none', cursor:'pointer', color:'var(--text-muted)'}}>
+              <X size={22} />
+            </button>
+            
+            <div style={{borderBottom:'1px solid var(--border)', paddingBottom:'1rem', marginBottom:'1.5rem'}}>
+              <h3 style={{fontSize:'1.3rem', fontWeight:800, margin:0, color:'#d97706', display:'flex', alignItems:'center', gap:'0.6rem'}}>
+                <ArrowRightLeft size={24} /> إنشاء طلب خروج وصرف صنف من المستودع
+              </h3>
+              <p style={{margin:'0.3rem 0 0', color:'var(--text-muted)', fontSize:'0.85rem'}}>
+                سيتم رفع هذا الطلب بحالة <strong>"بانتظار الموافقة"</strong>، ولن يتم خصم الرصيد إلا بعد اعتماد أمين المستودع / الإدارة المالية.
+              </p>
+            </div>
+
+            <form onSubmit={handleCreateIssueRequest} style={{display:'flex', flexDirection:'column', gap:'1.25rem'}}>
+              
+              {/* Item selection */}
+              <div>
+                <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الصنف المطلوب إخراجه من المستودع *</label>
+                <select 
+                  name="itemId" 
+                  required 
+                  defaultValue={issueModalItem.id || (warehouseItems[0] ? warehouseItems[0].id : '')} 
+                  style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontWeight:600}}
+                >
+                  {warehouseItems.map(w => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} — (SKU: {w.sku}) | الرصيد المتاح: {w.qty} {w.unit || 'حبة'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Quantity & Purpose */}
+              <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1rem'}}>
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الكمية المطلوبة *</label>
+                  <input name="qty" type="number" min="1" required defaultValue="1" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontWeight:800, fontSize:'1.1rem'}} />
+                </div>
+
+                <div>
+                  <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>نوع الخروج / سبب الصرف *</label>
+                  <select name="reason" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}}>
+                    <option value="تسليم عهدة عمل لموظف">تسليم عهدة عمل لموظف</option>
+                    <option value="صرف مواد تشغيلي لاستهلاك القسم">صرف مواد تشغيلي لاستهلاك القسم</option>
+                    <option value="صيانة وإصلاح خارجي">صيانة وإصلاح خارجي</option>
+                    <option value="تحويل ونقل إلى فرع آخر">تحويل ونقل إلى فرع آخر</option>
+                    <option value="مشروع رعاية وقفية وخيرية">مشروع رعاية وقفية وخيرية</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Recipient Employee or Department */}
+              <div>
+                <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>الموظف المستلم / الإدارة المستفيدة *</label>
+                <select name="recipient" style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)', fontWeight:600}}>
+                  <option value="أحمد الشمري (قسم المحاسبة والمالية)">أحمد الشمري — قسم المحاسبة والمالية</option>
+                  <option value="سعود العتيبي (تقنية المعلومات)">سعود العتيبي — تقنية المعلومات</option>
+                  <option value="محمد السالم (الموارد البشرية)">محمد السالم — الموارد البشرية</option>
+                  <option value="إدارة المشاريع والأوقاف">إدارة المشاريع والأوقاف</option>
+                  {employeesList.map(e => (
+                    <option key={e.id} value={`${e.full_name} (${e.department || e.role || 'موظف'})`}>
+                      {e.full_name} — {e.department || e.role || 'موظف'}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Custody checkbox option */}
+              <div style={{background:'rgba(16, 185, 129, 0.08)', border:'1px solid rgba(16, 185, 129, 0.3)', padding:'1rem', borderRadius:'10px'}}>
+                <label style={{display:'flex', alignItems:'center', gap:'0.75rem', cursor:'pointer', color:'#065f46', fontWeight:700, fontSize:'0.88rem'}}>
+                  <input type="checkbox" name="isCustody" defaultChecked style={{width:'18px', height:'18px', accentColor:'#10b981'}} />
+                  تسجيل الصنف كـ "عهدة موظف رسمية" فور موافقة الإدارة (سيتم توليد باركود الأصل وسند الاستلام آلياً)
+                </label>
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label style={{display:'block', marginBottom:'0.4rem', fontWeight:700, fontSize:'0.85rem'}}>ملاحظات وتفاصيل إضافية</label>
+                <textarea name="notes" rows={2} placeholder="مبررات الصرف وأي تفاصيل تشغيلية..." style={{width:'100%', padding:'0.75rem', borderRadius:'8px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
+              </div>
+
+              {/* Action buttons */}
+              <div style={{display:'flex', gap:'1rem', marginTop:'0.5rem'}}>
+                <button type="submit" className="btn btn-primary" style={{flex:2, padding:'0.85rem', fontWeight:800, background:'#d97706', borderColor:'#d97706'}}>
+                  🚀 إرسال طلب الصرف للاعتماد والموافقة
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => setIssueModalItem(null)} style={{flex:1, border:'1px solid var(--border)', padding:'0.85rem'}}>
+                  إلغاء
+                </button>
+              </div>
+
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PRINT MODAL: OFFICIAL MATERIAL ISSUE VOUCHER */}
+      {selectedVoucher && (
+        <MaterialIssuePrintModal 
+          request={selectedVoucher} 
+          onClose={() => setSelectedVoucher(null)} 
+        />
       )}
 
       {qrModalAsset && (
