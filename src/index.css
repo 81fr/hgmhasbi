@@ -48,22 +48,49 @@
   --glass: blur(12px) saturate(180%);
 }
 
-/* ===== DARK MODE ===== */
+/* ===== DARK MODE (Deep Midnight Cyber-Dark) ===== */
 body.dark-mode {
-  --bg: #1a1d23;
-  --bg-main: #1a1d23;
-  --bg-sidebar: linear-gradient(180deg, #22262e 0%, #1a1d23 100%);
-  --card-bg: #22262e;
-  --card-hover: #2a2e38;
-  --text: #e4e8ef;
-  --text-main: #e4e8ef;
-  --text-muted: #9aa3b4;
-  --text-secondary: #7a8494;
-  --border: #333842;
-  --brand-ink: #e4e8ef;
-  --brand-white: #1a1d23;
-  --shadow: 0 8px 24px rgba(0, 0, 0, .25);
-  --thead-bg: #272b34;
+  --bg: #0b1120;
+  --bg-main: #0b1120;
+  --bg-sidebar: linear-gradient(180deg, #0f172a 0%, #0b1120 100%);
+  --card-bg: #131d31;
+  --card-hover: #1e293b;
+  --text: #f1f5f9;
+  --text-main: #f1f5f9;
+  --text-muted: #94a3b8;
+  --text-secondary: #64748b;
+  --border: #1e293b;
+  --brand-ink: #f1f5f9;
+  --brand-white: #0f172a;
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+  --thead-bg: #172339;
+}
+
+/* ===== NEON GLASS THEME (Ultra Holographic Cyber-Glass) ===== */
+body.neon-glass {
+  --bg: #070913;
+  --bg-main: #070913;
+  --bg-sidebar: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 15, 30, 0.98) 100%);
+  --card-bg: rgba(22, 28, 45, 0.75);
+  --card-hover: rgba(30, 41, 69, 0.9);
+  --text: #ffffff;
+  --text-main: #ffffff;
+  --text-muted: #a5b4fc;
+  --text-secondary: #818cf8;
+  --border: rgba(139, 92, 246, 0.35);
+  --brand-teal: #06b6d4;
+  --brand-green: #10b981;
+  --brand-ink: #ffffff;
+  --brand-white: #070913;
+  --shadow: 0 12px 40px rgba(6, 182, 212, 0.15), 0 0 20px rgba(139, 92, 246, 0.2);
+  --thead-bg: rgba(30, 27, 75, 0.6);
+}
+
+body.neon-glass .card,
+body.neon-glass .sidebar,
+body.neon-glass header {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
 }
 
 * {

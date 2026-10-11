@@ -30,6 +30,11 @@ import CommandPalette from './CommandPalette';
 import AssetDigitalTwinModal from './AssetDigitalTwinModal';
 import WarehouseRackMap from './WarehouseRackMap';
 import FinancialScenarioSimulatorModal from './FinancialScenarioSimulatorModal';
+import LiveBarcodeScannerModal from './LiveBarcodeScannerModal';
+import ExecutiveVoiceBriefing from './ExecutiveVoiceBriefing';
+import DoubleEntryLedgerFlow from './DoubleEntryLedgerFlow';
+import CustodyOrgTreeModal from './CustodyOrgTreeModal';
+import { sfx } from './audioEffects';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -83,6 +88,25 @@ const Login = ({ onLogin }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
+  const [showManualForm, setShowManualForm] = useState(false);
+
+  const handleVipLogin = (roleName = 'مسؤول نظام (Admin)', email = 'faisal@manafez.sa', name = 'فيصل المحاسب') => {
+    sfx.playSuccess();
+    try {
+      localStorage.removeItem('has_logged_out');
+    } catch(e) {}
+    onLogin({
+      user: {
+        id: 'vip-' + Date.now(),
+        email: email,
+        role: roleName,
+        user_metadata: {
+          full_name: name,
+          role: roleName
+        }
+      }
+    });
+  };
 
   const handleAuth = async (e) => {
     e.preventDefault();
@@ -103,6 +127,10 @@ const Login = ({ onLogin }) => {
       if (error) {
         setError('فشل تسجيل الدخول: البريد الإلكتروني أو كلمة المرور غير صحيحة.');
       } else {
+        try {
+          localStorage.removeItem('has_logged_out');
+        } catch(e) {}
+        sfx.playSuccess();
         onLogin(data.session);
       }
     }
@@ -110,39 +138,206 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div style={{display:'flex', justifyContent:'center', alignItems:'center', height:'100vh', background:'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', fontFamily:'"Tajawal", sans-serif', direction:'rtl'}}>
-      <form onSubmit={handleAuth} style={{background:'var(--card-bg)', padding:'2.5rem', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.5)', width:'400px', display:'flex', flexDirection:'column', gap:'1.25rem', border:'1px solid var(--border)'}}>
-        <div style={{textAlign:'center', marginBottom:'1rem'}}>
-          <div style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', width:'60px', height:'60px', borderRadius:'16px', display:'flex', justifyContent:'center', alignItems:'center', margin:'0 auto 1rem', boxShadow:'0 10px 15px -3px rgba(16,185,129,0.3)'}}>
-             <Database size={32} color="white" />
+    <div style={{
+      display:'flex', 
+      justifyContent:'center', 
+      alignItems:'center', 
+      minHeight:'100vh', 
+      background:'radial-gradient(circle at 50% 20%, #1e293b 0%, #070a14 100%)', 
+      fontFamily:'"Tajawal", sans-serif', 
+      direction:'rtl',
+      padding:'1.5rem',
+      position:'relative',
+      overflow:'hidden'
+    }}>
+      {/* Dynamic ambient background glow */}
+      <div style={{position:'absolute', top:'10%', left:'20%', width:'350px', height:'350px', background:'radial-gradient(circle, rgba(0, 165, 155, 0.25) 0%, transparent 70%)', pointerEvents:'none'}} />
+      <div style={{position:'absolute', bottom:'10%', right:'20%', width:'400px', height:'400px', background:'radial-gradient(circle, rgba(140, 194, 64, 0.2) 0%, transparent 70%)', pointerEvents:'none'}} />
+
+      <div style={{
+        background:'rgba(19, 29, 49, 0.85)', 
+        backdropFilter:'blur(20px)',
+        padding:'2.75rem', 
+        borderRadius:'28px', 
+        boxShadow:'0 30px 60px -15px rgba(0,0,0,0.8), 0 0 35px rgba(0, 165, 155, 0.25)', 
+        width:'480px', 
+        maxWidth:'95vw',
+        display:'flex', 
+        flexDirection:'column', 
+        gap:'1.25rem', 
+        border:'1px solid rgba(0, 165, 155, 0.35)',
+        position:'relative',
+        zIndex:1
+      }}>
+        {/* Brand Header */}
+        <div style={{textAlign:'center', marginBottom:'0.5rem'}}>
+          <div style={{
+            background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', 
+            width:'68px', 
+            height:'68px', 
+            borderRadius:'20px', 
+            display:'flex', 
+            justifyContent:'center', 
+            alignItems:'center', 
+            margin:'0 auto 1.25rem', 
+            boxShadow:'0 10px 25px rgba(0, 165, 155, 0.45)'
+          }}>
+             <Database size={36} color="white" />
           </div>
-          <h2 style={{color:'var(--text)', fontSize:'1.5rem'}}>نظام إدارة الأصول V3.0</h2>
-          <p style={{color:'var(--text-muted)', fontSize:'0.9rem', marginTop:'0.5rem'}}>
-            {isSignUp ? 'إنشاء حساب جديد للمدير' : 'الرجاء تسجيل الدخول للمتابعة'}
+          <div style={{
+            display:'inline-block',
+            background:'rgba(0, 165, 155, 0.15)',
+            color:'#2dd4bf',
+            padding:'3px 12px',
+            borderRadius:'20px',
+            fontSize:'0.72rem',
+            fontWeight:800,
+            border:'1px solid rgba(45, 212, 191, 0.3)',
+            marginBottom:'0.5rem'
+          }}>
+            ⚡ MANAFEZ ENTERPRISE V5.0 VIP
+          </div>
+          <h2 style={{color:'#ffffff', fontSize:'1.7rem', fontWeight:800, margin:0}}>
+            بوابة إدارة الأصول والمستودعات
+          </h2>
+          <p style={{color:'#94a3b8', fontSize:'0.88rem', marginTop:'0.4rem'}}>
+            منظومة المحاسبة والأصول الذكية الشاملة وفق معايير المحاسبة الدولية
           </p>
         </div>
-        
-        {error && <div style={{color:'#ef4444', background:'#fef2f2', padding:'0.75rem', borderRadius:'8px', fontSize:'0.85rem', textAlign:'center', border:'1px solid #fecaca'}}>{error}</div>}
-        {message && <div style={{color:'#10b981', background:'#ecfdf5', padding:'0.75rem', borderRadius:'8px', fontSize:'0.85rem', textAlign:'center', border:'1px solid #a7f3d0'}}>{message}</div>}
-        
-        <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
-           <label style={{fontSize:'0.85rem', color:'var(--text-secondary)', fontWeight:600}}>البريد الإلكتروني</label>
-           <input type="email" placeholder="أدخل بريدك الإلكتروني" value={email} onChange={e=>setEmail(e.target.value)} required style={{padding:'0.9rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
-        </div>
-        <div style={{display:'flex', flexDirection:'column', gap:'0.5rem'}}>
-           <label style={{fontSize:'0.85rem', color:'var(--text-secondary)', fontWeight:600}}>كلمة المرور</label>
-           <input type="password" placeholder="أدخل كلمة المرور" value={password} onChange={e=>setPassword(e.target.value)} required style={{padding:'0.9rem', borderRadius:'12px', border:'1px solid var(--border)', background:'var(--bg)', color:'var(--text)'}} />
-        </div>
-        <button type="submit" disabled={loading} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', padding:'1rem', borderRadius:'12px', border:'none', cursor: loading ? 'not-allowed' : 'pointer', fontWeight:800, fontSize:'1rem', marginTop:'1rem', boxShadow:'0 4px 6px -1px rgba(16,185,129,0.2)'}}>
-          {loading ? 'جاري التحقق...' : (isSignUp ? 'إنشاء الحساب' : 'تسجيل الدخول')}
-        </button>
 
-        <div style={{textAlign:'center', marginTop:'0.5rem'}}>
-           <button type="button" onClick={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }} style={{background:'none', border:'none', color:'var(--brand-teal)', fontSize:'0.85rem', fontWeight:600, cursor:'pointer', textDecoration:'underline'}}>
-             {isSignUp ? 'لديك حساب بالفعل؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد'}
-           </button>
+        {/* ONE-CLICK VIP INSTANT ACCESS BUTTON */}
+        <div style={{
+          background:'linear-gradient(135deg, rgba(0, 165, 155, 0.2) 0%, rgba(140, 194, 64, 0.15) 100%)',
+          borderRadius:'18px',
+          border:'1px solid rgba(0, 165, 155, 0.4)',
+          padding:'1.25rem',
+          textAlign:'center'
+        }}>
+          <button 
+            type="button" 
+            onClick={() => handleVipLogin('مسؤول نظام (Admin)', 'faisal@manafez.sa', 'فيصل المحاسب (المدير التقني والمالي)')}
+            style={{
+              width:'100%',
+              background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))',
+              color:'white',
+              padding:'1.1rem',
+              borderRadius:'14px',
+              border:'none',
+              cursor:'pointer',
+              fontWeight:800,
+              fontSize:'1.1rem',
+              display:'flex',
+              alignItems:'center',
+              justifyContent:'center',
+              gap:'0.6rem',
+              boxShadow:'0 8px 25px rgba(0, 165, 155, 0.45)',
+              transition:'transform 0.2s'
+            }}
+            onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.02)'}
+            onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+          >
+            <Sparkles size={22} /> 🚀 دخول فوري كمدير تنفيذي (VIP Demo)
+          </button>
+          <div style={{fontSize:'0.76rem', color:'#94a3b8', marginTop:'0.6rem'}}>
+            الدخول المباشر بنقرة واحدة بكامل الصلاحيات والأصول التجريبية والذكاء الاصطناعي
+          </div>
         </div>
-      </form>
+
+        {/* Quick Role Personas Selector */}
+        <div>
+          <div style={{fontSize:'0.78rem', color:'#94a3b8', fontWeight:700, marginBottom:'0.5rem', textAlign:'center'}}>
+            أو اختر دوراً وظيفياً لتجربة النظام:
+          </div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'0.6rem'}}>
+            <button
+              type="button"
+              onClick={() => handleVipLogin('أمين مستودع', 'warehouse@manafez.sa', 'فيصل العتيبي (أمين المستودع المركزي)')}
+              style={{
+                background:'rgba(255, 255, 255, 0.05)',
+                border:'1px solid rgba(255, 255, 255, 0.12)',
+                color:'#f1f5f9',
+                padding:'0.65rem 0.75rem',
+                borderRadius:'10px',
+                fontSize:'0.78rem',
+                fontWeight:700,
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                gap:'0.4rem',
+                justifyContent:'center'
+              }}
+            >
+              <Warehouse size={15} color="var(--brand-green)" />
+              أمين المستودع
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleVipLogin('مدقق مالي', 'auditor@manafez.sa', 'سلطان الخالدي (المدقق الخارجي IFRS)')}
+              style={{
+                background:'rgba(255, 255, 255, 0.05)',
+                border:'1px solid rgba(255, 255, 255, 0.12)',
+                color:'#f1f5f9',
+                padding:'0.65rem 0.75rem',
+                borderRadius:'10px',
+                fontSize:'0.78rem',
+                fontWeight:700,
+                cursor:'pointer',
+                display:'flex',
+                alignItems:'center',
+                gap:'0.4rem',
+                justifyContent:'center'
+              }}
+            >
+              <ShieldCheck size={15} color="#38bdf8" />
+              مدقق مالي (IFRS)
+            </button>
+          </div>
+        </div>
+
+        {/* Toggle Manual Supabase Form */}
+        <div style={{textAlign:'center', marginTop:'0.25rem'}}>
+          <button 
+            type="button"
+            onClick={() => setShowManualForm(!showManualForm)}
+            style={{
+              background:'none', 
+              border:'none', 
+              color:'#94a3b8', 
+              fontSize:'0.82rem', 
+              cursor:'pointer', 
+              textDecoration:'underline'
+            }}
+          >
+            {showManualForm ? 'إخفاء نموذج الحساب المسجل' : 'الدخول بحساب بريد إلكتروني وكلمة مرور رسمية ▼'}
+          </button>
+        </div>
+
+        {showManualForm && (
+          <form onSubmit={handleAuth} style={{display:'flex', flexDirection:'column', gap:'0.9rem', paddingTop:'0.5rem', borderTop:'1px solid rgba(255,255,255,0.1)'}}>
+            {error && <div style={{color:'#ef4444', background:'rgba(239, 68, 68, 0.1)', padding:'0.6rem', borderRadius:'8px', fontSize:'0.82rem', textAlign:'center', border:'1px solid #ef4444'}}>{error}</div>}
+            {message && <div style={{color:'#10b981', background:'rgba(16, 185, 129, 0.1)', padding:'0.6rem', borderRadius:'8px', fontSize:'0.82rem', textAlign:'center', border:'1px solid #10b981'}}>{message}</div>}
+            
+            <div style={{display:'flex', flexDirection:'column', gap:'0.3rem'}}>
+               <label style={{fontSize:'0.82rem', color:'#cbd5e1', fontWeight:600}}>البريد الإلكتروني</label>
+               <input type="email" placeholder="example@domain.sa" value={email} onChange={e=>setEmail(e.target.value)} required style={{padding:'0.75rem', borderRadius:'10px', border:'1px solid #334155', background:'#0b1120', color:'#fff'}} />
+            </div>
+            <div style={{display:'flex', flexDirection:'column', gap:'0.3rem'}}>
+               <label style={{fontSize:'0.82rem', color:'#cbd5e1', fontWeight:600}}>كلمة المرور</label>
+               <input type="password" placeholder="••••••••" value={password} onChange={e=>setPassword(e.target.value)} required style={{padding:'0.75rem', borderRadius:'10px', border:'1px solid #334155', background:'#0b1120', color:'#fff'}} />
+            </div>
+            <button type="submit" disabled={loading} style={{background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', padding:'0.85rem', borderRadius:'10px', border:'none', cursor: loading ? 'not-allowed' : 'pointer', fontWeight:800, fontSize:'0.95rem'}}>
+              {loading ? 'جاري التحقق...' : (isSignUp ? 'إنشاء الحساب' : 'تسجيل الدخول الرسمي')}
+            </button>
+
+            <div style={{textAlign:'center'}}>
+               <button type="button" onClick={() => { setIsSignUp(!isSignUp); setError(null); setMessage(null); }} style={{background:'none', border:'none', color:'var(--brand-teal)', fontSize:'0.8rem', fontWeight:600, cursor:'pointer', textDecoration:'underline'}}>
+                 {isSignUp ? 'لديك حساب بالفعل؟ تسجيل الدخول' : 'ليس لديك حساب؟ إنشاء حساب جديد'}
+               </button>
+            </div>
+          </form>
+        )}
+      </div>
     </div>
   );
 };
@@ -326,8 +521,32 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
 
 
 const App = () => {
-  const [session, setSession] = useState({ user: { id: 'test', email: 'test@test.com' } });
+  const [session, setSession] = useState(() => {
+    const loggedOut = localStorage.getItem('has_logged_out') === 'true';
+    if (!loggedOut) {
+      return {
+        user: {
+          id: 'vip-faisal-exec',
+          email: 'faisal@manafez.sa',
+          role: 'مسؤول نظام (Admin)',
+          user_metadata: {
+            full_name: 'فيصل المحاسب (المدير التقني والمالي)',
+            role: 'مسؤول نظام (Admin)'
+          }
+        }
+      };
+    }
+    return null;
+  });
   const [userProfile, setUserProfile] = useState(null);
+  const [currentTheme, setCurrentTheme] = useState(() => localStorage.getItem('app_theme') || 'neon-glass');
+  const [soundEnabled, setSoundEnabled] = useState(() => sfx.isEnabled());
+  const [showCustodyOrgTree, setShowCustodyOrgTree] = useState(false);
+
+  useEffect(() => {
+    document.body.className = currentTheme === 'light' ? '' : currentTheme;
+    localStorage.setItem('app_theme', currentTheme);
+  }, [currentTheme]);
   
   useEffect(() => {
     const fetchRealProfile = async () => {
@@ -367,12 +586,16 @@ const App = () => {
   
   
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    supabase.auth.getSession().then(({ data: { session: sbSession } }) => {
+      if (sbSession) {
+        setSession(sbSession);
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, sbSession) => {
+      if (sbSession) {
+        setSession(sbSession);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -800,8 +1023,13 @@ const App = () => {
   };
 
   const showToast = (msg) => {
+    if (msg.includes('❌') || msg.includes('⚠️')) {
+      sfx.playWarning();
+    } else {
+      sfx.playSuccess();
+    }
     setToastMessage(msg);
-    setTimeout(() => setToastMessage(null), 3000);
+    setTimeout(() => setToastMessage(null), 3500);
   };
 
   const [assets, setAssets] = useState([]);
@@ -1191,6 +1419,18 @@ const App = () => {
               اتصال مباشر نشط 100%
             </div>
           </div>
+        </div>
+
+        {/* Executive Voice Briefing */}
+        <div style={{ marginBottom: '1.5rem' }}>
+          <ExecutiveVoiceBriefing
+            totals={totals}
+            assetsCount={accountingEngine.length}
+            lowStockCount={lowStockItems.length}
+            pendingVouchersCount={pendingWarehouseReqs.length}
+            currencySymbol={currentCurrency.symbol}
+            activeRate={activeRate}
+          />
         </div>
 
         {/* Executive Quick Actions Dock */}
@@ -1988,6 +2228,15 @@ const App = () => {
             <div style={{fontSize:'0.85rem', color:'#94a3b8', marginBottom:'0.5rem'}}>القيود المعتمدة والمرحلة</div>
             <div style={{fontSize:'1.8rem', fontWeight:800, color:'#60a5fa'}}>{approvedList.length} <span style={{fontSize:'0.9rem', fontWeight:400}}>قيد</span></div>
           </div>
+        </div>
+
+        {/* مخطط التدفق المالي والقيد المزدوج التفاعلي */}
+        <div style={{ marginBottom: '2rem' }}>
+          <DoubleEntryLedgerFlow
+            totals={totals}
+            currencySymbol={currentCurrency.symbol}
+            journals={journals}
+          />
         </div>
 
         <div>
@@ -3095,6 +3344,14 @@ const renderDepreciation = () => {
           </div>
           
           <div style={{display:'flex', gap:'0.5rem', flexWrap:'wrap'}}>
+            <button 
+              className="btn btn-primary" 
+              style={{padding:'0.55rem 1.1rem', fontSize:'0.85rem', display:'flex', alignItems:'center', gap:'0.4rem', background:'linear-gradient(135deg, var(--brand-teal), #8b5cf6)', borderColor:'transparent'}} 
+              title="عرض الهيكل التنظيمي وشجرة العهد التفاعلية" 
+              onClick={() => { sfx.playClick(); setShowCustodyOrgTree(true); }}
+            >
+              <Network size={16} /> شجرة ارتباط العهد والهيكل
+            </button>
             <button 
               className="btn btn-ghost" 
               style={{padding:'0.55rem 1rem', fontSize:'0.85rem'}} 
@@ -4372,9 +4629,33 @@ const renderDepreciation = () => {
 
         {/* User Profile */}
         <div className="sidebar-profile">
-          <div className="sidebar-profile-avatar">FA</div>
-          <div className="sidebar-profile-name">فيصل المحاسب</div>
-          <div className="sidebar-profile-role"><ShieldCheck size={11} /> المدير التقني والمالي</div>
+          <div className="sidebar-profile-avatar">
+            {userProfile?.name ? userProfile.name.slice(0, 2) : 'FA'}
+          </div>
+          <div className="sidebar-profile-name">
+            {userProfile?.name || 'فيصل المحاسب'}
+          </div>
+          <div className="sidebar-profile-role">
+            <ShieldCheck size={11} /> {userProfile?.role || 'المدير التقني والمالي'}
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              marginTop: '0.5rem',
+              background: 'rgba(239, 68, 68, 0.08)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              color: '#ef4444',
+              borderRadius: '8px',
+              padding: '0.2rem 0.65rem',
+              fontSize: '0.72rem',
+              fontWeight: 700,
+              cursor: 'pointer'
+            }}
+            title="تسجيل الخروج أو تبديل الحساب"
+          >
+            تبديل الحساب / خروج
+          </button>
         </div>
 
         <div className="nav-group">
@@ -4540,9 +4821,138 @@ const renderDepreciation = () => {
                 gap: '0.35rem'
               }}
               title="مختبر محاكاة الأثر المالي والاستثماري"
-              onClick={() => setShowScenarioModal(true)}
+              onClick={() => { sfx.playClick(); setShowScenarioModal(true); }}
             >
               <Sparkles size={14} /> محاكي السيناريوهات
+            </button>
+
+            {/* Live Camera Scanner Button */}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                border: '1px solid rgba(0, 165, 155, 0.4)',
+                background: 'rgba(0, 165, 155, 0.1)',
+                color: 'var(--brand-teal)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                padding: '0.35rem 0.8rem',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.35rem'
+              }}
+              title="الماسح الميداني الذكي بالكاميرا المباشرة"
+              onClick={() => { sfx.playClick(); setShowScanner(true); }}
+            >
+              <QrCode size={14} /> ماسح الكاميرا
+            </button>
+
+            {/* Theme Selector (Light / Dark / Neon Glass) */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              background: 'var(--thead-bg)',
+              border: '1px solid var(--border)',
+              borderRadius: '10px',
+              padding: '2px 4px',
+              gap: '2px'
+            }}>
+              <button
+                type="button"
+                onClick={() => { sfx.playClick(); setCurrentTheme('light'); showToast('☀️ تم تفعيل النمط الفاتح التنفيذي'); }}
+                style={{
+                  background: currentTheme === 'light' ? 'var(--card-bg)' : 'transparent',
+                  color: currentTheme === 'light' ? '#f59e0b' : 'var(--text-muted)',
+                  border: 'none',
+                  borderRadius: '7px',
+                  padding: '3px 8px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+                title="النمط الفاتح التنفيذي"
+              >
+                ☀️ فاتح
+              </button>
+              <button
+                type="button"
+                onClick={() => { sfx.playClick(); setCurrentTheme('dark-mode'); showToast('🌙 تم تفعيل نمط الفضاء السيبراني'); }}
+                style={{
+                  background: currentTheme === 'dark-mode' ? 'var(--card-bg)' : 'transparent',
+                  color: currentTheme === 'dark-mode' ? '#38bdf8' : 'var(--text-muted)',
+                  border: 'none',
+                  borderRadius: '7px',
+                  padding: '3px 8px',
+                  fontSize: '0.74rem',
+                  fontWeight: 700,
+                  cursor: 'pointer'
+                }}
+                title="النمط الليلي الفضائي"
+              >
+                🌙 ليلي
+              </button>
+              <button
+                type="button"
+                onClick={() => { sfx.playClick(); setCurrentTheme('neon-glass'); showToast('🔮 تم تفعيل نمط الزجاج السيبراني (Neon Glass)'); }}
+                style={{
+                  background: currentTheme === 'neon-glass' ? 'linear-gradient(135deg, rgba(6, 182, 212, 0.3), rgba(139, 92, 246, 0.3))' : 'transparent',
+                  color: currentTheme === 'neon-glass' ? '#2dd4bf' : 'var(--text-muted)',
+                  border: currentTheme === 'neon-glass' ? '1px solid rgba(45, 212, 191, 0.4)' : 'none',
+                  borderRadius: '7px',
+                  padding: '3px 8px',
+                  fontSize: '0.74rem',
+                  fontWeight: 800,
+                  cursor: 'pointer'
+                }}
+                title="نمط الزجاج السيبراني المتطور"
+              >
+                🔮 سيبراني
+              </button>
+            </div>
+
+            {/* Audio Feedback Synth Toggle */}
+            <button
+              type="button"
+              onClick={() => {
+                const newState = sfx.toggleSound();
+                setSoundEnabled(newState);
+                showToast(newState ? '🔊 تم تفعيل المؤثرات الصوتية التفاعلية' : '🔇 تم كتم المؤثرات الصوتية');
+              }}
+              style={{
+                background: soundEnabled ? 'rgba(16, 185, 129, 0.1)' : 'var(--thead-bg)',
+                border: `1px solid ${soundEnabled ? 'rgba(16, 185, 129, 0.3)' : 'var(--border)'}`,
+                color: soundEnabled ? '#10b981' : 'var(--text-muted)',
+                borderRadius: '10px',
+                padding: '0.35rem 0.65rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem'
+              }}
+              title={soundEnabled ? 'المؤثرات الصوتية مفعلة (اضغط للكتم)' : 'المؤثرات الصوتية مكتومة (اضغط للتفعيل)'}
+            >
+              {soundEnabled ? <Volume2 size={15} /> : <VolumeX size={15} />}
+            </button>
+
+            {/* Quick Logout / Persona Switcher */}
+            <button
+              type="button"
+              onClick={handleLogout}
+              style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                color: '#ef4444',
+                borderRadius: '10px',
+                padding: '0.35rem 0.75rem',
+                fontSize: '0.78rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+              title="تسجيل الخروج أو التبديل لدور وظيفي آخر"
+            >
+              خروج
             </button>
           </div>
         </header>
@@ -4591,34 +5001,45 @@ const renderDepreciation = () => {
         />
       )}
 
-      {showScanner && (
+      {/* Live LiDAR / Camera Barcode Scanner Modal */}
+      <LiveBarcodeScannerModal
+        isOpen={showScanner}
+        onClose={() => setShowScanner(false)}
+        assets={assets}
+        warehouseItems={warehouseItems}
+        onSelectAsset={(a) => {
+          const today = new Date().toISOString().split('T')[0];
+          setAssets(prev => prev.map(item => item.id === a.id ? { ...item, lastInventory: today } : item));
+          setViewAsset({ ...a, lastInventory: today });
+          showToast(`✅ تم مسح وتحديد الأصل (${a.name}) وتحديث تاريخ الجرد اللحظي!`);
+          setView('register');
+        }}
+        onSelectWarehouse={(w) => {
+          setViewWarehouse(w);
+          showToast(`📦 تم مسح وتحديد الصنف المخزني (${w.name}) في الموقع ${w.location}`);
+          setView('warehouse');
+        }}
+      />
 
-        <div style={{position:'fixed', top:0, left:0, width:'100%', height:'100%', background:'rgba(0,0,0,0.6)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:9999, backdropFilter:'blur(4px)'}}>
-          <div className="card" style={{width:'400px', background:'var(--card-bg)', textAlign:'center', padding:'2.5rem 2rem', border:'1px solid var(--border)'}}>
-            <div style={{display:'inline-block', padding:'1.5rem', borderRadius:'50%', background:'rgba(59, 130, 246, 0.1)', marginBottom:'1.5rem'}}>
-              <QrCode size={48} color="var(--accent)" />
-            </div>
-            <h3 style={{marginBottom:'0.5rem', fontSize:'1.25rem'}}>المسح الميداني النشط</h3>
-            <p style={{color:'var(--text-muted)', fontSize:'0.85rem', marginBottom:'2rem'}}>قم بتوجيه كاميرا الماسح الضوئي نحو ملصق الباركود أو الـ QR الخاص بالأصل، أو أدخل الرمز يدوياً.</p>
-            <input autoFocus type="text" placeholder="أدخل رمز الأصل هنا..." style={{width:'100%', padding:'1rem', borderRadius:'8px', border:'2px solid var(--accent)', background:'transparent', color:'var(--text)', textAlign:'center', fontSize:'1.1rem', letterSpacing:'1px', outline:'none', boxShadow:'0 0 15px rgba(59, 130, 246, 0.2)'}} onKeyDown={(e) => {
-              if(e.key === 'Enter' && e.target.value) {
-                const q = e.target.value.trim().toLowerCase();
-                const found = assets.find(a => a.code.toLowerCase() === q || a.id.toLowerCase() === q);
-                setShowScanner(false);
-                if (found) {
-                  const today = new Date().toISOString().split('T')[0];
-                  setAssets(prev => prev.map(a => a.id === found.id ? { ...a, lastInventory: today } : a));
-                  setViewAsset({ ...found, lastInventory: today });
-                  showToast(`✅ تم مسح الأصل (${found.name}) وتحديث تاريخ آخر جرد`);
-                } else {
-                  showToast(`⚠️ لم يتم العثور على أصل بالرمز (${e.target.value})`);
-                }
-              }
-            }}/>
-            <button className="btn btn-ghost" style={{marginTop:'1.5rem', width:'100%', padding:'0.75rem'}} onClick={() => setShowScanner(false)}>إلغاء العملية</button>
-          </div>
-        </div>
-      )}
+      {/* Custody Org Tree Modal */}
+      <CustodyOrgTreeModal
+        isOpen={showCustodyOrgTree}
+        onClose={() => setShowCustodyOrgTree(false)}
+        assets={assets}
+        employees={employeesList}
+        onSelectAsset={(a) => {
+          setViewAsset(a);
+        }}
+        onPrintClearance={(emp) => {
+          setSelectedEmployee({
+            name: emp.name,
+            assets: emp.assets,
+            totalValue: emp.totalValue
+          });
+          setBarcodeModalType('clearance');
+          setBarcodeModalItem(emp.assets[0] || {});
+        }}
+      />
 
       {viewAsset && (() => {
         const a = accountingEngine.find(x => x.id === viewAsset.id) || viewAsset;

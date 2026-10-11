@@ -18,8 +18,14 @@
 }
 
 body.dark-mode .sidebar {
-  background: linear-gradient(180deg, #22262e 0%, #1a1d23 100%);
-  border-color: #333842;
+  background: linear-gradient(180deg, #0f172a 0%, #0b1120 100%);
+  border-color: #1e293b;
+}
+
+body.neon-glass .sidebar {
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.95) 0%, rgba(10, 15, 30, 0.98) 100%);
+  border-color: rgba(139, 92, 246, 0.35);
+  box-shadow: 4px 0 35px rgba(139, 92, 246, 0.15);
 }
 
 .main-content {
