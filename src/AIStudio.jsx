@@ -1113,6 +1113,52 @@ export default function AIStudio({
                 );
               })()}
 
+              {/* Free Voice Library Showcase Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(13, 148, 136, 0.08) 100%)',
+                border: '1px solid rgba(16, 185, 129, 0.35)',
+                borderRadius: '16px',
+                padding: '1.25rem 1.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.85rem'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#10b981', fontWeight: 800, fontSize: '1rem' }}>
+                    <Volume2 size={20} /> مكتبة الأصوات المجانية المعتمدة (Free Voice Soundbank & EasySpeech)
+                  </div>
+                  <span style={{ background: 'rgba(16, 185, 129, 0.2)', color: '#10b981', fontSize: '0.75rem', fontWeight: 800, padding: '0.2rem 0.6rem', borderRadius: '12px' }}>
+                    مفعلة وتعمل مجاناً 100%
+                  </span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+                  <div style={{ background: 'var(--card-bg)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: 'var(--brand-teal)', marginBottom: '0.2rem' }}>
+                      🎙️ مكتبة الاستوديو البشري (10 أصوات)
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      تسجيلات استوديو بشرية سعودية 100% عالية النقاء لجميع الشخصيات واللهجات بدون استهلاك حصص.
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--card-bg)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#0ea5e9', marginBottom: '0.2rem' }}>
+                      🌐 مكتبة EasySpeech 2.x المفتوحة
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      إدارة ذكية لأصوات المتصفح، تمايز النبرات، ودعم الأصوات السحابية الطبيعية دون انقطاع.
+                    </div>
+                  </div>
+                  <div style={{ background: 'var(--card-bg)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                    <div style={{ fontWeight: 800, fontSize: '0.85rem', color: '#8b5cf6', marginBottom: '0.2rem' }}>
+                      ⚡ توليد مباشر ذكي (Groq Neural)
+                    </div>
+                    <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                      تحويل نصوص الردود الحية إلى صوت سعودي أصيل مع ذاكرة تخزين مؤقت فورية (Cache).
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               {/* Voice Personas */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem' }}>
@@ -1265,8 +1311,9 @@ export default function AIStudio({
                 {activeVoiceEngine && (
                   <span style={{ fontSize: '0.8rem', color: 'var(--brand-teal)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <CheckCircle size={15} />
-                    {activeVoiceEngine === 'human-studio-hd' && 'المشغل: تسجيل استوديو بشري نقي 100% (Human Studio HD)'}
+                    {activeVoiceEngine === 'human-studio-hd' && 'المشغل: تسجيل استوديو بشري نقي 100% (مكتبة الأصوات المجانية)'}
                     {activeVoiceEngine === 'groq-orpheus-saudi' && 'المشغل: Groq Orpheus السعودي (بشري استوديو)'}
+                    {activeVoiceEngine === 'easyspeech-natural' && 'المشغل: مكتبة EasySpeech السحابية (طبيعي متقدم)'}
                     {activeVoiceEngine === 'openai-neural' && 'المشغل: OpenAI TTS-1 (بشري فائق الدقة)'}
                     {activeVoiceEngine === 'browser-natural' && 'المشغل: مشغل الصوت الطبيعي المحسن'}
                   </span>

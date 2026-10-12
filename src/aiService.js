@@ -1,7 +1,11 @@
 import {
   loadAIConfig, buildFullSystemPrompt, runLocalTool, TOOL_DEFS, NAV_PAGES,
-  logAIEvent, chunkForTTS, DIALECTS
+  logAIEvent, chunkForTTS, DIALECTS, VOICES
 } from './aiConfig.js';
+import {
+  STUDIO_PERSONAS, STUDIO_DIALECTS, playPersonaStudio, playDialectStudio,
+  speakEasySpeech, stopAllSpeech, getStudioAudioUrl
+} from './voiceLibrary.js';
 
 /* ------------------------------------------------------------------ *
  *  خدمة الذكاء الاصطناعي — تراؤف AI
@@ -365,10 +369,10 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
 
   /**
    * ينطق النص بصوت بشري حقيقي ودافئ (استبعاد الصوت الآلي القديم نهائياً).
-   * الأولوية 0: المقاطع البشرية المسجلة مسبقاً (جودة استوديو 100% فورية بدون استهلاك حصص)
+   * الأولوية 0: مكتبة الاستوديو البشري المسجل (Human Studio Soundbank) — جودة نقية 100% فورية بدون استهلاك حصص
    * الأولوية 1: مفتاح OpenAI TTS المخصص إن وجد
    * الأولوية 2: محرك Groq Orpheus Saudi Neural (صوت استوديو بشري سعودي حقيقي 100%)
-   * الأولوية 3: أصوات Microsoft Natural Online البشرية في المتصفح أو المشغل الانسيابي المحسن
+   * الأولوية 3: مكتبة EasySpeech مفتوحة المصدر للأصوات السحابية الطبيعية في المتصفح
    */
   speak(text, { voiceId, rate } = {}) {
     const clean = cleanTextForSpeech(text);
@@ -380,6 +384,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     const effectiveVoiceId = voiceId || v.voiceId || 'fahad';
 
     speaker.stop();
+    stopAllSpeech();
     const token = ++speaker.token;
     const result = { engine: null, done: null };
 
@@ -393,6 +398,35 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     };
 
     result.done = (async () => {
+      // 0. فحص تطابق النص مع مكتبة الاستوديو البشري المسجل (تشغيل فوري بجودة 100% بشرية بدون تأخير ولا استهلاك حصص)
+      const matchedVoice = VOICES.find(vo => vo.sample && (clean.includes(vo.sample.slice(0, 15)) || vo.sample.includes(clean.slice(0, 15))));
+      if (matchedVoice && STUDIO_PERSONAS[effectiveVoiceId]) {
+        try {
+          notifyEngine('human-studio-hd');
+          await playPersonaStudio(effectiveVoiceId, { rate: effectiveRate });
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
+          return;
+        } catch (err) {
+          console.warn('Studio persona playback fallback:', err);
+        }
+      }
+
+      // فحص تطابق عينات اللهجات
+      const matchedDialectKey = Object.keys(DIALECTS).find(k => {
+        const samples = DIALECTS[k]?.samples || [];
+        return samples.some(s => clean.includes(s.slice(0, 12)) || s.includes(clean.slice(0, 12)));
+      });
+      if (matchedDialectKey && STUDIO_DIALECTS[matchedDialectKey]) {
+        try {
+          notifyEngine('human-studio-hd');
+          await playDialectStudio(matchedDialectKey, { rate: effectiveRate });
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
+          return;
+        } catch (err) {
+          console.warn('Studio dialect playback fallback:', err);
+        }
+      }
+
       // 1. مفتاح OpenAI المخصص إن وجد في إعدادات الصوت
       if (v.openaiKey) {
         try {
@@ -418,26 +452,39 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         if (err.code === 'terms') {
           console.info('Groq Orpheus model requires one-time terms acceptance at Groq console.');
         } else if (err.code === 'rate_limit') {
-          console.warn('Groq Orpheus daily rate limit reached, switching to natural human fallback.');
+          console.warn('Groq Orpheus daily rate limit reached, switching to EasySpeech library.');
         } else {
           console.warn('Groq Orpheus fallback:', err);
         }
       }
 
-      // 3. مشغل المتصفح الانسيابي المحسن بدون تقطيع وبنبرة دافئة
+      // 3. مكتبة EasySpeech المتقدمة للأصوات السحابية الطبيعية في المتصفح مع معالجة النبرات
+      try {
+        notifyEngine('easyspeech-natural');
+        await speakEasySpeech(clean, { voiceId: effectiveVoiceId, rate: effectiveRate });
+        logAIEvent({ type: 'voice-out', ok: true, engine: 'easyspeech-natural' });
+        return;
+      } catch (err) {
+        console.warn('EasySpeech fallback to browser chunks:', err);
+      }
+
+      // 4. مشغل المتصفح الانسيابي الاحتياطي الأخير
       try {
         notifyEngine('browser-natural');
         await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
         logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
       } catch (err) {
-        console.warn('Browser TTS error:', err);
+        console.warn('Browser TTS final error:', err);
       }
     })();
 
     return result;
   }
 
-  stopSpeaking() { speaker.stop(); }
+  stopSpeaking() {
+    speaker.stop();
+    stopAllSpeech();
+  }
 
   static ttsState() {
     try { return sessionStorage.getItem(TTS_FLAG) || 'unknown'; } catch (e) { return 'unknown'; }
