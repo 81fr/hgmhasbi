@@ -145,24 +145,17 @@ export default function AIStudio({
 
     try {
       const ai = new AIService(null, config.provider || 'groq', { config });
-      ai.speak(textToSpeak, {
+      const res = ai.speak(textToSpeak, {
         voiceId: config.voice?.voiceId || 'fahad',
         rate: config.voice?.rate || 1.0
       });
-      setTimeout(() => setAudioTesting(false), 3500);
-    } catch (e) {
-      // Fallback to browser synthesis
-      if (window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        const ut = new SpeechSynthesisUtterance(textToSpeak);
-        ut.lang = 'ar-SA';
-        ut.rate = config.voice?.rate || 1.0;
-        ut.onend = () => setAudioTesting(false);
-        ut.onerror = () => setAudioTesting(false);
-        window.speechSynthesis.speak(ut);
+      if (res && res.done) {
+        res.done.then(() => setAudioTesting(false)).catch(() => setAudioTesting(false));
       } else {
-        setAudioTesting(false);
+        setTimeout(() => setAudioTesting(false), 3500);
       }
+    } catch (e) {
+      setAudioTesting(false);
     }
   };
 

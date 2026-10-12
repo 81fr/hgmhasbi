@@ -73,16 +73,20 @@ export default function ExecutiveVoiceBriefing({
     const utterance = new SpeechSynthesisUtterance(text);
     utteranceRef.current = utterance;
 
-    // Pick Arabic voice
-    const voices = synthRef.current.getVoices();
-    const arabicVoice = voices.find(v => v.lang.startsWith('ar') || v.lang === 'ar-SA' || v.name.includes('Arabic') || v.name.includes('Maged') || v.name.includes('Tariq'));
-    if (arabicVoice) {
-      utterance.voice = arabicVoice;
+    // Pick Arabic voice with preference for natural human voices over robotic ones
+    const voices = synthRef.current.getVoices() || [];
+    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.includes('Arabic'));
+    const naturalVoice = ar.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && !v.name.includes('Naayf'))
+      || ar.find(v => (v.name.includes('Salma') || v.name.includes('Zariyah') || v.name.includes('Shakir') || v.name.includes('Hamed')) && !v.name.includes('Naayf'))
+      || ar.find(v => !v.name.includes('Naayf'))
+      || ar[0] || null;
+    if (naturalVoice) {
+      utterance.voice = naturalVoice;
     }
 
     utterance.lang = 'ar-SA';
-    utterance.rate = speechRate;
-    utterance.pitch = 1.0;
+    utterance.rate = Math.max(0.9, Math.min(1.15, speechRate || 1.0));
+    utterance.pitch = 1.05;
 
     utterance.onstart = () => {
       setIsPlaying(true);

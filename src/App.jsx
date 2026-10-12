@@ -1115,10 +1115,25 @@ const App = () => {
   };
 
   const speak = (text) => {
-    if (!window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'ar-SA';
-    window.speechSynthesis.speak(utterance);
+    try {
+      const ai = new AIService(aiApiKey || null, aiProvider || 'groq');
+      ai.speak(text);
+    } catch (e) {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ar-SA';
+        utterance.pitch = 1.05;
+        const voices = window.speechSynthesis.getVoices() || [];
+        const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.includes('Arabic'));
+        const humanVoice = ar.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && !v.name.includes('Naayf'))
+          || ar.find(v => (v.name.includes('Salma') || v.name.includes('Zariyah') || v.name.includes('Shakir') || v.name.includes('Hamed')) && !v.name.includes('Naayf'))
+          || ar.find(v => !v.name.includes('Naayf'))
+          || ar[0] || null;
+        if (humanVoice) utterance.voice = humanVoice;
+        window.speechSynthesis.speak(utterance);
+      }
+    }
   };
 
   const [mediaRecorder, setMediaRecorder] = useState(null);

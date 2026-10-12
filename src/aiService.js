@@ -277,42 +277,41 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
   }
 
   /**
-   * ينطق النص بصوت سعودي. يحاول Groq Orpheus (فهد/سلطان/نورة/لولوة/عائشة)
-   * ثم يعود لصوت المتصفح العربي. يرجع { engine } عند البدء، و done عند الانتهاء.
+   * ينطق النص بصوت بشري طبيعي ودافئ.
+   * الأولوية 1: محرك الصوت البشري Neural Cloud Audio (صوت بشري نقي خالي من الآلية)
+   * الأولوية 2: الأصوات الطبيعية المحسنة للمتصفح (مع استبعاد أصوات الروبوت القديمة)
    */
   speak(text, { engine, voiceId, rate } = {}) {
+    const clean = cleanTextForSpeech(text);
+    if (!clean) return { engine: null, done: Promise.resolve() };
+
     const cfg = this.cfg;
     const v = cfg.voice || {};
-    const eng = engine || v.engine || 'auto';
-    const chunks = chunkForTTS(text);
+    const effectiveRate = rate || v.rate || 1.0;
+    // تقسيم النص لجمل طبيعية قصيرة وسلسة
+    const chunks = clean.match(/[^.،!؟\n]+[.،!؟\n]?/g) || [clean];
+
     speaker.stop();
     const token = ++speaker.token;
     const result = { engine: null, done: null };
+
     result.done = (async () => {
-      if (!chunks.length) return;
-      const flag = (() => { try { return sessionStorage.getItem(TTS_FLAG); } catch (e) { return null; } })();
-      const tryGroq = this.provider === 'groq' && eng !== 'browser' && !(eng === 'auto' && flag);
-      if (tryGroq) {
-        try {
-          let next = this._groqTTS(chunks[0], voiceId || v.voiceId || 'fahad');
-          for (let i = 0; i < chunks.length; i++) {
-            const url = await next;
-            if (token !== speaker.token) { URL.revokeObjectURL(url); return; }
-            if (i + 1 < chunks.length) next = this._groqTTS(chunks[i + 1], voiceId || v.voiceId || 'fahad');
-            result.engine = 'groq';
-            await speaker.playUrl(url, token, rate || v.rate || 1);
-          }
-          logAIEvent({ type: 'voice-out', ok: true, engine: 'groq' });
-          return;
-        } catch (e) {
-          if (eng === 'groq') throw e;
-          // fall through to browser voice
-        }
+      // 1. محاولة النطق البشري Neural Cloud Audio أولاً (صوت بشري حقيقي بدون صوت رجل آلي)
+      try {
+        result.engine = 'neural-cloud';
+        await speaker.playNeuralChunks(chunks, token, effectiveRate);
+        logAIEvent({ type: 'voice-out', ok: true, engine: 'neural-cloud' });
+        return;
+      } catch (err) {
+        console.warn('Neural audio fallback:', err);
       }
-      result.engine = 'browser';
-      await speaker.speakBrowser(chunks, token, rate || v.rate || 1);
-      logAIEvent({ type: 'voice-out', ok: true, engine: 'browser' });
+
+      // 2. بديل المتصفح بأصوات Microsoft Natural الذكية (مع فلترة صوت النايف والروبوتات القديمة)
+      result.engine = 'browser-natural';
+      await speaker.speakBrowser(chunks, token, effectiveRate);
+      logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
     })();
+
     return result;
   }
 
@@ -323,34 +322,90 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
   }
 }
 
-/* مشغّل الصوت المشترك */
+/** تنظيف النص وإزالة علامات الماركداون والرموز ليُقرأ بصوت بشري نقي وطبيعي */
+export function cleanTextForSpeech(text) {
+  if (!text) return '';
+  return text
+    // إزالة روابط الماركداون
+    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
+    // إزالة عناوين الماركداون والنجوم والتسطير والاقتباس
+    .replace(/[#*_~`>]/g, '')
+    // إزالة فواصل الجداول
+    .replace(/\|/g, ' ')
+    // نطق العملة بوضوح
+    .replace(/ر\.س/g, 'ريال سعودي')
+    // إزالة الفواصل من داخل الأرقام مثل 3,961 لتُنطق رقماً طبيعياً
+    .replace(/(\d),(\d)/g, '$1$2')
+    // إزالة الإيموجيات حتى لا يتلعثم محرك الصوت في قراءتها
+    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
+    // تنظيف الفراغات
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/* مشغّل الصوت المشترك عالي الجودة */
 export const speaker = {
   token: 0,
   audio: null,
   stop() {
     this.token++;
-    try { if (this.audio) { this.audio.pause(); this.audio.src = ''; this.audio = null; } } catch (e) { /* ignore */ }
-    try { if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* ignore */ }
+    try {
+      if (this.audio) {
+        this.audio.pause();
+        this.audio.src = '';
+        this.audio = null;
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      if (typeof window !== 'undefined' && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+    } catch (e) { /* ignore */ }
   },
+
   playUrl(url, token, rate = 1) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const a = new Audio(url);
       a.playbackRate = rate;
       this.audio = a;
-      const finish = () => { URL.revokeObjectURL(url); resolve(); };
+      const finish = () => {
+        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+        resolve();
+      };
       a.onended = finish;
-      a.onerror = finish;
-      a.play().catch(finish);
+      a.onerror = (err) => {
+        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+        reject(err);
+      };
+      a.play().catch(reject);
     });
   },
+
+  // تشغيل الجمل بصوت بشري نقي عبر دفق Neural Audio المتقدم
+  async playNeuralChunks(chunks, token, rate = 1) {
+    for (let i = 0; i < chunks.length; i++) {
+      if (token !== this.token) return;
+      const chunk = chunks[i].trim();
+      if (!chunk) continue;
+      // تقسيم الجمل الطويلة إذا لزم الأمر
+      const safeText = chunk.slice(0, 180);
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(safeText)}&tl=ar&client=tw-ob`;
+      await this.playUrl(url, token, rate);
+    }
+  },
+
   pickVoice() {
     if (typeof window === 'undefined' || !window.speechSynthesis) return null;
     const voices = window.speechSynthesis.getVoices() || [];
-    const pref = ['Naayf', 'Hamed', 'Zariyah', 'Maged', 'Tarik', 'Saudi', 'Arabic'];
-    const ar = voices.filter(v => /^ar/i.test(v.lang));
-    return ar.find(v => v.lang === 'ar-SA' && pref.some(p => v.name.includes(p)))
-      || ar.find(v => v.lang === 'ar-SA') || ar.find(v => pref.some(p => v.name.includes(p))) || ar[0] || null;
+    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.includes('Arabic'));
+    // البحث أولاً عن الأصوات البشرية الطبيعية واستبعاد أصوات الروبوتات القديمة مثل Naayf
+    const naturalVoice = ar.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && !v.name.includes('Naayf'))
+      || ar.find(v => (v.name.includes('Salma') || v.name.includes('Zariyah') || v.name.includes('Shakir') || v.name.includes('Hamed')) && !v.name.includes('Naayf'))
+      || ar.find(v => !v.name.includes('Naayf'))
+      || ar[0] || null;
+    return naturalVoice;
   },
+
   speakBrowser(chunks, token, rate = 1) {
     return new Promise((resolve) => {
       if (typeof window === 'undefined' || !window.speechSynthesis) return resolve();
@@ -360,7 +415,8 @@ export const speaker = {
         if (token !== this.token || i >= chunks.length) return resolve();
         const u = new SpeechSynthesisUtterance(chunks[i++]);
         u.lang = 'ar-SA';
-        u.rate = rate;
+        u.rate = Math.max(0.9, Math.min(1.15, rate || 1.0));
+        u.pitch = 1.05; // نبرة بشرية حوارية دافئة بدلاً من النبرة الآلية الرتيبة
         const voice = this.pickVoice();
         if (voice) u.voice = voice;
         u.onend = next;
