@@ -383,11 +383,20 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     const token = ++speaker.token;
     const result = { engine: null, done: null };
 
+    const notifyEngine = (engine) => {
+      result.engine = engine;
+      try {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('traouf-voice-engine-change', { detail: { engine } }));
+        }
+      } catch (e) { /* ignore */ }
+    };
+
     result.done = (async () => {
       // 1. مفتاح OpenAI المخصص إن وجد في إعدادات الصوت
       if (v.openaiKey) {
         try {
-          result.engine = 'openai-neural';
+          notifyEngine('openai-neural');
           const openAIVoice = mapToOpenAIVoice(effectiveVoiceId);
           const audioUrl = await this._openAITTS(clean, v.openaiKey, openAIVoice);
           await speaker.playUrl(audioUrl, token, effectiveRate);
@@ -400,7 +409,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
 
       // 2. محرك Groq Orpheus Saudi Neural (صوت بشري استوديو حقيقي باللهجة السعودية)
       try {
-        result.engine = 'groq-orpheus-saudi';
+        notifyEngine('groq-orpheus-saudi');
         const audioUrl = await this._groqTTS(clean, effectiveVoiceId);
         await speaker.playUrl(audioUrl, token, effectiveRate);
         logAIEvent({ type: 'voice-out', ok: true, engine: 'groq-orpheus-saudi' });
@@ -417,7 +426,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
 
       // 3. مشغل المتصفح الانسيابي المحسن بدون تقطيع وبنبرة دافئة
       try {
-        result.engine = 'browser-natural';
+        notifyEngine('browser-natural');
         await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
         logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
       } catch (err) {
@@ -498,6 +507,32 @@ export function cleanTextForSpeech(text) {
   return s.trim();
 }
 
+export const EDGE_VOICE_MAP = {
+  fahad:   ['hamed', 'fahed'],
+  sultan:  ['hamdan', 'moaz'],
+  salman:  ['abdullah', 'bassel'],
+  majed:   ['moaz', 'shakir'],
+  hamed:   ['fahed', 'hamed'],
+  noura:   ['zariyah', 'noura'],
+  sara:    ['fatima', 'salma'],
+  lulwa:   ['noura', 'laila'],
+  aisha:   ['aysha', 'rana'],
+  reem:    ['amal', 'sana']
+};
+
+export const PERSONA_SPEECH_PARAMS = {
+  fahad:   { pitch: 0.92, rate: 0.94 }, // وقور ورسمي
+  sultan:  { pitch: 1.08, rate: 1.05 }, // واثق وحيوي وسريع
+  salman:  { pitch: 0.78, rate: 0.88 }, // تنفيذي قيادي عميق ورزين
+  majed:   { pitch: 0.98, rate: 0.98 }, // ميداني ودود
+  hamed:   { pitch: 0.88, rate: 0.92 }, // خبير مالي مطمئن
+  noura:   { pitch: 1.30, rate: 0.95 }, // دافئ وواضح
+  sara:    { pitch: 1.42, rate: 1.05 }, // نشيط ومتحمس
+  lulwa:   { pitch: 1.38, rate: 0.90 }, // ناعم ودقيق وهادئ
+  aisha:   { pitch: 1.25, rate: 0.92 }, // استشاري رصين
+  reem:    { pitch: 1.22, rate: 0.95 }  // تنفيذي قيادي راقي
+};
+
 /* مشغّل الصوت المشترك عالي الجودة */
 export const speaker = {
   token: 0,
@@ -571,42 +606,55 @@ export const speaker = {
     
     // الأصوات العربية
     const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.toLowerCase().includes('arabic') || /[\u0600-\u06FF]/.test(v.name));
+    if (!ar.length) return voices[0] || null;
 
     // 1. الأصوات البشرية السحابية الفائقة (Microsoft Natural Online & Google Neural)
     const naturalVoices = ar.filter(v => {
       const n = (v.name || '').toLowerCase();
       return n.includes('natural') || n.includes('online') || n.includes('neural') ||
              n.includes('طبيعي') || n.includes('متصل') || n.includes('سحابي') ||
-             n.includes('cloud') || n.includes('google') ||
-             n.includes('hamed') || n.includes('zariyah') || n.includes('salma') ||
-             n.includes('fatima') || n.includes('shakir') || n.includes('حامد') ||
-             n.includes('زارية') || n.includes('سارة') || n.includes('سلمى');
+             n.includes('cloud') || n.includes('google');
     });
 
     if (naturalVoices.length) {
+      // بحث دقيق عن الصوت المطابق للشخصية في متصفح إيدج
+      const targets = EDGE_VOICE_MAP[voiceId] || [];
+      for (const target of targets) {
+        const found = naturalVoices.find(v => (v.name || '').toLowerCase().includes(target));
+        if (found) return found;
+      }
       if (isFemale) {
         const female = naturalVoices.find(v => {
           const n = (v.name || '').toLowerCase();
-          return n.includes('zariyah') || n.includes('salma') || n.includes('fatima') || n.includes('زارية') || n.includes('سلمى') || n.includes('فاطمة');
+          return n.includes('zariyah') || n.includes('salma') || n.includes('fatima') || n.includes('noura') || n.includes('aysha') || n.includes('amal') || n.includes('laila') || n.includes('زارية') || n.includes('سلمى') || n.includes('فاطمة');
         });
         if (female) return female;
       } else {
         const male = naturalVoices.find(v => {
           const n = (v.name || '').toLowerCase();
-          return n.includes('hamed') || n.includes('shakir') || n.includes('حامد') || n.includes('شاكر');
+          return n.includes('hamed') || n.includes('shakir') || n.includes('fahed') || n.includes('hamdan') || n.includes('abdullah') || n.includes('moaz') || n.includes('حامد') || n.includes('شاكر');
         });
         if (male) return male;
       }
       return naturalVoices[0];
     }
 
-    // 2. الأصوات الطبيعية العامة غير الروبوتية
+    // 2. إذا كنا في كروم أو محرك محلي لا يملك أصواتاً طبيعية، نبحث عن صوت نسائي صريح للشخصيات النسائية
+    if (isFemale) {
+      const femaleFallback = ar.find(v => {
+        const n = (v.name || '').toLowerCase();
+        return n.includes('hoda') || n.includes('female') || n.includes('woman') || n.includes('هدى') || n.includes('marian');
+      });
+      if (femaleFallback) return femaleFallback;
+    }
+
+    // 3. الأصوات العربية غير Naayf إن وُجدت
     const nonNaayf = ar.filter(v => !v.name.toLowerCase().includes('naayf'));
     if (nonNaayf.length) {
       return nonNaayf[0];
     }
 
-    // 3. آخر احتمال متبقي
+    // 4. آخر احتمال متبقي
     return ar[0] || null;
   },
 
@@ -615,6 +663,7 @@ export const speaker = {
     const synth = window.speechSynthesis;
     const voices = await this.getVoicesAsync();
     const voice = this.pickBestVoice(voices, voiceId);
+    const params = PERSONA_SPEECH_PARAMS[voiceId] || { pitch: 0.95, rate: 0.92 };
 
     // تقسيم النص لجمل متكاملة فقط عند علامات الوقف الكبرى (. ! ؟ \n) لمنع التقطيع الآلي الميكانيكي
     const chunks = fullText.split(/(?<=[.!؟\n])\s+/).filter(s => s.trim().length > 0);
@@ -634,9 +683,10 @@ export const speaker = {
         } else {
           u.lang = 'ar-SA';
         }
-        // نبرة هادئة ودافئة تحاكي الإلقاء البشري المريح وتمنع النبرة المعدنية
-        u.pitch = 0.95;
-        u.rate = Math.max(0.85, Math.min(1.05, rate || 0.92));
+        
+        // مواءمة نبرة وسرعة الصوت بحسب شخصية المتحدث المحددة لمنع تكرار الصوت نفسه
+        u.pitch = params.pitch;
+        u.rate = Math.max(0.75, Math.min(1.25, (rate ? rate * (params.rate / 0.95) : params.rate)));
 
         u.onend = next;
         u.onerror = next;
@@ -647,4 +697,50 @@ export const speaker = {
   }
 };
 
+/** تشخيص محرك الصوت النشط في متصفح المستخدم */
+export function detectBrowserAudioEngine(cfg = {}) {
+  if (typeof window === 'undefined') return { type: 'unknown', isNatural: false, name: 'غير معروف', badge: '⚪ جاري الفحص' };
+
+  if (cfg.voice?.openaiKey) {
+    return {
+      type: 'openai-neural',
+      isNatural: true,
+      name: 'OpenAI TTS-1 Neural Studio (صوت استوديو بشري فائق)',
+      badge: '🟢 صوت بشري استوديو (OpenAI)'
+    };
+  }
+
+  if (cfg.voice?.groqKey) {
+    return {
+      type: 'groq-orpheus-saudi',
+      isNatural: true,
+      name: 'Groq Orpheus Saudi Neural (صوت استوديو سعودي حقيقي)',
+      badge: '🟢 صوت بشري سعودي (مفتاحك الخاص)'
+    };
+  }
+
+  const ua = navigator.userAgent || '';
+  const isEdge = ua.includes('Edg/');
+  const synth = window.speechSynthesis;
+  const voices = synth ? synth.getVoices() : [];
+  const hasNatural = voices.some(v => (v.name || '').toLowerCase().includes('natural') || (v.name || '').toLowerCase().includes('online'));
+
+  if (isEdge || hasNatural) {
+    return {
+      type: 'edge-natural',
+      isNatural: true,
+      name: 'Microsoft Edge Natural Online (أصوات استوديو بشرية فائقة مجاناً)',
+      badge: '🟢 صوت بشري طبيعي 100% (Edge)'
+    };
+  }
+
+  return {
+    type: 'chrome-sapi',
+    isNatural: false,
+    name: 'Google Chrome SAPI (نظام ويندوز الصوتي الاحتياطي)',
+    badge: '🟡 متصفح كروم (صوت تركيبي محلي)'
+  };
+}
+
 export { DIALECTS };
+

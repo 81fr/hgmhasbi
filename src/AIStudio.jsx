@@ -11,7 +11,7 @@ import {
   VOICES, LENGTHS, TOOL_DEFS, NAV_PAGES, getUsageStats, clearUsageLog,
   dialectScore, DEFAULT_CONFIG, buildFullSystemPrompt, saudiGreeting
 } from './aiConfig.js';
-import { AIService, GROQ_MODELS } from './aiService.js';
+import { AIService, GROQ_MODELS, detectBrowserAudioEngine } from './aiService.js';
 import { sfx } from './audioEffects.js';
 
 const AVATAR_ICONS = ['🤖', '🧠', '✨', '💬', '⚡', '💼', '🇸🇦', '🎯'];
@@ -39,7 +39,7 @@ export default function AIStudio({
   const [usageStats, setUsageStats] = useState(() => getUsageStats());
   const [newFaqQ, setNewFaqQ] = useState('');
   const [newFaqA, setNewFaqA] = useState('');
-  const [activeVoiceEngine, setActiveVoiceEngine] = useState(null);
+  const [activeVoiceEngine, setActiveVoiceEngine] = useState(() => detectBrowserAudioEngine(loadAIConfig()).type);
   const [ttsTermsRequired, setTtsTermsRequired] = useState(() => {
     try { return sessionStorage.getItem('traouf_tts_groq_state') === 'terms'; } catch (e) { return false; }
   });
@@ -55,12 +55,17 @@ export default function AIStudio({
       setUsageStats(getUsageStats());
     };
     const handleTermsReq = () => setTtsTermsRequired(true);
+    const handleEngineChange = (e) => {
+      if (e.detail?.engine) setActiveVoiceEngine(e.detail.engine);
+    };
 
     window.addEventListener('traouf-ai-config', handleCfgChange);
     window.addEventListener('traouf-tts-terms-required', handleTermsReq);
+    window.addEventListener('traouf-voice-engine-change', handleEngineChange);
     return () => {
       window.removeEventListener('traouf-ai-config', handleCfgChange);
       window.removeEventListener('traouf-tts-terms-required', handleTermsReq);
+      window.removeEventListener('traouf-voice-engine-change', handleEngineChange);
     };
   }, []);
 
@@ -1035,23 +1040,78 @@ export default function AIStudio({
                 />
               </div>
 
-              {/* Notice for human-like voices in browsers */}
-              <div style={{
-                background: 'rgba(0, 165, 155, 0.08)',
-                border: '1px solid rgba(0, 165, 155, 0.25)',
-                borderRadius: '12px',
-                padding: '0.9rem 1.25rem',
-                fontSize: '0.85rem',
-                lineHeight: 1.6
-              }}>
-                <div style={{ fontWeight: 800, color: 'var(--brand-teal)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                  <Sparkles size={16} /> سر الحصول على صوت بشري حقيقي وطبيعي 100%:
-                </div>
-                <ul style={{ margin: 0, paddingRight: '1.25rem', color: 'var(--text-muted)' }}>
-                  <li><strong>عبر متصفح Microsoft Edge (مجاناً وفوراً):</strong> افتح النظام في متصفح Edge للاستمتاع تلقائياً بأصوات <em>Microsoft Natural البشرية</em> الطبيعية مجاناً وبدون أي إعدادات.</li>
-                  <li><strong>عبر متصفح Google Chrome:</strong> يرجى وضع مفتاح Groq مجاني أو مفتاح OpenAI في الحقول أدناه لربط محرك Orpheus البشري بدون قيود الحصص المشتركة.</li>
-                </ul>
-              </div>
+              {/* Diagnostic banner for audio engine status */}
+              {(() => {
+                const engine = detectBrowserAudioEngine(config);
+                return (
+                  <div style={{
+                    background: engine.isNatural ? 'rgba(16, 185, 129, 0.08)' : 'rgba(245, 158, 11, 0.09)',
+                    border: `1px solid ${engine.isNatural ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.35)'}`,
+                    borderRadius: '14px',
+                    padding: '1.1rem 1.4rem',
+                    fontSize: '0.88rem',
+                    lineHeight: 1.65
+                  }}>
+                    <div style={{
+                      fontWeight: 800,
+                      color: engine.isNatural ? '#10b981' : '#f59e0b',
+                      marginBottom: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '0.5rem'
+                    }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.95rem' }}>
+                        <Sparkles size={18} /> المحرك الصوتي النشط: {engine.name}
+                      </span>
+                      <span style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 800,
+                        background: engine.isNatural ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.18)',
+                        padding: '0.2rem 0.6rem',
+                        borderRadius: '6px'
+                      }}>
+                        {engine.badge}
+                      </span>
+                    </div>
+
+                    {engine.type === 'chrome-sapi' ? (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                        <p style={{ margin: '0 0 0.5rem 0', fontWeight: 700, color: '#f59e0b' }}>
+                          💡 تنبيه هام لرواد متصفح Google Chrome:
+                        </p>
+                        <p style={{ margin: '0 0 0.5rem 0' }}>
+                          متصفح كروم على نظام ويندوز يفتقر إلى مكتبة الأصوات السحابية الطبيعية، ويعتمد عند نفاد حصة Groq المشتركة على صوت ويندوز القديم (Microsoft Naayf الآلي).
+                        </p>
+                        <div style={{
+                          background: 'var(--bg)',
+                          padding: '0.75rem 1rem',
+                          borderRadius: '10px',
+                          border: '1px solid var(--border)',
+                          marginTop: '0.5rem'
+                        }}>
+                          <div style={{ fontWeight: 800, marginBottom: '0.3rem', color: 'var(--brand-teal)' }}>
+                            ✨ طريقتان للاستماع لصوت بشري 100% كأنه إنسان حقيقي:
+                          </div>
+                          <ol style={{ margin: 0, paddingRight: '1.25rem' }}>
+                            <li style={{ marginBottom: '0.35rem' }}>
+                              <strong>الخيار الأسهل والفوري (مجاني 100%):</strong> افتح هذا الرابط نفسه في متصفح <strong>Microsoft Edge</strong> (المثبت مسبقاً على جهازك) للاستمتاع فوراً بأصوات <em>Microsoft Natural البشرية</em> الطبيعية مجاناً وبدون أي إعدادات!
+                            </li>
+                            <li>
+                              <strong>للاستمرار في Chrome:</strong> ضع مفتاحك المجاني الخاص من <code>console.groq.com</code> أو مفتاح <code>OpenAI</code> في الحقول أدناه لربط محرك الاستوديو الصوتي بحصتك الخاصة.
+                            </li>
+                          </ol>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '0.84rem' }}>
+                        🎉 نظامك الصوتي مهيأ ويعمل الآن بمحرك بشري استوديو عالي الواقعية. يمكنك الاستماع واختيار أي من الشخصيات العشر أدناه بنبرات صوتية طبيعية ومتباينة.
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
 
               {/* Voice Personas */}
               <div>
