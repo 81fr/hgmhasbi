@@ -62,91 +62,23 @@ export function isNativeModel(model) {
   return m.startsWith('openai/gpt-oss') || m.includes('llama-3') || m.includes('llama-4');
 }
 
-/**
- * يحدد ما إذا كان النص المطلوب نطقة له تسجيل بشري مسبق عالي الجودة (استوديو 100%).
- * يضمن هذا تشغيلاً فورياً بصوت بشري نقي دون أي تأخير ودون استهلاك أي حصص من خوادم الذكاء الاصطناعي.
- */
-export function getPreloadedAudioUrl(text, voiceId) {
-  const t = String(text || '').trim();
-  const base = import.meta.env.BASE_URL || '/';
+export const OPENAI_VOICE_MAP = {
+  fahad: 'alloy',        // وقور ورسمي (Alloy)
+  sultan: 'echo',        // واثق وحيوي (Echo)
+  salman: 'onyx',        // تنفيذي قيادي (Onyx)
+  majed: 'echo',         // ميداني ودود (Echo)
+  hamed: 'onyx',         // خبير مالي (Onyx)
+  noura: 'nova',         // دافئ وواضح (Nova)
+  sara: 'nova',          // ذكي ومتحمس (Nova)
+  lulwa: 'shimmer',      // ناعم ودقيق (Shimmer)
+  aisha: 'shimmer',      // مهني وواثق (Shimmer)
+  reem: 'fable'          // تنفيذي راقي (Fable)
+};
 
-  // 1. الإيجاز الصوتي التنفيذي اللحظي
-  if (t.includes('موجزنا المالي والتشغيلي') || t.includes('لوحة قيادة جمعية تراؤف')) {
-    return `${base}audio/samples/briefing_saudi.mp3`;
-  }
-  if (t.includes('لوحة القيادة التنفيذية') || t.includes('الإيجاز المالي والتشغيلي')) {
-    return `${base}audio/samples/briefing_formal.mp3`;
-  }
-
-  // 2. شخصيات الأصوات العشرة المحددة
-  if (t.includes('أنا فهد مستشاركم المالي') || (voiceId === 'fahad' && t.includes('فهد'))) {
-    return `${base}audio/samples/voice_fahad.mp3`;
-  }
-  if (t.includes('أنا سلطان') || (voiceId === 'sultan' && t.includes('سلطان'))) {
-    return `${base}audio/samples/voice_sultan.mp3`;
-  }
-  if (t.includes('أنا سلمان') || (voiceId === 'salman' && t.includes('سلمان'))) {
-    return `${base}audio/samples/voice_salman.mp3`;
-  }
-  if (t.includes('أنا ماجد') || (voiceId === 'majed' && t.includes('ماجد'))) {
-    return `${base}audio/samples/voice_majed.mp3`;
-  }
-  if (t.includes('أنا حامد الخبير المحاسبي') || (voiceId === 'hamed' && t.includes('حامد'))) {
-    return `${base}audio/samples/voice_hamed.mp3`;
-  }
-  if (t.includes('أنا نورة') || (voiceId === 'noura' && t.includes('نورة'))) {
-    return `${base}audio/samples/voice_noura.mp3`;
-  }
-  if (t.includes('أنا سارة') || (voiceId === 'sara' && t.includes('سارة'))) {
-    return `${base}audio/samples/voice_sara.mp3`;
-  }
-  if (t.includes('أنا لولوة') || (voiceId === 'lulwa' && t.includes('لولوة'))) {
-    return `${base}audio/samples/voice_lulwa.mp3`;
-  }
-  if (t.includes('أنا عائشة') || (voiceId === 'aisha' && t.includes('عائشة'))) {
-    return `${base}audio/samples/voice_aisha.mp3`;
-  }
-  if (t.includes('أنا ريم') || (voiceId === 'reem' && t.includes('ريم'))) {
-    return `${base}audio/samples/voice_reem.mp3`;
-  }
-
-  // 3. عينات اللهجات الثمانية
-  if (t.includes('أبشر بعزك كل بيانات الأصول والمستودع')) {
-    return `${base}audio/samples/dialect_white.mp3`;
-  }
-  if (t.includes('سم طال عمرك، أبشر بعزك وما طلبت')) {
-    return `${base}audio/samples/dialect_najdi.mp3`;
-  }
-  if (t.includes('يا هلا والله وغلا، نورتنا ودحين')) {
-    return `${base}audio/samples/dialect_hijazi.mp3`;
-  }
-  if (t.includes('يا هلا بحبايبنا، عساك عالقوة')) {
-    return `${base}audio/samples/dialect_eastern.mp3`;
-  }
-  if (t.includes('مرحبا ألوف وتراحيب المطر')) {
-    return `${base}audio/samples/dialect_southern.mp3`;
-  }
-  if (t.includes('يا هلا وغلا، أبشر بسعدك وعوني')) {
-    return `${base}audio/samples/dialect_northern.mp3`;
-  }
-  if (t.includes('المؤشرات المالية والتشغيلية ممتازة ومكتملة')) {
-    return `${base}audio/samples/dialect_gulf.mp3`;
-  }
-  if (t.includes('نفيدكم بأن محفظة الأصول والعهد محدثة')) {
-    return `${base}audio/samples/dialect_formal.mp3`;
-  }
-
-  // 4. العينة الافتراضية العامة
-  if (t.includes('أبشر بعزك، جميع الأرقام والبيانات في جمعية تراؤف')) {
-    return `${base}audio/samples/default_sample.mp3`;
-  }
-
-  // 5. في حال طلب معاينة صوت شخصية محددة
-  if (voiceId && ['fahad', 'sultan', 'salman', 'majed', 'hamed', 'noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId)) {
-    return `${base}audio/samples/voice_${voiceId}.mp3`;
-  }
-
-  return null;
+export function mapToOpenAIVoice(voiceId = 'fahad') {
+  if (OPENAI_VOICE_MAP[voiceId]) return OPENAI_VOICE_MAP[voiceId];
+  const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
+  return isFemale ? 'nova' : 'alloy';
 }
 
 export class AIService {
@@ -452,24 +384,12 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     const result = { engine: null, done: null };
 
     result.done = (async () => {
-      // 0. التحقق من المقاطع البشرية المسجلة مسبقاً (جودة استوديو بشرية 100% بدون أي حدود أو اعتمادية)
-      const preloaded = getPreloadedAudioUrl(clean, effectiveVoiceId);
-      if (preloaded) {
-        try {
-          result.engine = 'human-studio-hd';
-          await speaker.playUrl(preloaded, token, effectiveRate);
-          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
-          return;
-        } catch (err) {
-          console.warn('Preloaded audio playback error:', err);
-        }
-      }
-
       // 1. مفتاح OpenAI المخصص إن وجد في إعدادات الصوت
       if (v.openaiKey) {
         try {
           result.engine = 'openai-neural';
-          const audioUrl = await this._openAITTS(clean, v.openaiKey, v.openaiVoice || 'alloy');
+          const openAIVoice = mapToOpenAIVoice(effectiveVoiceId);
+          const audioUrl = await this._openAITTS(clean, v.openaiKey, openAIVoice);
           await speaker.playUrl(audioUrl, token, effectiveRate);
           logAIEvent({ type: 'voice-out', ok: true, engine: 'openai-neural' });
           return;

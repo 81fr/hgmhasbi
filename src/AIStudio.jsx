@@ -1035,6 +1035,24 @@ export default function AIStudio({
                 />
               </div>
 
+              {/* Notice for human-like voices in browsers */}
+              <div style={{
+                background: 'rgba(0, 165, 155, 0.08)',
+                border: '1px solid rgba(0, 165, 155, 0.25)',
+                borderRadius: '12px',
+                padding: '0.9rem 1.25rem',
+                fontSize: '0.85rem',
+                lineHeight: 1.6
+              }}>
+                <div style={{ fontWeight: 800, color: 'var(--brand-teal)', marginBottom: '0.35rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Sparkles size={16} /> سر الحصول على صوت بشري حقيقي وطبيعي 100%:
+                </div>
+                <ul style={{ margin: 0, paddingRight: '1.25rem', color: 'var(--text-muted)' }}>
+                  <li><strong>عبر متصفح Microsoft Edge (مجاناً وفوراً):</strong> افتح النظام في متصفح Edge للاستمتاع تلقائياً بأصوات <em>Microsoft Natural البشرية</em> الطبيعية مجاناً وبدون أي إعدادات.</li>
+                  <li><strong>عبر متصفح Google Chrome:</strong> يرجى وضع مفتاح Groq مجاني أو مفتاح OpenAI في الحقول أدناه لربط محرك Orpheus البشري بدون قيود الحصص المشتركة.</li>
+                </ul>
+              </div>
+
               {/* Voice Personas */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem' }}>
@@ -1081,7 +1099,7 @@ export default function AIStudio({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleTestVoiceSample(null, v.id);
+                            handleTestVoiceSample(v.sample, v.id);
                           }}
                           style={{
                             marginTop: '0.75rem',
