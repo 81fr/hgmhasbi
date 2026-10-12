@@ -594,7 +594,7 @@ const AssetForm = ({ ea, systemLookups, onSubmit, onCancel }) => {
 // Master clean & restore logic: wipes any dirty test data, dummy entries, or deleted blacklists
 // and guarantees 100% authentic Traouf Charity datasets on every device.
 try {
-  const MASTER_KEY = 'traouf_master_clean_v5';
+  const MASTER_KEY = 'traouf_master_clean_v6';
   if (typeof window !== 'undefined' && localStorage.getItem(MASTER_KEY) !== 'true') {
     localStorage.removeItem('traouf_assets');
     localStorage.removeItem('traouf_employees');
@@ -651,7 +651,7 @@ const App = () => {
           .from('employees')
           .select('role, full_name')
           .eq('email', session.user.email)
-          .single();
+          .maybeSingle();
           
         if (empData) {
           role = empData.role;
@@ -715,7 +715,17 @@ const App = () => {
   const [custodyPage, setCustodyPage] = useState(1);
   const [custodySearch, setCustodySearch] = useState('');
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [chatMessages, setChatMessages] = useState(() => [{role: 'bot', text: `أهلاً بك! أنا ${localStorage.getItem('aiName') || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}]);
+  const [chatMessages, setChatMessages] = useState(() => {
+    try {
+      const raw = localStorage.getItem('traouf_ai_studio_v1');
+      if (raw) {
+        const cfg = JSON.parse(raw);
+        const name = cfg.name || 'تراؤف AI';
+        return [{ role: 'bot', text: `🇸🇦 يا هلا ومسهلا! أنا «${name}» مستشارك الذكي بجمعية تراؤف. آمرني، وش تبي تعرف عن الأصول والعهد والمستودع والقيود اليوم؟` }];
+      }
+    } catch(e) {}
+    return [{ role: 'bot', text: `🇸🇦 يا هلا ومسهلا! أنا «${localStorage.getItem('aiName') || 'تراؤف AI'}» مستشارك الذكي. كيف أقدر أخدمك اليوم؟` }];
+  });
   const [chatInput, setChatInput] = useState('');
 
 
@@ -878,13 +888,25 @@ const App = () => {
   const [aiSystemPrompt, setAiSystemPrompt] = useState(localStorage.getItem('aiSystemPrompt') || 'أنت تراؤف، مساعد ذكي ومحاسب وخبير أصول. أنت تتحدث باللغة العربية وتساعد المستخدم في إدارة النظام المحاسبي، الأصول، والمستودعات. أجب باختصار وبشكل مهني.');
   
   useEffect(() => {
-    setChatMessages(prev => {
-      if (prev.length === 1 && prev[0].role === 'bot' && prev[0].text.includes('مرحباً بك! أنا')) {
-        return [{role: 'bot', text: `مرحباً بك! أنا ${aiName || 'المساعد الذكي'}. كيف يمكنني مساعدتك اليوم؟`}];
+    const handleStudioUpdate = (e) => {
+      const cfg = e.detail;
+      if (cfg) {
+        if (cfg.name) {
+          setAiName(cfg.name);
+          localStorage.setItem('aiName', cfg.name);
+        }
+        if (cfg.appearance?.icon) {
+          setAiIcon(cfg.appearance.icon);
+          localStorage.setItem('aiIcon', cfg.appearance.icon);
+        }
+        if (cfg.voice?.enabled !== undefined) {
+          setAutoSpeak(cfg.voice.enabled);
+        }
       }
-      return prev;
-    });
-  }, [aiName]);
+    };
+    window.addEventListener('traouf-ai-config', handleStudioUpdate);
+    return () => window.removeEventListener('traouf-ai-config', handleStudioUpdate);
+  }, []);
 
   const [aiApiKey, setAiApiKey] = useState(() => {
     const saved = localStorage.getItem('aiApiKey');
@@ -1172,7 +1194,7 @@ const App = () => {
 
   const fetchInitialData = async () => {
     // جلب الأصول
-    const { data: setData } = await supabase.from('system_settings').select('lookups').limit(1).single();
+    const { data: setData } = await supabase.from('system_settings').select('lookups').limit(1).maybeSingle();
     if (setData?.lookups) {
       setSystemLookups(setData.lookups);
     }
@@ -1305,7 +1327,7 @@ const App = () => {
     const { data: logsData } = await supabase.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
     if (logsData) setAuditLogs(logsData);
     
-    const { data: setts } = await supabase.from('system_settings').select('*').limit(1).single();
+    const { data: setts } = await supabase.from('system_settings').select('*').limit(1).maybeSingle();
     if (setts) setSystemSettings(setts);
     
     const { data: notifs } = await supabase.from('notifications').select('*').order('created_at', { ascending: false });
@@ -2429,7 +2451,7 @@ const App = () => {
       return true;
     });
 
-    const journalPageSize = 15;
+    const journalPageSize = 50;
     const totalJournalPages = Math.ceil(filteredJournals.length / journalPageSize) || 1;
     const currentJournalPage = Math.min(Math.max(1, journalPage), totalJournalPages);
     const paginatedJournals = filteredJournals.slice((currentJournalPage - 1) * journalPageSize, currentJournalPage * journalPageSize);
@@ -2540,7 +2562,7 @@ const App = () => {
               type="button"
               className={`btn ${journalFilter === 'all' ? 'btn-primary' : 'btn-ghost'}`}
               style={{padding:'0.5rem 1.2rem', fontSize:'0.85rem', border: journalFilter === 'all' ? 'none' : '1px solid var(--border)'}}
-              onClick={() => setJournalFilter('all')}
+              onClick={() => { setJournalFilter('all'); setJournalPage(1); }}
             >
               جميع القيود ({journals.length})
             </button>
@@ -2556,7 +2578,7 @@ const App = () => {
                 color: journalFilter === 'pending' ? 'white' : '#b45309',
                 background: journalFilter === 'pending' ? '#d97706' : 'rgba(245, 158, 11, 0.12)'
               }}
-              onClick={() => setJournalFilter('pending')}
+              onClick={() => { setJournalFilter('pending'); setJournalPage(1); }}
             >
               ⏳ قيود جديدة للمراجعة والاعتماد ({pendingList.length})
             </button>
@@ -2571,7 +2593,7 @@ const App = () => {
                 color: journalFilter === 'approved' ? 'white' : '#047857',
                 background: journalFilter === 'approved' ? '#059669' : 'rgba(16, 185, 129, 0.1)'
               }}
-              onClick={() => setJournalFilter('approved')}
+              onClick={() => { setJournalFilter('approved'); setJournalPage(1); }}
             >
               ✅ قيود معتمدة ومرحلة ({approvedList.length})
             </button>
@@ -3216,7 +3238,27 @@ const App = () => {
     setIsGeneratingReport(false);
   };
 
-  const renderAIStudio = () => <AIStudio aiName={aiName} setAiName={setAiName} aiSystemPrompt={aiSystemPrompt} setAiSystemPrompt={setAiSystemPrompt} aiProvider={aiProvider} setAiProvider={setAiProvider} />;
+  const renderAIStudio = () => (
+    <AIStudio 
+      aiName={aiName} 
+      setAiName={setAiName} 
+      aiSystemPrompt={aiSystemPrompt} 
+      setAiSystemPrompt={setAiSystemPrompt} 
+      aiProvider={aiProvider} 
+      setAiProvider={setAiProvider} 
+      aiIcon={aiIcon}
+      setAiIcon={setAiIcon}
+      setIsChatOpen={setIsChatOpen}
+      setChatMessages={setChatMessages}
+      assets={assets} 
+      employees={employeesList} 
+      warehouseItems={warehouseItems} 
+      journals={journals} 
+      transfers={transfers} 
+      onNavigate={setView} 
+      showToast={showToast} 
+    />
+  );
 
   const renderAIInsights = () => {
     // Fallback to basic calculations if analyticsData not yet fetched
@@ -5022,7 +5064,7 @@ const renderDepreciation = () => {
       localStorage.removeItem('deletedJournalIds');
       localStorage.removeItem('deletedTransferIds');
       localStorage.removeItem('deletedWarehouseReqIds');
-      localStorage.setItem('traouf_master_clean_v5', 'true');
+      localStorage.setItem('traouf_master_clean_v6', 'true');
     } catch(e) {}
 
     const allReal = [...realAssetsData, ...realCustodyData];
@@ -5169,8 +5211,30 @@ const renderDepreciation = () => {
           <div className={`nav-item ${view === 'ai-insights' ? 'active' : ''}`} onClick={() => setView('ai-insights')}>
             <div className="nav-icon-box"><Sparkles size={18} /></div> التحليلات التنبؤية
           </div>
-          <div className={`nav-item ${view === 'ai-studio' ? 'active' : ''}`} onClick={() => setView('ai-studio')}>
-            <div className="nav-icon-box"><BrainCircuit size={18} /></div> استوديو الذكاء الاصطناعي
+          <div 
+            className={`nav-item ${view === 'ai-studio' ? 'active' : ''}`} 
+            onClick={() => { sfx.playClick(); setView('ai-studio'); }}
+            style={{ position: 'relative' }}
+          >
+            <div className="nav-icon-box" style={{
+              background: view === 'ai-studio' ? 'linear-gradient(135deg, var(--brand-teal), #8b5cf6)' : undefined,
+              color: view === 'ai-studio' ? 'white' : 'var(--brand-teal)'
+            }}>
+              <BrainCircuit size={18} />
+            </div>
+            <span style={{ fontWeight: 800 }}>استوديو الذكاء الاصطناعي</span>
+            <span style={{
+              marginRight: 'auto',
+              background: 'linear-gradient(135deg, #10b981, #059669)',
+              color: 'white',
+              fontSize: '0.62rem',
+              fontWeight: 800,
+              padding: '2px 7px',
+              borderRadius: '10px',
+              boxShadow: '0 2px 5px rgba(16, 185, 129, 0.4)'
+            }}>
+              جديد ✨
+            </span>
           </div>
         </div>
 
@@ -5271,6 +5335,30 @@ const renderDepreciation = () => {
                 {['2026', '2025', '2024', '2023'].map(y => <option key={y} value={y}>{y}</option>)}
               </select>
             </div>
+
+            {/* AI Studio Header Button */}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{
+                border: view === 'ai-studio' ? '1px solid #10b981' : '1px solid rgba(13, 148, 136, 0.45)',
+                background: view === 'ai-studio' ? 'linear-gradient(135deg, var(--brand-teal), #8b5cf6)' : 'rgba(13, 148, 136, 0.12)',
+                color: view === 'ai-studio' ? 'white' : 'var(--brand-teal)',
+                fontSize: '0.8rem',
+                fontWeight: 800,
+                padding: '0.35rem 0.85rem',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.4rem',
+                boxShadow: view === 'ai-studio' ? '0 0 15px rgba(13, 148, 136, 0.5)' : 'none',
+                transition: 'all 0.2s ease'
+              }}
+              title="فتح استوديو الذكاء الاصطناعي وتخصيص اللهجة السعودية"
+              onClick={() => { sfx.playClick(); setView('ai-studio'); }}
+            >
+              <BrainCircuit size={15} /> استوديو الذكاء الاصطناعي ✨
+            </button>
 
             {/* Scenario Simulator Button */}
             <button
@@ -5682,29 +5770,40 @@ const renderDepreciation = () => {
       )}
 
       <button 
-        style={{position:'fixed', bottom:'2rem', left:'2rem', background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', width:'60px', height:'60px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-accent)', zIndex:9998, border:'none', cursor:'pointer', transition:'transform 0.2s'}}
+        style={{position:'fixed', bottom:'2rem', left:'2rem', background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))', color:'white', width:'60px', height:'60px', borderRadius:'50%', display:'flex', alignItems:'center', justifyContent:'center', boxShadow:'var(--shadow-accent)', zIndex:99998, border:'none', cursor:'pointer', transition:'transform 0.2s'}}
         onClick={() => setIsChatOpen(true)}
         onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.1)'}
         onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+        title={`المساعد الذكي (${aiName || 'تراؤف AI'})`}
       >
-        <Bot size={28} />
+        <span style={{fontSize:'1.8rem', lineHeight:1}}>{aiIcon || '🤖'}</span>
       </button>
 
       {isChatOpen && (
-        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'420px', height:'620px', background:'var(--card-bg)', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.25)', zIndex:10000, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'slideUp 0.3s ease-out'}}>
+        <div style={{position:'fixed', bottom:'5rem', left:'2rem', width:'420px', maxWidth:'calc(100vw - 2.5rem)', height:'620px', maxHeight:'calc(100vh - 6.5rem)', background:'var(--card-bg)', borderRadius:'24px', boxShadow:'0 25px 50px -12px rgba(0,0,0,0.3)', zIndex:99999, display:'flex', flexDirection:'column', border:'1px solid var(--border)', overflow:'hidden', animation:'slideUp 0.3s ease-out'}}>
           {/* AI Header - Manafez Brand */}
           <div style={{background:'linear-gradient(135deg, var(--brand-teal) 0%, var(--brand-green) 100%)', color:'white', padding:'1.5rem', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
             <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
-              <div style={{background:'rgba(255,255,255,0.2)', padding:'0.5rem', borderRadius:'12px', position:'relative'}}>
-                 <Bot size={24} />
+              <div style={{background:'rgba(255,255,255,0.2)', padding:'0.4rem 0.6rem', borderRadius:'12px', position:'relative', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                 <span style={{fontSize:'1.6rem', lineHeight:1}}>{aiIcon || '🤖'}</span>
                  <div style={{position:'absolute', bottom:'-2px', right:'-2px', width:'10px', height:'10px', background:'#fff', borderRadius:'50%', border:'2px solid var(--brand-green)'}}></div>
               </div>
               <div>
-                 <div style={{fontWeight:800, fontSize:'1rem'}}>تراؤف AI V5.0</div>
-                 <div style={{fontSize:'0.7rem', opacity:0.9}}>متصل | أصول + مستودعات + RADAR</div>
+                 <div style={{fontWeight:800, fontSize:'1rem'}}>
+                   {aiName || 'تراؤف AI'}
+                 </div>
+                 <div style={{fontSize:'0.7rem', opacity:0.9}}>متصل • لهجة سعودية حية • بيانات النظام</div>
               </div>
             </div>
-            <div style={{display:'flex', gap:'0.5rem'}}>
+            <div style={{display:'flex', gap:'0.5rem', alignItems:'center'}}>
+               <button 
+                  type="button"
+                  onClick={() => { sfx.playClick(); setView('ai-studio'); setIsChatOpen(false); }} 
+                  style={{background:'rgba(255,255,255,0.25)', border:'none', color:'white', cursor:'pointer', padding:'4px 9px', borderRadius:'8px', fontSize:'0.72rem', display:'flex', alignItems:'center', gap:'4px', fontWeight:800}}
+                  title="فتح استوديو الذكاء الاصطناعي وتخصيص اللهجة"
+               >
+                  <BrainCircuit size={14} /> استوديو الذكاء ✨
+               </button>
                <button onClick={() => setAutoSpeak(!autoSpeak)} style={{background:'transparent', border:'none', color:'white', cursor:'pointer', opacity: autoSpeak ? 1 : 0.5}} title="التحدث تلقائياً">
                   {autoSpeak ? <Volume2 size={20}/> : <VolumeX size={20}/>}
                </button>
@@ -5728,7 +5827,7 @@ const renderDepreciation = () => {
                   {msg.text}
                 </div>
                 <div style={{fontSize:'0.65rem', color:'var(--text-muted)', textAlign: msg.role === 'bot' ? 'right' : 'left', padding:'0 0.5rem'}}>
-                  {msg.role === 'bot' ? 'تراؤف ذكاء اصطناعي' : 'أنت'}
+                  {msg.role === 'bot' ? 'تراؤف ذكاء اصطناعي 🇸🇦' : 'أنت'}
                 </div>
               </div>
             ))}
@@ -5742,14 +5841,14 @@ const renderDepreciation = () => {
             <div ref={chatEndRef} />
           </div>
 
-          {/* Quick Actions - Enhanced with Warehouse */}
+          {/* Quick Actions - Authentic Saudi dialect chips */}
           <div style={{padding:'0.5rem 1rem', display:'flex', gap:'0.5rem', overflowX:'auto', background:'var(--card-bg)', borderTop:'1px solid var(--border)'}}>
              {[
-               {label: 'حالة المخزون', icon: <Warehouse size={12}/>},
-               {label: 'أصول حرجة', icon: <AlertTriangle size={12}/>},
-               {label: 'تحليل RADAR', icon: <Target size={12}/>},
-               {label: 'فرص الوفر', icon: <Zap size={12}/>},
-               {label: 'تقرير شامل', icon: <BarChart3 size={12}/>},
+               {label: 'كم الأصول الثابتة وقيمتها؟', icon: <Calculator size={12}/>},
+               {label: 'مين أكثر موظف عنده عهد؟', icon: <Users size={12}/>},
+               {label: 'وش وضع المستودع والنواقص؟', icon: <Warehouse size={12}/>},
+               {label: 'افتح لي سجل الأصول', icon: <Box size={12}/>},
+               {label: 'هل القيود متوازنة؟', icon: <CheckCircle size={12}/>},
              ].map((chip, idx) => (
                <button key={idx} onClick={() => setChatInput(chip.label)} style={{whiteSpace:'nowrap', padding:'0.4rem 0.8rem', borderRadius:'20px', border:'1px solid var(--border)', background:'var(--card-bg)', fontSize:'0.75rem', fontWeight:600, color:'var(--text-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.4rem', transition:'all 0.2s'}} onMouseEnter={e => {e.currentTarget.style.borderColor = 'var(--brand-teal)'; e.currentTarget.style.color = 'var(--brand-teal)';}} onMouseLeave={e => {e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)';}}>
                  {chip.icon} {chip.label}
@@ -5757,8 +5856,6 @@ const renderDepreciation = () => {
              ))}
           </div>
 
-          {/* Input Area */}
-          
           {/* Input Area */}
           <form style={{display:'flex', padding:'1.25rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.75rem'}} onSubmit={async (e) => {
             e.preventDefault();
@@ -5770,33 +5867,40 @@ const renderDepreciation = () => {
             
             setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
-            if (!aiApiKey) {
-              const errResp = "⚠️ يرجى إضافة مفتاح الـ API الخاص بك (Groq أو Hugging Face) في صفحة الإعدادات لتفعيل الذكاء الاصطناعي.";
-              setChatMessages(prev => [...prev, {role: 'bot', text: errResp}]);
-              setIsTyping(false);
-              return;
-            }
-
             let botResponse = '';
             try {
-              let sysPrompt = aiSystemPrompt + "\n\nالسياق الإضافي: " + (window.aiFileContext || "");
-              sysPrompt += "\nالصفحة الحالية للمستخدم هي: " + view;
-              
-              // Prepare context with system prompt + history
-              const messagesContext = [
-                { role: "system", content: sysPrompt },
+              const liveData = {
+                assets,
+                employees: employeesList,
+                warehouseItems,
+                journals,
+                transfers
+              };
+              const ai = new AIService(aiApiKey || null, aiProvider || 'groq', {
+                getData: () => liveData,
+                onNavigate: (page) => {
+                  setView(page);
+                  showToast(`🚀 [تراؤف AI] تم الانتقال إلى صفحة: ${page}`);
+                },
+                view
+              });
+
+              const history = [
                 ...chatMessages.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text })),
-                { role: "user", content: userInput }
+                { role: 'user', content: userInput }
               ];
 
-              const ai = new AIService(aiApiKey, aiProvider);
-              const resultMessage = await ai.sendChat(messagesContext);
-              botResponse = resultMessage.content || "تم تنفيذ الطلب.";
+              const result = await ai.chat(history, {
+                enableTools: true,
+                view,
+                extraContext: window.aiFileContext || ''
+              });
+              botResponse = result.content || "أبشر، تم تنفيذ المطلوب.";
               setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
               window.aiFileContext = "";
             } catch (err) {
               console.error(err);
-              setChatMessages(prev => [...prev, {role: 'bot', text: "❌ حدث خطأ في الاتصال بالذكاء الاصطناعي: " + err.message}]);
+              setChatMessages(prev => [...prev, {role: 'bot', text: "❌ " + (err.message || "تعذر إكمال الرد، يرجى المحاولة لاحقاً")}]);
             }
             
             setIsTyping(false);

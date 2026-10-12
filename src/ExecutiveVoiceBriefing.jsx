@@ -14,6 +14,7 @@ export default function ExecutiveVoiceBriefing({
   const [isPaused, setIsPaused] = useState(false);
   const [speechRate, setSpeechRate] = useState(1.0);
   const [voiceSupported, setVoiceSupported] = useState(true);
+  const [dialectMode, setDialectMode] = useState('saudi');
   const synthRef = useRef(null);
   const utteranceRef = useRef(null);
 
@@ -35,6 +36,15 @@ export default function ExecutiveVoiceBriefing({
     const costMillion = (totals.cost / 1_000_000).toFixed(2);
     const nbvMillion = (totals.nbv / 1_000_000).toFixed(2);
     const depK = Math.round(totals.dep / 1_000);
+
+    if (dialectMode === 'saudi') {
+      return `يا هلا ومسهلا والله، حياكم الله في لوحة قيادة جمعية تراؤف لإدارة الأصول والمستودعات. 
+أبشركم، هذا موجزنا المالي والتشغيلي اللحظي: 
+إجمالي أصولنا المسجلة وصل ${totals.cost > 1000000 ? `${costMillion} مليون` : `${Math.round(totals.cost).toLocaleString()}`} ${currencySymbol}، وصافي القيمة الدفترية الحين ${totals.nbv > 1000000 ? `${nbvMillion} مليون` : `${Math.round(totals.nbv).toLocaleString()}`} ${currencySymbol} بعد ما حسبنا مجمع إهلاك قدره ${depK.toLocaleString()} ألف ${currencySymbol}. 
+وجاهزية أصولنا ما شاء الله تبارك الله ممتازة بنسبة ${activeRate} بالمية موزعة على ${assetsCount} أصل ونظام تشغيلي. 
+وبالنسبة للمستودع، عندنا ${lowStockCount} أصناف وصلت الحد الأدنى وتحتاج إعادة طلب، ومعها ${pendingVouchersCount} طلبات صرف عهد بانتظار الاعتماد. 
+شغلنا كله تمام ومطابق لأعلى المعايير المحاسبية، وعسى الله يبارك بجهودكم جميعاً.`;
+    }
 
     return `السلام عليكم ورحمة الله وبركاته. مرحباً بكم في لوحة القيادة التنفيذية لمنظومة جمعية تراؤف لرعاية الأيتام لإدارة الأصول والمستودعات. 
 يسعدنا إحاطتكم بالإيجاز المالي والتشغيلي اللحظي: 
@@ -251,6 +261,44 @@ export default function ExecutiveVoiceBriefing({
             </button>
           </div>
         )}
+
+        {/* Dialect Selector */}
+        <div style={{ display: 'flex', background: 'var(--card-bg)', border: '1px solid var(--border)', borderRadius: '10px', padding: '2px', gap: '2px' }}>
+          <button
+            type="button"
+            onClick={() => { sfx.playClick(); setDialectMode('saudi'); }}
+            style={{
+              background: dialectMode === 'saudi' ? 'linear-gradient(135deg, var(--brand-teal), #10b981)' : 'transparent',
+              color: dialectMode === 'saudi' ? 'white' : 'var(--text-muted)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0.45rem 0.75rem',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+            title="لهجة سعودية بيضاء ودودة"
+          >
+            🇸🇦 سعودي
+          </button>
+          <button
+            type="button"
+            onClick={() => { sfx.playClick(); setDialectMode('formal'); }}
+            style={{
+              background: dialectMode === 'formal' ? 'linear-gradient(135deg, var(--brand-teal), #10b981)' : 'transparent',
+              color: dialectMode === 'formal' ? 'white' : 'var(--text-muted)',
+              border: 'none',
+              borderRadius: '8px',
+              padding: '0.45rem 0.75rem',
+              fontSize: '0.78rem',
+              fontWeight: 800,
+              cursor: 'pointer'
+            }}
+            title="عربية فصحى رسمية"
+          >
+            🏛️ فصحى
+          </button>
+        </div>
 
         {/* Speed toggle */}
         <select
