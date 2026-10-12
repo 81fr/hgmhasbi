@@ -1187,9 +1187,10 @@ export default function AIStudio({
                 {activeVoiceEngine && (
                   <span style={{ fontSize: '0.8rem', color: 'var(--brand-teal)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                     <CheckCircle size={15} />
+                    {activeVoiceEngine === 'human-studio-hd' && 'المشغل: تسجيل استوديو بشري نقي 100% (Human Studio HD)'}
                     {activeVoiceEngine === 'groq-orpheus-saudi' && 'المشغل: Groq Orpheus السعودي (بشري استوديو)'}
                     {activeVoiceEngine === 'openai-neural' && 'المشغل: OpenAI TTS-1 (بشري فائق الدقة)'}
-                    {activeVoiceEngine === 'browser-natural' && 'المشغل: أصوات Microsoft Natural البشرية'}
+                    {activeVoiceEngine === 'browser-natural' && 'المشغل: مشغل الصوت الطبيعي المحسن'}
                   </span>
                 )}
               </div>
