@@ -256,7 +256,8 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
   }
 
   /* ------------------------------ الصوت ------------------------------ */
-  async _groqTTS(text, voice) {
+  /* ------------------------------ الصوت البشري ------------------------------ */
+  async _groqTTS(text, voice = 'fahad') {
     const res = await fetch(`${BASE}/audio/speech`, {
       method: 'POST', headers: this.getHeaders(),
       body: JSON.stringify({ model: GROQ_MODELS.tts, input: text, voice, response_format: 'wav' })
@@ -264,7 +265,14 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       if (body.includes('model_terms_required')) {
-        try { sessionStorage.setItem(TTS_FLAG, 'terms'); } catch (e) { /* ignore */ }
+        try {
+          sessionStorage.setItem(TTS_FLAG, 'terms');
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('traouf-tts-terms-required', {
+              detail: { url: 'https://console.groq.com/playground?model=canopylabs%2Forpheus-arabic-saudi' }
+            }));
+          }
+        } catch (e) { /* ignore */ }
       } else if (res.status === 429) {
         try { sessionStorage.setItem(TTS_FLAG, 'rate'); } catch (e) { /* ignore */ }
       }
@@ -272,44 +280,79 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
       err.code = body.includes('model_terms_required') ? 'terms' : 'error';
       throw err;
     }
+    try { sessionStorage.setItem(TTS_FLAG, 'ready'); } catch (e) { /* ignore */ }
+    const blob = await res.blob();
+    return URL.createObjectURL(blob);
+  }
+
+  async _openAITTS(text, apiKey, voice = 'alloy') {
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'tts-1', input: text, voice })
+    });
+    if (!res.ok) throw new Error('OpenAI TTS failed: ' + res.status);
     const blob = await res.blob();
     return URL.createObjectURL(blob);
   }
 
   /**
-   * ينطق النص بصوت بشري طبيعي ودافئ.
-   * الأولوية 1: محرك الصوت البشري Neural Cloud Audio (صوت بشري نقي خالي من الآلية)
-   * الأولوية 2: الأصوات الطبيعية المحسنة للمتصفح (مع استبعاد أصوات الروبوت القديمة)
+   * ينطق النص بصوت بشري حقيقي ودافئ (استبعاد الصوت الآلي القديم).
+   * الأولوية 1: مفتاح OpenAI TTS المخصص إن وجد
+   * الأولوية 2: محرك Groq Orpheus Saudi Neural (صوت استوديو بشري سعودي حقيقي 100%)
+   * الأولوية 3: أصوات Microsoft Natural Online البشرية في المتصفح (Hamed Natural / Zariyah Natural)
+   * الأولوية 4: بديل المتصفح المحسن بنبرة بشرية طبيعية
    */
-  speak(text, { engine, voiceId, rate } = {}) {
+  speak(text, { voiceId, rate } = {}) {
     const clean = cleanTextForSpeech(text);
     if (!clean) return { engine: null, done: Promise.resolve() };
 
     const cfg = this.cfg;
     const v = cfg.voice || {};
     const effectiveRate = rate || v.rate || 1.0;
-    // تقسيم النص لجمل طبيعية قصيرة وسلسة
-    const chunks = clean.match(/[^.،!؟\n]+[.،!؟\n]?/g) || [clean];
+    const effectiveVoiceId = voiceId || v.voiceId || 'fahad';
 
     speaker.stop();
     const token = ++speaker.token;
     const result = { engine: null, done: null };
 
     result.done = (async () => {
-      // 1. محاولة النطق البشري Neural Cloud Audio أولاً (صوت بشري حقيقي بدون صوت رجل آلي)
-      try {
-        result.engine = 'neural-cloud';
-        await speaker.playNeuralChunks(chunks, token, effectiveRate);
-        logAIEvent({ type: 'voice-out', ok: true, engine: 'neural-cloud' });
-        return;
-      } catch (err) {
-        console.warn('Neural audio fallback:', err);
+      // 1. مفتاح OpenAI المخصص إن وجد في إعدادات الصوت
+      if (v.openaiKey) {
+        try {
+          result.engine = 'openai-neural';
+          const audioUrl = await this._openAITTS(clean, v.openaiKey, v.openaiVoice || 'alloy');
+          await speaker.playUrl(audioUrl, token, effectiveRate);
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'openai-neural' });
+          return;
+        } catch (err) {
+          console.warn('OpenAI TTS fallback:', err);
+        }
       }
 
-      // 2. بديل المتصفح بأصوات Microsoft Natural الذكية (مع فلترة صوت النايف والروبوتات القديمة)
-      result.engine = 'browser-natural';
-      await speaker.speakBrowser(chunks, token, effectiveRate);
-      logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
+      // 2. Groq Orpheus Saudi Neural (صوت بشري استوديو حقيقي باللهجة السعودية)
+      try {
+        result.engine = 'groq-orpheus-saudi';
+        const audioUrl = await this._groqTTS(clean, effectiveVoiceId);
+        await speaker.playUrl(audioUrl, token, effectiveRate);
+        logAIEvent({ type: 'voice-out', ok: true, engine: 'groq-orpheus-saudi' });
+        return;
+      } catch (err) {
+        if (err.code === 'terms') {
+          console.info('Groq Orpheus model requires one-time terms acceptance at Groq console.');
+        } else {
+          console.warn('Groq Orpheus fallback:', err);
+        }
+      }
+
+      // 3. أصوات Microsoft Natural Online البشرية في المتصفح (متاحة في Edge والنظام الحديث)
+      try {
+        result.engine = 'browser-natural';
+        await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
+        logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
+      } catch (err) {
+        console.warn('Browser TTS error:', err);
+      }
     })();
 
     return result;
@@ -347,6 +390,9 @@ export function cleanTextForSpeech(text) {
 export const speaker = {
   token: 0,
   audio: null,
+  cachedVoices: [],
+  voicesLoaded: false,
+
   stop() {
     this.token++;
     try {
@@ -381,44 +427,92 @@ export const speaker = {
     });
   },
 
-  // تشغيل الجمل بصوت بشري نقي عبر دفق Neural Audio المتقدم
-  async playNeuralChunks(chunks, token, rate = 1) {
-    for (let i = 0; i < chunks.length; i++) {
-      if (token !== this.token) return;
-      const chunk = chunks[i].trim();
-      if (!chunk) continue;
-      // تقسيم الجمل الطويلة إذا لزم الأمر
-      const safeText = chunk.slice(0, 180);
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(safeText)}&tl=ar&client=tw-ob`;
-      await this.playUrl(url, token, rate);
+  async getVoicesAsync() {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return [];
+    if (this.voicesLoaded && this.cachedVoices.length) return this.cachedVoices;
+    
+    let list = window.speechSynthesis.getVoices() || [];
+    if (list.length) {
+      this.cachedVoices = list;
+      this.voicesLoaded = true;
+      return list;
     }
-  },
 
-  pickVoice() {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-    const voices = window.speechSynthesis.getVoices() || [];
-    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.includes('Arabic'));
-    // البحث أولاً عن الأصوات البشرية الطبيعية واستبعاد أصوات الروبوتات القديمة مثل Naayf
-    const naturalVoice = ar.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && !v.name.includes('Naayf'))
-      || ar.find(v => (v.name.includes('Salma') || v.name.includes('Zariyah') || v.name.includes('Shakir') || v.name.includes('Hamed')) && !v.name.includes('Naayf'))
-      || ar.find(v => !v.name.includes('Naayf'))
-      || ar[0] || null;
-    return naturalVoice;
-  },
-
-  speakBrowser(chunks, token, rate = 1) {
     return new Promise((resolve) => {
-      if (typeof window === 'undefined' || !window.speechSynthesis) return resolve();
-      const synth = window.speechSynthesis;
+      let timer = setTimeout(() => {
+        this.cachedVoices = window.speechSynthesis?.getVoices() || [];
+        resolve(this.cachedVoices);
+      }, 700);
+
+      window.speechSynthesis.onvoiceschanged = () => {
+        clearTimeout(timer);
+        this.cachedVoices = window.speechSynthesis?.getVoices() || [];
+        this.voicesLoaded = true;
+        resolve(this.cachedVoices);
+      };
+    });
+  },
+
+  pickBestVoice(voices = [], voiceId = 'fahad') {
+    if (!voices.length) return null;
+    const isFemale = ['noura', 'lulwa', 'aisha'].includes(voiceId);
+    
+    // الأصوات العربية
+    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.toLowerCase().includes('arabic'));
+
+    // 1. الأصوات البشرية السحابية الفائقة (Microsoft Natural Online)
+    const naturalVoices = ar.filter(v => 
+      v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Neural')
+    );
+
+    if (naturalVoices.length) {
+      if (isFemale) {
+        const female = naturalVoices.find(v => v.name.includes('Zariyah') || v.name.includes('Salma') || v.name.includes('Fatima'));
+        if (female) return female;
+      } else {
+        const male = naturalVoices.find(v => v.name.includes('Hamed') || v.name.includes('Shakir'));
+        if (male) return male;
+      }
+      return naturalVoices[0];
+    }
+
+    // 2. الأصوات الطبيعية العامة غير الروبوتية
+    const nonNaayf = ar.filter(v => !v.name.toLowerCase().includes('naayf'));
+    if (nonNaayf.length) {
+      return nonNaayf[0];
+    }
+
+    // 3. آخر احتمال متبقي
+    return ar[0] || null;
+  },
+
+  async speakBrowserChunks(fullText, token, rate = 1, voiceId = 'fahad') {
+    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    const synth = window.speechSynthesis;
+    const voices = await this.getVoicesAsync();
+    const voice = this.pickBestVoice(voices, voiceId);
+
+    // تقسيم النص لجمل طبيعية قصيرة
+    const chunks = fullText.match(/[^.،!؟\n]+[.،!؟\n]?/g) || [fullText];
+
+    return new Promise((resolve) => {
       let i = 0;
       const next = () => {
         if (token !== this.token || i >= chunks.length) return resolve();
-        const u = new SpeechSynthesisUtterance(chunks[i++]);
-        u.lang = 'ar-SA';
-        u.rate = Math.max(0.9, Math.min(1.15, rate || 1.0));
-        u.pitch = 1.05; // نبرة بشرية حوارية دافئة بدلاً من النبرة الآلية الرتيبة
-        const voice = this.pickVoice();
-        if (voice) u.voice = voice;
+        const sentence = chunks[i++].trim();
+        if (!sentence) return next();
+
+        const u = new SpeechSynthesisUtterance(sentence);
+        if (voice) {
+          u.voice = voice;
+          u.lang = voice.lang || 'ar-SA';
+        } else {
+          u.lang = 'ar-SA';
+        }
+        // نبرة هادئة طبيعية 1.0 لتفادي التحريف المعدني الروبوتي
+        u.pitch = 1.0;
+        u.rate = Math.max(0.85, Math.min(1.2, rate || 1.0));
+
         u.onend = next;
         u.onerror = next;
         synth.speak(u);

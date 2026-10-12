@@ -1,4 +1,4 @@
-import { AIService } from './aiService.js';
+import { AIService, speaker } from './aiService.js';
 import { AnalyticsService } from './analyticsService.js';
 import ErrorBoundary from './ErrorBoundary';
 import AIStudio from './AIStudio';
@@ -1119,19 +1119,11 @@ const App = () => {
       const ai = new AIService(aiApiKey || null, aiProvider || 'groq');
       ai.speak(text);
     } catch (e) {
-      if (typeof window !== 'undefined' && window.speechSynthesis) {
-        window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'ar-SA';
-        utterance.pitch = 1.05;
-        const voices = window.speechSynthesis.getVoices() || [];
-        const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.includes('Arabic'));
-        const humanVoice = ar.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && !v.name.includes('Naayf'))
-          || ar.find(v => (v.name.includes('Salma') || v.name.includes('Zariyah') || v.name.includes('Shakir') || v.name.includes('Hamed')) && !v.name.includes('Naayf'))
-          || ar.find(v => !v.name.includes('Naayf'))
-          || ar[0] || null;
-        if (humanVoice) utterance.voice = humanVoice;
-        window.speechSynthesis.speak(utterance);
+      console.warn('AIService speak fallback:', e);
+      try {
+        speaker.speakBrowserChunks(text);
+      } catch (err) {
+        console.warn('Speaker fallback error:', err);
       }
     }
   };
@@ -5841,8 +5833,18 @@ const renderDepreciation = () => {
                 }}>
                   {msg.text}
                 </div>
-                <div style={{fontSize:'0.65rem', color:'var(--text-muted)', textAlign: msg.role === 'bot' ? 'right' : 'left', padding:'0 0.5rem'}}>
-                  {msg.role === 'bot' ? 'تراؤف ذكاء اصطناعي 🇸🇦' : 'أنت'}
+                <div style={{fontSize:'0.68rem', color:'var(--text-muted)', display:'flex', justifyContent: msg.role === 'bot' ? 'space-between' : 'flex-end', alignItems:'center', padding:'0 0.5rem'}}>
+                  <span>{msg.role === 'bot' ? 'تراؤف ذكاء اصطناعي 🇸🇦' : 'أنت'}</span>
+                  {msg.role === 'bot' && (
+                    <button
+                      type="button"
+                      onClick={() => speak(msg.text)}
+                      style={{background:'transparent', border:'none', cursor:'pointer', color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'3px', padding:'2px 4px', borderRadius:'4px'}}
+                      title="استمع للصوت البشري"
+                    >
+                      <Volume2 size={13} /> استماع
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

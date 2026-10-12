@@ -39,6 +39,10 @@ export default function AIStudio({
   const [usageStats, setUsageStats] = useState(() => getUsageStats());
   const [newFaqQ, setNewFaqQ] = useState('');
   const [newFaqA, setNewFaqA] = useState('');
+  const [activeVoiceEngine, setActiveVoiceEngine] = useState(null);
+  const [ttsTermsRequired, setTtsTermsRequired] = useState(() => {
+    try { return sessionStorage.getItem('traouf_tts_groq_state') === 'terms'; } catch (e) { return false; }
+  });
 
   const chatScrollRef = useRef(null);
   const fileUploadRef = useRef(null);
@@ -50,8 +54,14 @@ export default function AIStudio({
       setConfig(updated);
       setUsageStats(getUsageStats());
     };
+    const handleTermsReq = () => setTtsTermsRequired(true);
+
     window.addEventListener('traouf-ai-config', handleCfgChange);
-    return () => window.removeEventListener('traouf-ai-config', handleCfgChange);
+    window.addEventListener('traouf-tts-terms-required', handleTermsReq);
+    return () => {
+      window.removeEventListener('traouf-ai-config', handleCfgChange);
+      window.removeEventListener('traouf-tts-terms-required', handleTermsReq);
+    };
   }, []);
 
   const handleSaveAndPublish = () => {
@@ -149,10 +159,16 @@ export default function AIStudio({
         voiceId: config.voice?.voiceId || 'fahad',
         rate: config.voice?.rate || 1.0
       });
-      if (res && res.done) {
-        res.done.then(() => setAudioTesting(false)).catch(() => setAudioTesting(false));
-      } else {
-        setTimeout(() => setAudioTesting(false), 3500);
+      if (res) {
+        if (res.engine) setActiveVoiceEngine(res.engine);
+        if (res.done) {
+          res.done.then(() => {
+            setAudioTesting(false);
+            if (res.engine) setActiveVoiceEngine(res.engine);
+          }).catch(() => setAudioTesting(false));
+        } else {
+          setTimeout(() => setAudioTesting(false), 3500);
+        }
       }
     } catch (e) {
       setAudioTesting(false);
@@ -920,11 +936,80 @@ export default function AIStudio({
             <div className="card" style={{ padding: '1.75rem', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
               <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
                 <h3 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 800, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                  <Volume2 size={22} color="var(--brand-teal)" /> الصوت والنطق السعودي التفاعلي
+                  <Volume2 size={22} color="var(--brand-teal)" /> الصوت البشري والنطق السعودي التفاعلي
                 </h3>
                 <p style={{ margin: '0.3rem 0 0', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  إعدادات محرك توليد الكلام السعودي (Groq Orpheus Saudi Voice) والأصوات المتاحة لجمعية تراؤف.
+                  محرك توليد الكلام البشري فائق الدقة (Groq Orpheus Saudi Neural + Microsoft Natural Online) لجمعية تراؤف.
                 </p>
+              </div>
+
+              {/* Status Banner: Groq Orpheus Terms Acceptance */}
+              {ttsTermsRequired && (
+                <div style={{
+                  background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(15, 23, 42, 0.7) 100%)',
+                  border: '1px solid rgba(245, 158, 11, 0.45)',
+                  borderRadius: '14px',
+                  padding: '1.25rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.75rem'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#f59e0b', fontWeight: 800, fontSize: '0.98rem' }}>
+                    <Sparkles size={20} /> تفعيل الصوت البشري فائق الواقعية (CanopyLabs Orpheus)
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text)', lineHeight: 1.6 }}>
+                    نموذج <strong>CanopyLabs Orpheus</strong> هو نموذج صوت بشري استوديو حقيقي مسجل من متحدثين سعوديين. يتطلب حساب Groq قبول شروط ترخيص النموذج لمرة واحدة فقط (تستغرق ثانيتين):
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <a
+                      href="https://console.groq.com/playground?model=canopylabs%2Forpheus-arabic-saudi"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="btn btn-primary"
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '0.4rem',
+                        textDecoration: 'none',
+                        background: '#f59e0b',
+                        color: '#000',
+                        fontWeight: 800,
+                        padding: '0.55rem 1rem',
+                        borderRadius: '8px'
+                      }}
+                    >
+                      فتح صفحة قبول الشروط في Groq ↗
+                    </a>
+                    <button
+                      type="button"
+                      className="btn btn-ghost"
+                      onClick={() => {
+                        sessionStorage.removeItem('traouf_tts_groq_state');
+                        setTtsTermsRequired(false);
+                        handleTestVoiceSample('يا هلا والله، تم تفعيل الصوت بنجاح.');
+                      }}
+                      style={{ border: '1px solid var(--border)', fontSize: '0.82rem', padding: '0.55rem 0.9rem' }}
+                    >
+                      تم القبول، اختبر الصوت الآن 🔄
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Browser Neural Voices Recommendation Banner */}
+              <div style={{
+                background: 'linear-gradient(135deg, rgba(13, 148, 136, 0.08) 0%, rgba(30, 41, 59, 0.4) 100%)',
+                border: '1px solid rgba(13, 148, 136, 0.3)',
+                borderRadius: '12px',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.85rem'
+              }}>
+                <span style={{ fontSize: '1.6rem' }}>💎</span>
+                <div style={{ fontSize: '0.82rem', color: 'var(--text)', lineHeight: 1.55 }}>
+                  <strong>نصيحة لصوت بشري فوري:</strong> متصفح <strong>Microsoft Edge</strong> يتضمن تلقائياً وبشكل مجاني أصوات <strong>Microsoft Hamed Online (Natural)</strong> و <strong>Zariyah Online (Natural)</strong> البشرية الفائقة، وتعمل فيه دون أي روبوتات أو إعدادات.
+                </div>
               </div>
 
               {/* Enable voice toggle */}
@@ -983,6 +1068,23 @@ export default function AIStudio({
                 </div>
               </div>
 
+              {/* Custom OpenAI TTS Key (Optional) */}
+              <div style={{ background: 'var(--thead-bg)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                  مفتاح OpenAI اختياري للصوت البشري (OpenAI TTS-1)
+                </label>
+                <input
+                  type="password"
+                  placeholder="sk-proj-..."
+                  value={config.voice?.openaiKey || ''}
+                  onChange={e => setConfig(prev => ({ ...prev, voice: { ...prev.voice, openaiKey: e.target.value } }))}
+                  style={{ width: '100%', padding: '0.65rem 0.9rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem' }}
+                />
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  في حال إدخال مفتاح OpenAI، سيستخدم النظام نموذج `tts-1` فائق الواقعية مباشرةً.
+                </div>
+              </div>
+
               {/* Speech Rate Slider */}
               <div style={{ background: 'var(--thead-bg)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -1004,8 +1106,8 @@ export default function AIStudio({
                 />
               </div>
 
-              {/* Test Audio Button */}
-              <div>
+              {/* Test Audio Button & Indicator */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
                 <button
                   type="button"
                   className="btn btn-primary"
@@ -1023,6 +1125,15 @@ export default function AIStudio({
                 >
                   <Volume2 size={18} /> {audioTesting ? 'جاري نطق العينة الصوتية...' : 'تشغيل عينة من الصوت المختار'}
                 </button>
+
+                {activeVoiceEngine && (
+                  <span style={{ fontSize: '0.8rem', color: 'var(--brand-teal)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                    <CheckCircle2 size={15} />
+                    {activeVoiceEngine === 'groq-orpheus-saudi' && 'المشغل: Groq Orpheus السعودي (بشري استوديو)'}
+                    {activeVoiceEngine === 'openai-neural' && 'المشغل: OpenAI TTS-1 (بشري فائق الدقة)'}
+                    {activeVoiceEngine === 'browser-natural' && 'المشغل: أصوات Microsoft Natural البشرية'}
+                  </span>
+                )}
               </div>
             </div>
           )}

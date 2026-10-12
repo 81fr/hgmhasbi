@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, Play, Pause, Square, Sparkles, Activity, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { sfx } from './audioEffects';
+import { AIService, speaker } from './aiService';
 
 export default function ExecutiveVoiceBriefing({
   totals,
@@ -57,68 +58,38 @@ export default function ExecutiveVoiceBriefing({
   };
 
   const handleStartBriefing = () => {
-    if (!synthRef.current) return;
     sfx.playClick();
 
-    if (isPaused) {
-      synthRef.current.resume();
-      setIsPaused(false);
-      setIsPlaying(true);
-      return;
-    }
-
-    synthRef.current.cancel();
-
+    speaker.stop();
     const text = generateBriefingText();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utteranceRef.current = utterance;
+    const ai = new AIService();
+    const res = ai.speak(text, { rate: speechRate });
 
-    // Pick Arabic voice with preference for natural human voices over robotic ones
-    const voices = synthRef.current.getVoices() || [];
-    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.includes('Arabic'));
-    const naturalVoice = ar.find(v => (v.name.includes('Natural') || v.name.includes('Online')) && !v.name.includes('Naayf'))
-      || ar.find(v => (v.name.includes('Salma') || v.name.includes('Zariyah') || v.name.includes('Shakir') || v.name.includes('Hamed')) && !v.name.includes('Naayf'))
-      || ar.find(v => !v.name.includes('Naayf'))
-      || ar[0] || null;
-    if (naturalVoice) {
-      utterance.voice = naturalVoice;
+    setIsPlaying(true);
+    setIsPaused(false);
+
+    if (res?.done) {
+      res.done.then(() => {
+        setIsPlaying(false);
+        setIsPaused(false);
+        sfx.playSuccess();
+      }).catch(() => {
+        setIsPlaying(false);
+        setIsPaused(false);
+      });
     }
-
-    utterance.lang = 'ar-SA';
-    utterance.rate = Math.max(0.9, Math.min(1.15, speechRate || 1.0));
-    utterance.pitch = 1.05;
-
-    utterance.onstart = () => {
-      setIsPlaying(true);
-      setIsPaused(false);
-    };
-
-    utterance.onend = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-      sfx.playSuccess();
-    };
-
-    utterance.onerror = () => {
-      setIsPlaying(false);
-      setIsPaused(false);
-    };
-
-    synthRef.current.speak(utterance);
   };
 
   const handlePause = () => {
-    if (!synthRef.current) return;
     sfx.playClick();
-    synthRef.current.pause();
-    setIsPaused(true);
+    speaker.stop();
+    setIsPaused(false);
     setIsPlaying(false);
   };
 
   const handleStop = () => {
-    if (!synthRef.current) return;
     sfx.playClick();
-    synthRef.current.cancel();
+    speaker.stop();
     setIsPlaying(false);
     setIsPaused(false);
   };
