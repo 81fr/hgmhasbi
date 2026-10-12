@@ -365,25 +365,67 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
   }
 }
 
-/** تنظيف النص وإزالة علامات الماركداون والرموز ليُقرأ بصوت بشري نقي وطبيعي */
+/** تنظيف النص وإعادة تشكيله صوتياً (Phonetic Normalization) ليُقرأ بصوت بشري أصيل وطبيعي */
 export function cleanTextForSpeech(text) {
   if (!text) return '';
-  return text
-    // إزالة روابط الماركداون
-    .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1')
-    // إزالة عناوين الماركداون والنجوم والتسطير والاقتباس
-    .replace(/[#*_~`>]/g, '')
-    // إزالة فواصل الجداول
-    .replace(/\|/g, ' ')
-    // نطق العملة بوضوح
-    .replace(/ر\.س/g, 'ريال سعودي')
-    // إزالة الفواصل من داخل الأرقام مثل 3,961 لتُنطق رقماً طبيعياً
-    .replace(/(\d),(\d)/g, '$1$2')
-    // إزالة الإيموجيات حتى لا يتلعثم محرك الصوت في قراءتها
-    .replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '')
-    // تنظيف الفراغات
-    .replace(/\s+/g, ' ')
-    .trim();
+  let s = String(text);
+
+  // 1. إزالة كود البرمجة والأدوات التقنية
+  s = s.replace(/```[\s\S]*?```/g, ' ');
+  s = s.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, ' ');
+
+  // 2. إزالة روابط الماركداون والوسوم
+  s = s.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+  s = s.replace(/https?:\/\/\S+/g, 'الرابط المرفق');
+
+  // 3. تنظيف الجداول وعلامات الماركداون
+  s = s.replace(/\|[-:\s|]+\|/g, ' ');
+  s = s.replace(/\|/g, '، ');
+  s = s.replace(/[#*_~`>]/g, ' ');
+
+  // 4. نطق المصطلحات المحاسبية والتقنية بالعربية الفصيحة بدلاً من التهجئة الإنجليزية
+  s = s.replace(/\bSKU\b/gi, 'رمز الصنف');
+  s = s.replace(/\bNBV\b/gi, 'صافي القيمة الدفترية');
+  s = s.replace(/\bID\b/gi, 'رقم المعرف');
+  s = s.replace(/\bAI\b/gi, 'الذكاء الاصطناعي');
+  s = s.replace(/\bPDF\b/gi, 'بي دي إف');
+  s = s.replace(/\bExcel\b/gi, 'إكسل');
+  s = s.replace(/\bCSV\b/gi, 'سي إس في');
+  s = s.replace(/\bAPI\b/gi, 'واجهة الربط');
+  s = s.replace(/\bDep\b/gi, 'الإهلاك');
+
+  // 5. نطق العملات والنسب بدقة وسلاسة
+  s = s.replace(/ر\.س|SAR/g, 'ريال سعودي');
+  s = s.replace(/(\d+)\s*%/g, '$1 في المائة');
+  s = s.replace(/%\s*(\d+)/g, '$1 في المائة');
+
+  // 6. التعامل مع الأرقام الكبيرة والمختصرات (مثل 2.5M أو 500K)
+  s = s.replace(/(\d+(?:\.\d+)?)\s*M\b/gi, '$1 مليون');
+  s = s.replace(/(\d+(?:\.\d+)?)\s*K\b/gi, '$1 ألف');
+
+  // 7. إزالة الفواصل الإنجليزية داخل الأرقام مثل 3,961 أو 1,500,000 لتنطق أرقاماً متصلة
+  s = s.replace(/(\d+),(\d+)/g, '$1$2');
+
+  // 8. ضبط النطق الصوتي للكلمات الحوارية والسعودية الشائعة
+  s = s.replace(/تراؤف/g, 'تَـرَاؤُف');
+  s = s.replace(/يا هلا ومسهلا/g, 'يا هَلا ومَسْهَلا');
+  s = s.replace(/\bوش\b/g, 'وِشْ');
+  s = s.replace(/\bأبشر\b/g, 'أَبْشِـرْ');
+  s = s.replace(/\bالحين\b/g, 'الحِينْ');
+  s = s.replace(/\bدحين\b/g, 'دَحِينْ');
+  s = s.replace(/\bإيه\b/g, 'إِيهْ');
+  s = s.replace(/\bسم\b/g, 'سَمْ');
+
+  // 9. إزالة الإيموجيات والرموز الخاصة
+  s = s.replace(/[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu, '');
+
+  // 10. استبدال الشرطات والنقاط المتتالية بفواصل كلامية مريحة
+  s = s.replace(/[-–—]/g, '، ');
+  s = s.replace(/:\s*/g, '، ');
+  s = s.replace(/[()]/g, ' ');
+  s = s.replace(/\s{2,}/g, ' ');
+
+  return s.trim();
 }
 
 /* مشغّل الصوت المشترك عالي الجودة */
@@ -409,7 +451,7 @@ export const speaker = {
     } catch (e) { /* ignore */ }
   },
 
-  playUrl(url, token, rate = 1) {
+  playUrl(url, token, rate = 0.95) {
     return new Promise((resolve, reject) => {
       const a = new Audio(url);
       a.playbackRate = rate;
@@ -455,22 +497,34 @@ export const speaker = {
 
   pickBestVoice(voices = [], voiceId = 'fahad') {
     if (!voices.length) return null;
-    const isFemale = ['noura', 'lulwa', 'aisha'].includes(voiceId);
+    const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
     
     // الأصوات العربية
-    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.toLowerCase().includes('arabic'));
+    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.toLowerCase().includes('arabic') || /[\u0600-\u06FF]/.test(v.name));
 
-    // 1. الأصوات البشرية السحابية الفائقة (Microsoft Natural Online)
-    const naturalVoices = ar.filter(v => 
-      v.name.includes('Natural') || v.name.includes('Online') || v.name.includes('Neural')
-    );
+    // 1. الأصوات البشرية السحابية الفائقة (Microsoft Natural Online & Google Neural)
+    const naturalVoices = ar.filter(v => {
+      const n = (v.name || '').toLowerCase();
+      return n.includes('natural') || n.includes('online') || n.includes('neural') ||
+             n.includes('طبيعي') || n.includes('متصل') || n.includes('سحابي') ||
+             n.includes('cloud') || n.includes('google') ||
+             n.includes('hamed') || n.includes('zariyah') || n.includes('salma') ||
+             n.includes('fatima') || n.includes('shakir') || n.includes('حامد') ||
+             n.includes('زارية') || n.includes('سارة') || n.includes('سلمى');
+    });
 
     if (naturalVoices.length) {
       if (isFemale) {
-        const female = naturalVoices.find(v => v.name.includes('Zariyah') || v.name.includes('Salma') || v.name.includes('Fatima'));
+        const female = naturalVoices.find(v => {
+          const n = (v.name || '').toLowerCase();
+          return n.includes('zariyah') || n.includes('salma') || n.includes('fatima') || n.includes('زارية') || n.includes('سلمى') || n.includes('فاطمة');
+        });
         if (female) return female;
       } else {
-        const male = naturalVoices.find(v => v.name.includes('Hamed') || v.name.includes('Shakir'));
+        const male = naturalVoices.find(v => {
+          const n = (v.name || '').toLowerCase();
+          return n.includes('hamed') || n.includes('shakir') || n.includes('حامد') || n.includes('شاكر');
+        });
         if (male) return male;
       }
       return naturalVoices[0];
@@ -486,13 +540,13 @@ export const speaker = {
     return ar[0] || null;
   },
 
-  async speakBrowserChunks(fullText, token, rate = 1, voiceId = 'fahad') {
+  async speakBrowserChunks(fullText, token, rate = 0.95, voiceId = 'fahad') {
     if (typeof window === 'undefined' || !window.speechSynthesis) return;
     const synth = window.speechSynthesis;
     const voices = await this.getVoicesAsync();
     const voice = this.pickBestVoice(voices, voiceId);
 
-    // تقسيم النص لجمل طبيعية قصيرة
+    // تقسيم النص لعبارات متوازنة تحاكي التنفس البشري الطبيعي
     const chunks = fullText.match(/[^.،!؟\n]+[.،!؟\n]?/g) || [fullText];
 
     return new Promise((resolve) => {
@@ -509,9 +563,9 @@ export const speaker = {
         } else {
           u.lang = 'ar-SA';
         }
-        // نبرة هادئة طبيعية 1.0 لتفادي التحريف المعدني الروبوتي
+        // نبرة هادئة ورصينة تحاكي الإلقاء البشري المريح
         u.pitch = 1.0;
-        u.rate = Math.max(0.85, Math.min(1.2, rate || 1.0));
+        u.rate = Math.max(0.85, Math.min(1.15, rate || 0.95));
 
         u.onend = next;
         u.onerror = next;

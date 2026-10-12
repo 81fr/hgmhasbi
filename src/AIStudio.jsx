@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Bot, Sparkles, BrainCircuit, Settings, Volume2, VolumeX, Play, Pause,
-  CheckCircle, RotateCcw, Save, ShieldCheck, Zap, Activity, MessageSquare,
+  CheckCircle, CheckCircle2, RotateCcw, Save, ShieldCheck, Zap, Activity, MessageSquare,
   Mic, Search, ChevronLeft, Sliders, Database, Link, ArrowRight,
   Check, AlertCircle, FileText, Upload, RefreshCw, BarChart3, HelpCircle,
   Trash2, Plus, File, Lock, CheckSquare, Square, X
@@ -148,16 +148,17 @@ export default function AIStudio({
   };
 
   // Play audio sample in selected dialect
-  const handleTestVoiceSample = (sampleText) => {
+  const handleTestVoiceSample = (sampleText, customVoiceId) => {
     sfx.playClick();
-    const textToSpeak = sampleText || DIALECTS[config.dialect]?.samples?.[0] || 'أبشر بعزك، جميع الأرقام والبيانات محدثة وجاهزة.';
+    const effectiveVoiceId = customVoiceId || config.voice?.voiceId || 'fahad';
+    const textToSpeak = sampleText || DIALECTS[config.dialect]?.samples?.[0] || 'أبشر بعزك، جميع الأرقام والبيانات في جمعية تراؤف محدثة وجاهزة.';
     setAudioTesting(true);
 
     try {
       const ai = new AIService(null, config.provider || 'groq', { config });
       const res = ai.speak(textToSpeak, {
-        voiceId: config.voice?.voiceId || 'fahad',
-        rate: config.voice?.rate || 1.0
+        voiceId: effectiveVoiceId,
+        rate: config.voice?.rate || 0.95
       });
       if (res) {
         if (res.engine) setActiveVoiceEngine(res.engine);
@@ -1037,9 +1038,9 @@ export default function AIStudio({
               {/* Voice Personas */}
               <div>
                 <label style={{ display: 'block', fontSize: '0.9rem', fontWeight: 700, marginBottom: '0.75rem' }}>
-                  شخصية الصوت السعودي (Voice Character)
+                  شخصية الصوت البشري (10 أصوات سعودية متنوعة)
                 </label>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '0.85rem' }}>
                   {VOICES.map(v => {
                     const isSelected = (config.voice?.voiceId || 'fahad') === v.id;
                     return (
@@ -1050,18 +1051,58 @@ export default function AIStudio({
                           setConfig(prev => ({ ...prev, voice: { ...prev.voice, voiceId: v.id } }));
                         }}
                         style={{
-                          padding: '1rem',
-                          borderRadius: '10px',
+                          padding: '1.1rem',
+                          borderRadius: '12px',
                           border: isSelected ? '2px solid var(--brand-teal)' : '1px solid var(--border)',
                           background: isSelected ? 'rgba(13, 148, 136, 0.08)' : 'var(--card-bg)',
-                          cursor: 'pointer'
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between'
                         }}
                       >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontWeight: 800 }}>{v.label}</span>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--brand-teal)', fontWeight: 700 }}>{v.gender}</span>
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                            <span style={{ fontWeight: 800, fontSize: '1rem', color: isSelected ? 'var(--brand-teal)' : 'var(--text)' }}>{v.label}</span>
+                            <div style={{ display: 'flex', gap: '0.35rem' }}>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--brand-teal)', background: 'rgba(13, 148, 136, 0.1)', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 700 }}>
+                                {v.gender}
+                              </span>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', background: 'var(--thead-bg)', padding: '0.15rem 0.45rem', borderRadius: '4px', fontWeight: 600 }}>
+                                {v.tone}
+                              </span>
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>{v.desc}</div>
                         </div>
-                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>{v.desc}</div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleTestVoiceSample(null, v.id);
+                          }}
+                          style={{
+                            marginTop: '0.75rem',
+                            background: 'transparent',
+                            border: '1px dashed var(--border)',
+                            borderRadius: '8px',
+                            padding: '0.35rem 0.5rem',
+                            fontSize: '0.74rem',
+                            color: 'var(--brand-teal)',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.35rem',
+                            width: '100%',
+                            transition: 'all 0.2s'
+                          }}
+                        >
+                          <Volume2 size={13} /> استمع لصوت {v.label}
+                        </button>
                       </div>
                     );
                   })}
@@ -1089,18 +1130,18 @@ export default function AIStudio({
               <div style={{ background: 'var(--thead-bg)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                   <label style={{ fontSize: '0.88rem', fontWeight: 700, margin: 0 }}>
-                    سرعة النطق الصوتي: <strong>{config.voice?.rate || 1.0}x</strong>
+                    سرعة النطق الصوتي: <strong>{config.voice?.rate || 0.95}x</strong>
                   </label>
                   <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                    {(config.voice?.rate || 1.0) < 1 ? 'هادئ ومتأنٍ' : (config.voice?.rate || 1.0) === 1 ? 'سرعة طبيعية' : 'سريع وحيوي'}
+                    {(config.voice?.rate || 0.95) < 0.95 ? 'هادئ ومتأنٍ' : (config.voice?.rate || 0.95) <= 1.05 ? 'سرعة طبيعية مريحة' : 'سريع وحيوي'}
                   </span>
                 </div>
                 <input
                   type="range"
                   min="0.8"
-                  max="1.4"
+                  max="1.3"
                   step="0.05"
-                  value={config.voice?.rate || 1.0}
+                  value={config.voice?.rate || 0.95}
                   onChange={e => setConfig(prev => ({ ...prev, voice: { ...prev.voice, rate: parseFloat(e.target.value) } }))}
                   style={{ width: '100%', accentColor: 'var(--brand-teal)', cursor: 'pointer' }}
                 />
@@ -1128,7 +1169,7 @@ export default function AIStudio({
 
                 {activeVoiceEngine && (
                   <span style={{ fontSize: '0.8rem', color: 'var(--brand-teal)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                    <CheckCircle2 size={15} />
+                    <CheckCircle size={15} />
                     {activeVoiceEngine === 'groq-orpheus-saudi' && 'المشغل: Groq Orpheus السعودي (بشري استوديو)'}
                     {activeVoiceEngine === 'openai-neural' && 'المشغل: OpenAI TTS-1 (بشري فائق الدقة)'}
                     {activeVoiceEngine === 'browser-natural' && 'المشغل: أصوات Microsoft Natural البشرية'}
