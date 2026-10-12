@@ -20,6 +20,33 @@ export const GROQ_MODELS = {
 const BASE = 'https://api.groq.com/openai/v1';
 const TTS_FLAG = 'traouf_tts_groq_state';
 
+/**
+ * خريطة مواءمة الشخصيات الصوتية العشر مع محرك Groq Orpheus السعودي
+ * المحرك يقبل حصرياً الأصوات الستة: ['fahad', 'sultan', 'noura', 'lulwa', 'aisha', 'abdullah']
+ */
+export const GROQ_VOICE_MAP = {
+  fahad: 'fahad',        // وقور ورسمي (فهد)
+  sultan: 'sultan',      // واثق وحيوي (سلطان)
+  salman: 'abdullah',    // تنفيذي قيادي (عبدالله نبرة فخمة ورزينة)
+  majed: 'sultan',       // ميداني ودود (سلطان)
+  hamed: 'fahad',        // خبير مالي (فهد)
+  abdullah: 'abdullah',  // وقور وتنفيذي
+  noura: 'noura',        // دافئ وواضح (نورة)
+  sara: 'noura',         // ذكي ومتحمس (نورة)
+  lulwa: 'lulwa',        // ناعم ودقيق (لولوة)
+  aisha: 'aisha',        // مهني وواثق (عائشة)
+  reem: 'lulwa'          // تنفيذي راقي (لولوة)
+};
+
+export function mapToGroqVoice(voiceId = 'fahad') {
+  if (GROQ_VOICE_MAP[voiceId]) return GROQ_VOICE_MAP[voiceId];
+  const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
+  return isFemale ? 'noura' : 'fahad';
+}
+
+/** ذاكرة تخزين مؤقت للصوت البشري لمنع تكرار الطلبات وتفادي استهلاك الحصص وتشغيل فوري */
+export const speechAudioCache = new Map();
+
 function friendlyError(status, body = '') {
   const b = String(body || '');
   if (status === 401) return 'مفتاح الـ API غير صحيح أو منتهي، حدّثه من الإعدادات.';
@@ -255,12 +282,30 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     return (data.text || '').trim();
   }
 
-  /* ------------------------------ الصوت ------------------------------ */
-  /* ------------------------------ الصوت البشري ------------------------------ */
+  /* ------------------------------ الصوت البشري المتقدم ------------------------------ */
+
   async _groqTTS(text, voice = 'fahad') {
+    const groqVoice = mapToGroqVoice(voice);
+    const cacheKey = `${groqVoice}_${text.trim()}`;
+    if (speechAudioCache.has(cacheKey)) {
+      return speechAudioCache.get(cacheKey);
+    }
+
+    const customKey = this.cfg?.voice?.groqKey;
+    const keyToUse = customKey && customKey.trim().startsWith('gsk_') ? customKey.trim() : this.apiKey;
+
     const res = await fetch(`${BASE}/audio/speech`, {
-      method: 'POST', headers: this.getHeaders(),
-      body: JSON.stringify({ model: GROQ_MODELS.tts, input: text, voice, response_format: 'wav' })
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${keyToUse}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: GROQ_MODELS.tts,
+        input: text,
+        voice: groqVoice,
+        response_format: 'wav'
+      })
     });
     if (!res.ok) {
       const body = await res.text().catch(() => '');
@@ -277,12 +322,14 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         try { sessionStorage.setItem(TTS_FLAG, 'rate'); } catch (e) { /* ignore */ }
       }
       const err = new Error(friendlyError(res.status, body));
-      err.code = body.includes('model_terms_required') ? 'terms' : 'error';
+      err.code = body.includes('model_terms_required') ? 'terms' : (res.status === 429 ? 'rate_limit' : 'error');
       throw err;
     }
     try { sessionStorage.setItem(TTS_FLAG, 'ready'); } catch (e) { /* ignore */ }
     const blob = await res.blob();
-    return URL.createObjectURL(blob);
+    const audioUrl = URL.createObjectURL(blob);
+    speechAudioCache.set(cacheKey, audioUrl);
+    return audioUrl;
   }
 
   async _openAITTS(text, apiKey, voice = 'alloy') {
@@ -546,14 +593,15 @@ export const speaker = {
     const voices = await this.getVoicesAsync();
     const voice = this.pickBestVoice(voices, voiceId);
 
-    // تقسيم النص لعبارات متوازنة تحاكي التنفس البشري الطبيعي
-    const chunks = fullText.match(/[^.،!؟\n]+[.،!؟\n]?/g) || [fullText];
+    // تقسيم النص لجمل متكاملة فقط عند علامات الوقف الكبرى (. ! ؟ \n) لمنع التقطيع الآلي الميكانيكي
+    const chunks = fullText.split(/(?<=[.!؟\n])\s+/).filter(s => s.trim().length > 0);
+    const finalChunks = chunks.length ? chunks : [fullText];
 
     return new Promise((resolve) => {
       let i = 0;
       const next = () => {
-        if (token !== this.token || i >= chunks.length) return resolve();
-        const sentence = chunks[i++].trim();
+        if (token !== this.token || i >= finalChunks.length) return resolve();
+        const sentence = finalChunks[i++].trim();
         if (!sentence) return next();
 
         const u = new SpeechSynthesisUtterance(sentence);
@@ -563,9 +611,9 @@ export const speaker = {
         } else {
           u.lang = 'ar-SA';
         }
-        // نبرة هادئة ورصينة تحاكي الإلقاء البشري المريح
-        u.pitch = 1.0;
-        u.rate = Math.max(0.85, Math.min(1.15, rate || 0.95));
+        // نبرة هادئة ودافئة تحاكي الإلقاء البشري المريح وتمنع النبرة المعدنية
+        u.pitch = 0.95;
+        u.rate = Math.max(0.85, Math.min(1.05, rate || 0.92));
 
         u.onend = next;
         u.onerror = next;

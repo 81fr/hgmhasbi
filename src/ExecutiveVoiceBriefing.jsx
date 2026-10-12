@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Volume2, VolumeX, Play, Pause, Square, Sparkles, Activity, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { sfx } from './audioEffects';
 import { AIService, speaker } from './aiService';
+import { loadAIConfig } from './aiConfig';
 
 export default function ExecutiveVoiceBriefing({
   totals,
@@ -62,8 +63,12 @@ export default function ExecutiveVoiceBriefing({
 
     speaker.stop();
     const text = generateBriefingText();
-    const ai = new AIService();
-    const res = ai.speak(text, { rate: speechRate });
+    const cfg = loadAIConfig();
+    const ai = new AIService(null, cfg.provider || 'groq', { config: cfg });
+    const res = ai.speak(text, {
+      voiceId: cfg.voice?.voiceId || 'salman',
+      rate: speechRate || cfg.voice?.rate || 0.95
+    });
 
     setIsPlaying(true);
     setIsPaused(false);

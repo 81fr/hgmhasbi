@@ -1109,6 +1109,23 @@ export default function AIStudio({
                 </div>
               </div>
 
+              {/* Custom Groq API Key (Optional for dedicated Orpheus quota) */}
+              <div style={{ background: 'var(--thead-bg)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.4rem' }}>
+                  مفتاح Groq API مخصص للصوت السحابي (Groq Orpheus Saudi)
+                </label>
+                <input
+                  type="password"
+                  placeholder="gsk_..."
+                  value={config.voice?.groqKey || ''}
+                  onChange={e => setConfig(prev => ({ ...prev, voice: { ...prev.voice, groqKey: e.target.value } }))}
+                  style={{ width: '100%', padding: '0.65rem 0.9rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem' }}
+                />
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.3rem' }}>
+                  يمكنك الحصول على مفتاح مجاني فوري من console.groq.com لضمان حصة استوديو صوتية خاصة غير مشتركة.
+                </div>
+              </div>
+
               {/* Custom OpenAI TTS Key (Optional) */}
               <div style={{ background: 'var(--thead-bg)', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
                 <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 700, marginBottom: '0.4rem' }}>
