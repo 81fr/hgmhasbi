@@ -12,6 +12,7 @@ import {
   dialectScore, DEFAULT_CONFIG, buildFullSystemPrompt, saudiGreeting
 } from './aiConfig.js';
 import { AIService, GROQ_MODELS, detectBrowserAudioEngine } from './aiService.js';
+import { playPersonaStudio, playDialectStudio, STUDIO_PERSONAS, STUDIO_DIALECTS } from './voiceLibrary.js';
 import { sfx } from './audioEffects.js';
 
 const AVATAR_ICONS = ['🤖', '🧠', '✨', '💬', '⚡', '💼', '🇸🇦', '🎯'];
@@ -152,32 +153,50 @@ export default function AIStudio({
     }
   };
 
-  // Play audio sample in selected dialect
-  const handleTestVoiceSample = (sampleText, customVoiceId) => {
+  // Play authentic persona studio audio
+  const handleTestPersonaVoice = async (voiceId) => {
     sfx.playClick();
-    const effectiveVoiceId = customVoiceId || config.voice?.voiceId || 'fahad';
-    const textToSpeak = sampleText || DIALECTS[config.dialect]?.samples?.[0] || 'أبشر بعزك، جميع الأرقام والبيانات في جمعية تراؤف محدثة وجاهزة.';
+    const effectiveVoiceId = voiceId || config.voice?.voiceId || 'fahad';
     setAudioTesting(true);
+    setActiveVoiceEngine('human-studio-hd');
 
     try {
-      const ai = new AIService(null, config.provider || 'groq', { config });
-      const res = ai.speak(textToSpeak, {
-        voiceId: effectiveVoiceId,
-        rate: config.voice?.rate || 0.95
-      });
-      if (res) {
-        if (res.engine) setActiveVoiceEngine(res.engine);
-        if (res.done) {
-          res.done.then(() => {
-            setAudioTesting(false);
-            if (res.engine) setActiveVoiceEngine(res.engine);
-          }).catch(() => setAudioTesting(false));
-        } else {
-          setTimeout(() => setAudioTesting(false), 3500);
-        }
-      }
+      await playPersonaStudio(effectiveVoiceId, { rate: config.voice?.rate || 0.95 });
     } catch (e) {
+      console.warn('Persona playback fallback:', e);
+      const persona = VOICES.find(vo => vo.id === effectiveVoiceId);
+      const ai = new AIService(null, config.provider || 'groq', { config });
+      ai.speak(persona?.sample || 'أهلاً بكم في جمعية تراؤف.', { voiceId: effectiveVoiceId });
+    } finally {
       setAudioTesting(false);
+    }
+  };
+
+  // Play authentic dialect studio audio
+  const handleTestDialect = async (dialectKey) => {
+    sfx.playClick();
+    const effectiveDialect = dialectKey || config.dialect || 'white';
+    setAudioTesting(true);
+    setActiveVoiceEngine('human-studio-hd');
+
+    try {
+      await playDialectStudio(effectiveDialect, { rate: config.voice?.rate || 0.95 });
+    } catch (e) {
+      console.warn('Dialect playback fallback:', e);
+      const sample = DIALECTS[effectiveDialect]?.samples?.[0] || 'أبشر، الحين أطلع لك الأرقام بدقة.';
+      const ai = new AIService(null, config.provider || 'groq', { config });
+      ai.speak(sample, { dialect: effectiveDialect });
+    } finally {
+      setAudioTesting(false);
+    }
+  };
+
+  // General test sample (backward compatibility)
+  const handleTestVoiceSample = (sampleText, customVoiceId) => {
+    if (customVoiceId) {
+      handleTestPersonaVoice(customVoiceId);
+    } else {
+      handleTestPersonaVoice(config.voice?.voiceId || 'fahad');
     }
   };
 
@@ -584,6 +603,8 @@ export default function AIStudio({
                       onClick={() => {
                         sfx.playClick();
                         setConfig(prev => ({ ...prev, dialect: key }));
+                        handleTestDialect(key);
+                        if (showToast) showToast(`تم تفعيل نطق لهجة: ${d.label} ${d.emoji}`);
                       }}
                       style={{
                         padding: '1.25rem',
@@ -614,7 +635,7 @@ export default function AIStudio({
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleTestVoiceSample(d.samples[0]);
+                          handleTestDialect(key);
                         }}
                         style={{
                           marginTop: '0.75rem',
@@ -1173,6 +1194,7 @@ export default function AIStudio({
                         onClick={() => {
                           sfx.playClick();
                           setConfig(prev => ({ ...prev, voice: { ...prev.voice, voiceId: v.id } }));
+                          handleTestPersonaVoice(v.id);
                         }}
                         style={{
                           padding: '1.1rem',
@@ -1205,7 +1227,7 @@ export default function AIStudio({
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleTestVoiceSample(v.sample, v.id);
+                            handleTestPersonaVoice(v.id);
                           }}
                           style={{
                             marginTop: '0.75rem',

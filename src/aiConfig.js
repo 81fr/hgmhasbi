@@ -400,7 +400,7 @@ export function buildFullSystemPrompt(cfg, data, view) {
 }
 
 /* ----------------------------- الأدوات المحلية ----------------------------- */
-const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[\u064B-\u0652]/g, '').trim();
+export const norm = (s) => String(s || '').toLowerCase().replace(/[أإآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[\u064B-\u0652]/g, '').trim();
 const slim = (a) => ({ id: a.id, الاسم: a.name, الفئة: a.category, التكلفة: n(a.cost), الحالة: a.status, العهدة: a.custody, الإدارة: a.department, الموقع: a.location, الكود: a.code });
 
 export function runLocalTool(name, args = {}, data = {}, cfg = DEFAULT_CONFIG, hooks = {}) {

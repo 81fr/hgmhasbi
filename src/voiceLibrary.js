@@ -27,7 +27,9 @@ export const STUDIO_DIALECTS = {
   hijazi: { id: 'hijazi', label: 'حجازي ودود', file: 'audio/voices/dialect_hijazi.wav' },
   eastern: { id: 'eastern', label: 'شرقاوي حساوي', file: 'audio/voices/dialect_eastern.wav' },
   southern: { id: 'southern', label: 'جنوبي مرحب', file: 'audio/voices/dialect_southern.wav' },
-  northern: { id: 'northern', label: 'شمالي كرم', file: 'audio/voices/dialect_northern.wav' }
+  northern: { id: 'northern', label: 'شمالي كرم', file: 'audio/voices/dialect_northern.wav' },
+  gulf: { id: 'gulf', label: 'خليجي تنفيذي', file: 'audio/voices/dialect_gulf.wav' },
+  formal: { id: 'formal', label: 'فصحى إدارية سعودية', file: 'audio/voices/dialect_formal.wav' }
 };
 
 export const PERSONA_MODULATION = {

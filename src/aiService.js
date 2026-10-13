@@ -1,6 +1,6 @@
 import {
   loadAIConfig, buildFullSystemPrompt, runLocalTool, TOOL_DEFS, NAV_PAGES,
-  logAIEvent, chunkForTTS, DIALECTS, VOICES
+  logAIEvent, chunkForTTS, DIALECTS, VOICES, norm
 } from './aiConfig.js';
 import {
   STUDIO_PERSONAS, STUDIO_DIALECTS, playPersonaStudio, playDialectStudio,
@@ -374,7 +374,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
    * الأولوية 2: محرك Groq Orpheus Saudi Neural (صوت استوديو بشري سعودي حقيقي 100%)
    * الأولوية 3: مكتبة EasySpeech مفتوحة المصدر للأصوات السحابية الطبيعية في المتصفح
    */
-  speak(text, { voiceId, rate } = {}) {
+  speak(text, { voiceId, dialect, rate } = {}) {
     const clean = cleanTextForSpeech(text);
     if (!clean) return { engine: null, done: Promise.resolve() };
 
@@ -398,23 +398,26 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     };
 
     result.done = (async () => {
-      // 0. فحص تطابق النص مع مكتبة الاستوديو البشري المسجل (تشغيل فوري بجودة 100% بشرية بدون تأخير ولا استهلاك حصص)
-      const matchedVoice = VOICES.find(vo => vo.sample && (clean.includes(vo.sample.slice(0, 15)) || vo.sample.includes(clean.slice(0, 15))));
-      if (matchedVoice && STUDIO_PERSONAS[effectiveVoiceId]) {
+      const normClean = norm(clean);
+
+      // 0.أ. إذا تم تحديد لهجة صراحة أو تطابق النص مع عينة لهجة
+      if (dialect && STUDIO_DIALECTS[dialect]) {
         try {
           notifyEngine('human-studio-hd');
-          await playPersonaStudio(effectiveVoiceId, { rate: effectiveRate });
+          await playDialectStudio(dialect, { rate: effectiveRate });
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
-          console.warn('Studio persona playback fallback:', err);
+          console.warn('Studio explicit dialect playback fallback:', err);
         }
       }
 
-      // فحص تطابق عينات اللهجات
       const matchedDialectKey = Object.keys(DIALECTS).find(k => {
         const samples = DIALECTS[k]?.samples || [];
-        return samples.some(s => clean.includes(s.slice(0, 12)) || s.includes(clean.slice(0, 12)));
+        return samples.some(s => {
+          const normS = norm(s);
+          return normClean.includes(normS.slice(0, 10)) || normS.includes(normClean.slice(0, 10));
+        });
       });
       if (matchedDialectKey && STUDIO_DIALECTS[matchedDialectKey]) {
         try {
@@ -423,7 +426,24 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
-          console.warn('Studio dialect playback fallback:', err);
+          console.warn('Studio dialect sample playback fallback:', err);
+        }
+      }
+
+      // 0.ب. فحص تطابق النص مع شخصية استوديو محددة
+      const matchedVoice = VOICES.find(vo => {
+        if (!vo.sample) return false;
+        const normS = norm(vo.sample);
+        return normClean.includes(normS.slice(0, 12)) || normS.includes(normClean.slice(0, 12));
+      });
+      if (matchedVoice && STUDIO_PERSONAS[effectiveVoiceId]) {
+        try {
+          notifyEngine('human-studio-hd');
+          await playPersonaStudio(effectiveVoiceId, { rate: effectiveRate });
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
+          return;
+        } catch (err) {
+          console.warn('Studio persona playback fallback:', err);
         }
       }
 
