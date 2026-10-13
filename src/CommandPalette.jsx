@@ -58,7 +58,7 @@ const CommandPalette = ({
 
   // Quick Navigation shortcuts
   const navigationShortcuts = [
-    { title: 'لوحة القيادة الاستراتيجية', view: 'dashboard', icon: <Sparkles size={16} color="#8b5cf6" /> },
+    { title: 'قاعدة بيانات أصول جمعية تراؤف', view: 'dashboard', icon: <Sparkles size={16} color="#8b5cf6" /> },
     { title: 'سجل الأصول الثابتة', view: 'register', icon: <Box size={16} color="#0d9488" /> },
     { title: 'إدارة المستودعات والمخزون', view: 'warehouse', icon: <Warehouse size={16} color="#3b82f6" /> },
     { title: 'دفتر اليومية والقيود المزدوجة', view: 'journal', icon: <FileText size={16} color="#10b981" /> },

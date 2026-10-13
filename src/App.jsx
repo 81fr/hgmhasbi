@@ -1585,7 +1585,7 @@ const App = () => {
             </div>
             <div>
               <div style={{fontWeight:800, fontSize:'1.35rem', marginBottom:'0.3rem', display:'flex', alignItems:'center', gap:'0.6rem'}}>
-                المركز القيادي المالي والرقابي (Executive Command Center)
+                قاعدة بيانات أصول جمعية تراؤف
                 <span style={{fontSize:'0.75rem', background:'rgba(255,255,255,0.25)', padding:'3px 10px', borderRadius:'12px', fontWeight:700}}>Traouf V5.0</span>
               </div>
               <div style={{fontSize:'0.92rem', opacity:0.95}}>
@@ -5178,7 +5178,7 @@ const renderDepreciation = () => {
         <div className="nav-group">
           <div className="nav-label">الرئيسية</div>
           <div className={`nav-item ${view === 'dashboard' ? 'active' : ''}`} onClick={() => setView('dashboard')}>
-            <div className="nav-icon-box"><LayoutGrid size={18} /></div> لوحة التحكم
+            <div className="nav-icon-box"><LayoutGrid size={18} /></div> قاعدة بيانات أصول جمعية تراؤف
           </div>
         </div>
 
