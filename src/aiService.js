@@ -48,8 +48,86 @@ export function mapToGroqVoice(voiceId = 'fahad') {
   return isFemale ? 'noura' : 'fahad';
 }
 
-/** ذاكرة تخزين مؤقت للصوت البشري لمنع تكرار الطلبات وتفادي استهلاك الحصص وتشغيل فوري */
+/** ذاكرة تخزين مؤقت للصوت البشري ككتل ثنائية (Blobs) في الرام + IndexedDB لمنع تكرار الطلبات وتفادي استهلاك الحصص وتشغيل فوري دائم */
 export const speechAudioCache = new Map();
+
+const VOICE_IDB_NAME = 'traouf_voice_cache_v2';
+const VOICE_STORE_NAME = 'audio_blobs';
+
+function openVoiceDB() {
+  if (typeof window === 'undefined' || !window.indexedDB) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(VOICE_IDB_NAME, 1);
+      req.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(VOICE_STORE_NAME)) {
+          db.createObjectStore(VOICE_STORE_NAME);
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => resolve(null);
+    } catch (e) {
+      resolve(null);
+    }
+  });
+}
+
+export async function getVoiceBlobFromCache(cacheKey) {
+  // 1. فحص ذاكرة الرام السريعة (In-memory Map)
+  if (speechAudioCache.has(cacheKey)) {
+    const val = speechAudioCache.get(cacheKey);
+    if (val instanceof Blob) return val;
+  }
+  // 2. فحص التخزين الدائم في المتصفح (IndexedDB)
+  try {
+    const db = await openVoiceDB();
+    if (!db) return null;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(VOICE_STORE_NAME, 'readonly');
+        const store = tx.objectStore(VOICE_STORE_NAME);
+        const req = store.get(cacheKey);
+        req.onsuccess = () => {
+          const res = req.result;
+          if (res instanceof Blob) {
+            speechAudioCache.set(cacheKey, res);
+            resolve(res);
+          } else {
+            resolve(null);
+          }
+        };
+        req.onerror = () => resolve(null);
+      } catch (e) {
+        resolve(null);
+      }
+    });
+  } catch (e) {
+    return null;
+  }
+}
+
+export async function setVoiceBlobInCache(cacheKey, blob) {
+  if (!(blob instanceof Blob)) return;
+  speechAudioCache.set(cacheKey, blob);
+  try {
+    const db = await openVoiceDB();
+    if (!db) return;
+    return new Promise((resolve) => {
+      try {
+        const tx = db.transaction(VOICE_STORE_NAME, 'readwrite');
+        const store = tx.objectStore(VOICE_STORE_NAME);
+        store.put(blob, cacheKey);
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => resolve();
+      } catch (e) {
+        resolve();
+      }
+    });
+  } catch (e) {
+    // ignore
+  }
+}
 
 function friendlyError(status, body = '') {
   const b = String(body || '');
@@ -309,9 +387,14 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
 
   async _groqTTS(text, voice = 'fahad') {
     const groqVoice = mapToGroqVoice(voice);
-    const cacheKey = `${groqVoice}_${text.trim()}`;
-    if (speechAudioCache.has(cacheKey)) {
-      return speechAudioCache.get(cacheKey);
+    const trimmed = text.trim();
+    const cacheKey = `${groqVoice}_${trimmed}`;
+
+    // 1. التحقق من وجود الصوت البشري الأصلي في الذاكرة المؤقتة (Blob)
+    const cachedBlob = await getVoiceBlobFromCache(cacheKey);
+    if (cachedBlob) {
+      // إرجاع رابط جديد وحي للـ Blob في كل مرة يُطلب فيها الصوت لضمان استمراريته وعدم تحوله لروبوت
+      return URL.createObjectURL(cachedBlob);
     }
 
     const customKey = this.cfg?.voice?.groqKey;
@@ -350,12 +433,20 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     }
     try { sessionStorage.setItem(TTS_FLAG, 'ready'); } catch (e) { /* ignore */ }
     const blob = await res.blob();
-    const audioUrl = URL.createObjectURL(blob);
-    speechAudioCache.set(cacheKey, audioUrl);
-    return audioUrl;
+    // حفظ الـ Blob الثنائي الحقيقي في الرام و IndexedDB
+    await setVoiceBlobInCache(cacheKey, blob);
+    return URL.createObjectURL(blob);
   }
 
   async _openAITTS(text, apiKey, voice = 'alloy') {
+    const trimmed = text.trim();
+    const cacheKey = `openai_${voice}_${trimmed}`;
+
+    const cachedBlob = await getVoiceBlobFromCache(cacheKey);
+    if (cachedBlob) {
+      return URL.createObjectURL(cachedBlob);
+    }
+
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -363,6 +454,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     });
     if (!res.ok) throw new Error('OpenAI TTS failed: ' + res.status);
     const blob = await res.blob();
+    await setVoiceBlobInCache(cacheKey, blob);
     return URL.createObjectURL(blob);
   }
 
@@ -402,12 +494,14 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
 
       // 0.أ. إذا تم تحديد لهجة صراحة أو تطابق النص مع عينة لهجة
       if (dialect && STUDIO_DIALECTS[dialect]) {
+        if (token !== speaker.token) return;
         try {
           notifyEngine('human-studio-hd');
           await playDialectStudio(dialect, { rate: effectiveRate });
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
+          if (token !== speaker.token) return;
           console.warn('Studio explicit dialect playback fallback:', err);
         }
       }
@@ -420,12 +514,14 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         });
       });
       if (matchedDialectKey && STUDIO_DIALECTS[matchedDialectKey]) {
+        if (token !== speaker.token) return;
         try {
           notifyEngine('human-studio-hd');
           await playDialectStudio(matchedDialectKey, { rate: effectiveRate });
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
+          if (token !== speaker.token) return;
           console.warn('Studio dialect sample playback fallback:', err);
         }
       }
@@ -437,38 +533,56 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         return normClean.includes(normS.slice(0, 12)) || normS.includes(normClean.slice(0, 12));
       });
       if (matchedVoice && STUDIO_PERSONAS[effectiveVoiceId]) {
+        if (token !== speaker.token) return;
         try {
           notifyEngine('human-studio-hd');
           await playPersonaStudio(effectiveVoiceId, { rate: effectiveRate });
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
+          if (token !== speaker.token) return;
           console.warn('Studio persona playback fallback:', err);
         }
       }
 
       // 1. مفتاح OpenAI المخصص إن وجد في إعدادات الصوت
       if (v.openaiKey) {
+        if (token !== speaker.token) return;
         try {
           notifyEngine('openai-neural');
           const openAIVoice = mapToOpenAIVoice(effectiveVoiceId);
           const audioUrl = await this._openAITTS(clean, v.openaiKey, openAIVoice);
+          if (token !== speaker.token) {
+            if (audioUrl && audioUrl.startsWith('blob:')) {
+              try { URL.revokeObjectURL(audioUrl); } catch (e) {}
+            }
+            return;
+          }
           await speaker.playUrl(audioUrl, token, effectiveRate);
           logAIEvent({ type: 'voice-out', ok: true, engine: 'openai-neural' });
           return;
         } catch (err) {
+          if (token !== speaker.token) return;
           console.warn('OpenAI TTS fallback:', err);
         }
       }
 
       // 2. محرك Groq Orpheus Saudi Neural (صوت بشري استوديو حقيقي باللهجة السعودية)
+      if (token !== speaker.token) return;
       try {
         notifyEngine('groq-orpheus-saudi');
         const audioUrl = await this._groqTTS(clean, effectiveVoiceId);
+        if (token !== speaker.token) {
+          if (audioUrl && audioUrl.startsWith('blob:')) {
+            try { URL.revokeObjectURL(audioUrl); } catch (e) {}
+          }
+          return;
+        }
         await speaker.playUrl(audioUrl, token, effectiveRate);
         logAIEvent({ type: 'voice-out', ok: true, engine: 'groq-orpheus-saudi' });
         return;
       } catch (err) {
+        if (token !== speaker.token) return;
         if (err.code === 'terms') {
           console.info('Groq Orpheus model requires one-time terms acceptance at Groq console.');
         } else if (err.code === 'rate_limit') {
@@ -479,16 +593,19 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
       }
 
       // 3. مكتبة EasySpeech المتقدمة للأصوات السحابية الطبيعية في المتصفح مع معالجة النبرات
+      if (token !== speaker.token) return;
       try {
         notifyEngine('easyspeech-natural');
         await speakEasySpeech(clean, { voiceId: effectiveVoiceId, rate: effectiveRate });
         logAIEvent({ type: 'voice-out', ok: true, engine: 'easyspeech-natural' });
         return;
       } catch (err) {
+        if (token !== speaker.token) return;
         console.warn('EasySpeech fallback to browser chunks:', err);
       }
 
       // 4. مشغل المتصفح الانسيابي الاحتياطي الأخير
+      if (token !== speaker.token) return;
       try {
         notifyEngine('browser-natural');
         await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
@@ -611,9 +728,12 @@ export const speaker = {
     this.token++;
     try {
       if (this.audio) {
-        this.audio.pause();
-        this.audio.src = '';
+        const a = this.audio;
         this.audio = null;
+        a.onended = null;
+        a.onerror = null;
+        a.pause();
+        a.src = '';
       }
     } catch (e) { /* ignore */ }
     try {
@@ -625,19 +745,54 @@ export const speaker = {
 
   playUrl(url, token, rate = 0.95) {
     return new Promise((resolve, reject) => {
+      if (token && token !== this.token) {
+        if (url && url.startsWith('blob:')) {
+          try { URL.revokeObjectURL(url); } catch (e) {}
+        }
+        return resolve();
+      }
+
       const a = new Audio(url);
       a.playbackRate = rate;
       this.audio = a;
-      const finish = () => {
-        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
+
+      let cleaned = false;
+      const cleanup = () => {
+        if (cleaned) return;
+        cleaned = true;
+        if (this.audio === a) {
+          this.audio = null;
+        }
+        if (url && url.startsWith('blob:')) {
+          try { URL.revokeObjectURL(url); } catch (e) {}
+        }
+      };
+
+      a.onended = () => {
+        cleanup();
         resolve();
       };
-      a.onended = finish;
+
       a.onerror = (err) => {
-        if (url.startsWith('blob:')) URL.revokeObjectURL(url);
-        reject(err);
+        cleanup();
+        if (token && token !== this.token) {
+          resolve();
+        } else {
+          reject(err);
+        }
       };
-      a.play().catch(reject);
+
+      const p = a.play();
+      if (p !== undefined) {
+        p.catch(err => {
+          cleanup();
+          if (token && token !== this.token) {
+            resolve();
+          } else {
+            reject(err);
+          }
+        });
+      }
     });
   },
 
