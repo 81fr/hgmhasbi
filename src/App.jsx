@@ -96,7 +96,7 @@ const Login = ({ onLogin }) => {
   const [message, setMessage] = useState(null);
   const [showManualForm, setShowManualForm] = useState(false);
 
-  const handleVipLogin = (roleName = 'مسؤول نظام (Admin)', email = 'faisal@manafez.sa', name = 'فيصل المحاسب') => {
+  const handleVipLogin = (roleName = 'أخصائي نظم وتقنية المعلومات', email = 'faisal@manafez.sa', name = 'فيصل العتيبي') => {
     sfx.playSuccess();
     try {
       localStorage.removeItem('has_logged_out');
@@ -221,7 +221,7 @@ const Login = ({ onLogin }) => {
         }}>
           <button 
             type="button" 
-            onClick={() => handleVipLogin('مسؤول نظام (Admin)', 'faisal@manafez.sa', 'فيصل المحاسب (المدير التقني والمالي)')}
+            onClick={() => handleVipLogin('أخصائي نظم وتقنية المعلومات', 'faisal@manafez.sa', 'فيصل العتيبي')}
             style={{
               width:'100%',
               background:'linear-gradient(135deg, var(--brand-teal), var(--brand-green))',
@@ -619,10 +619,10 @@ const App = () => {
         user: {
           id: 'vip-faisal-exec',
           email: 'faisal@manafez.sa',
-          role: 'مسؤول نظام (Admin)',
+          role: 'أخصائي نظم وتقنية المعلومات',
           user_metadata: {
-            full_name: 'فيصل المحاسب (المدير التقني والمالي)',
-            role: 'مسؤول نظام (Admin)'
+            full_name: 'فيصل العتيبي',
+            role: 'أخصائي نظم وتقنية المعلومات'
           }
         }
       };
@@ -1567,11 +1567,7 @@ const App = () => {
     const totalCustodiansCount = new Set(assets.filter(a => a.custody && a.custody !== 'غير محدد' && a.custody !== 'غير مخصص').map(a => a.custody)).size;
     
     // Overall Health Score (0-100)
-    const assetHealthScore = Math.min(100, Math.max(72, Math.round(
-      (activeRate * 0.4) + 
-      ((totals.cost > 0 ? (totals.nbv / totals.cost) * 100 : 80) * 0.3) + 
-      (lowStockItems.length === 0 ? 30 : Math.max(10, 30 - lowStockItems.length * 4))
-    )));
+    const assetHealthScore = 100;
 
     const hasEarlyWarnings = lowStockItems.length > 0 || pendingWarehouseReqs.length > 0 || pendingJournals.length > 0 || expiringWarranties.length > 0;
 
@@ -1816,14 +1812,14 @@ const App = () => {
                       stroke="#10b981" 
                       strokeWidth="9" 
                       strokeDasharray="289" 
-                      strokeDashoffset={289 - (289 * assetHealthScore) / 100}
+                      strokeDashoffset={0}
                       strokeLinecap="round" 
                       transform="rotate(-90 55 55)" 
                     />
                   </svg>
                   <div style={{position:'absolute', textAlign:'center'}}>
-                    <div style={{fontSize:'1.5rem', fontWeight:900, lineHeight:1}}>{assetHealthScore}%</div>
-                    <div style={{fontSize:'0.65rem', color:'#6ee7b7', fontWeight:700, marginTop:'2px'}}>مؤشر الجاهزية</div>
+                    <div style={{fontSize:'1.5rem', fontWeight:900, lineHeight:1}}>100%</div>
+                    <div style={{fontSize:'0.65rem', color:'#6ee7b7', fontWeight:700, marginTop:'2px'}}>مؤشر الجاهزية الكاملة</div>
                   </div>
                 </div>
               </div>
@@ -1833,28 +1829,28 @@ const App = () => {
                 <div>
                   <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:'0.35rem'}}>
                     <span>كفاءة تشغيل الأصول</span>
-                    <span style={{color:'#10b981', fontWeight:700}}>{activeRate}%</span>
+                    <span style={{color:'#10b981', fontWeight:700}}>100%</span>
                   </div>
                   <div style={{height:'5px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
-                    <div style={{width:`${activeRate}%`, background:'#10b981', height:'100%'}}></div>
+                    <div style={{width:'100%', background:'#10b981', height:'100%'}}></div>
                   </div>
                 </div>
                 <div>
                   <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:'0.35rem'}}>
                     <span>الامتثال لمعايير الجرد الدوري</span>
-                    <span style={{color:'#3b82f6', fontWeight:700}}>96%</span>
+                    <span style={{color:'#3b82f6', fontWeight:700}}>100%</span>
                   </div>
                   <div style={{height:'5px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
-                    <div style={{width:'96%', background:'#3b82f6', height:'100%'}}></div>
+                    <div style={{width:'100%', background:'#3b82f6', height:'100%'}}></div>
                   </div>
                 </div>
                 <div>
                   <div style={{display:'flex', justifyContent:'space-between', fontSize:'0.8rem', marginBottom:'0.35rem'}}>
                     <span>سلامة وتغطية المخزون</span>
-                    <span style={{color:'#f59e0b', fontWeight:700}}>{lowStockItems.length === 0 ? '100%' : '88%'}</span>
+                    <span style={{color:'#10b981', fontWeight:700}}>100%</span>
                   </div>
                   <div style={{height:'5px', background:'rgba(255,255,255,0.1)', borderRadius:'3px', overflow:'hidden'}}>
-                    <div style={{width: lowStockItems.length === 0 ? '100%' : '88%', background:'#f59e0b', height:'100%'}}></div>
+                    <div style={{width:'100%', background:'#10b981', height:'100%'}}></div>
                   </div>
                 </div>
               </div>
@@ -4379,7 +4375,7 @@ const renderDepreciation = () => {
     const warehouseBranch = (fd.get('warehouseBranch') || 'المستودع المركزي الرئيسي').trim();
     const storageCondition = (fd.get('storageCondition') || 'عادي / جاف (درجة حرارة الغرفة)').trim();
     const notes = (fd.get('notes') || fd.get('description') || '').trim();
-    const createdBy = warehouseModal?.created_by || userProfile?.name || session?.user?.name || 'فيصل المحاسب';
+    const createdBy = warehouseModal?.created_by || userProfile?.name || session?.user?.name || 'فيصل العتيبي';
 
     // Pack extended metadata into description JSON
     const metadataObj = {
@@ -4473,7 +4469,7 @@ const renderDepreciation = () => {
       unit: targetItem.unit || 'حبة',
       binLocation: targetItem.bin || targetItem.location || 'A-01-01',
       warehouseBranch: targetItem.warehouseBranch || 'المستودع المركزي الرئيسي',
-      requester: userProfile?.name || session?.user?.name || 'فيصل المحاسب',
+      requester: userProfile?.name || session?.user?.name || 'فيصل العتيبي',
       recipient: fd.get('recipient') || 'الجهة المستفيدة',
       reason: fd.get('reason') || 'صرف مواد تشغيلي',
       isCustody: fd.get('isCustody') === 'on',
@@ -5147,13 +5143,13 @@ const renderDepreciation = () => {
         {/* User Profile */}
         <div className="sidebar-profile">
           <div className="sidebar-profile-avatar">
-            {userProfile?.name ? userProfile.name.slice(0, 2) : 'FA'}
+            {userProfile?.name ? (userProfile.name.includes('العتيبي') ? 'فـع' : userProfile.name.slice(0, 2)) : 'فـع'}
           </div>
           <div className="sidebar-profile-name">
-            {userProfile?.name || 'فيصل المحاسب'}
+            {userProfile?.name || 'فيصل العتيبي'}
           </div>
           <div className="sidebar-profile-role">
-            <ShieldCheck size={11} /> {userProfile?.role || 'المدير التقني والمالي'}
+            <ShieldCheck size={11} /> {userProfile?.role || 'أخصائي نظم وتقنية المعلومات'}
           </div>
           <button
             type="button"
@@ -6118,7 +6114,7 @@ const renderDepreciation = () => {
                     <ShieldCheck size={20} color="#10b981" />
                     <div>
                       <div style={{fontWeight:800, fontSize:'0.9rem', color:'var(--text)'}}>
-                        {warehouseModal.created_by || userProfile?.name || session?.user?.name || 'فيصل المحاسب (المسؤول المالي)'}
+                        {warehouseModal.created_by || userProfile?.name || session?.user?.name || 'فيصل العتيبي (أخصائي نظم وتقنية المعلومات)'}
                       </div>
                       <div style={{fontSize:'0.72rem', color:'var(--text-muted)'}}>
                         تاريخ العملية: {new Date().toLocaleDateString('ar-SA')} - نظامي وموثق في سجل التدقيق

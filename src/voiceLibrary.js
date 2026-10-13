@@ -139,6 +139,44 @@ export function playDialectStudio(dialectId, options = {}) {
   return playStudioAudio(dialect.file, options);
 }
 
+/** مكتبة الإجابات السريعة المسجلة استوديو فائق النقاء للإجابة الفورية بدون استهلاك حصص */
+export const STUDIO_QA_ANSWERS = {
+  warehouse: {
+    male: 'audio/voices/answer_warehouse_male.mp3',
+    female: 'audio/voices/answer_warehouse_female.mp3',
+    keywords: ['مستودع', 'المستودع', 'نواقص', 'النواقص', 'المخزون', 'أصناف', 'نقصة']
+  },
+  assets: {
+    male: 'audio/voices/answer_assets_male.mp3',
+    female: 'audio/voices/answer_assets_female.mp3',
+    keywords: ['الأصول الثابتة', 'وقيمتها', '476', '110.19']
+  },
+  custody: {
+    male: 'audio/voices/answer_custody_male.mp3',
+    female: 'audio/voices/answer_custody_female.mp3',
+    keywords: ['أكثر موظف', 'عنده عهد', 'نواف عبيد', 'الحربي']
+  },
+  journals: {
+    male: 'audio/voices/answer_journals_male.mp3',
+    female: 'audio/voices/answer_journals_female.mp3',
+    keywords: ['القيود متوازنة', 'قيود اليومية', 'المدين يطابق الدائن']
+  },
+  register: {
+    male: 'audio/voices/answer_register_male.mp3',
+    female: 'audio/voices/answer_register_female.mp3',
+    keywords: ['سجل الأصول', 'افتح لي سجل']
+  }
+};
+
+/** تشغيل إجابة استوديو سريعة بصوت بشري أصيل ومناسب للشخصية المختارة */
+export function playQAStudio(qaKey, { voiceId = 'fahad', rate = 1.0, onEnd } = {}) {
+  const qa = STUDIO_QA_ANSWERS[qaKey];
+  if (!qa) return Promise.reject(new Error('Unknown QA key'));
+  const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
+  const file = isFemale ? qa.female : qa.male;
+  return playStudioAudio(file, { rate, onEnd });
+}
+
 /** جلب جميع الأصوات المجانية المتاحة للمتصفح مصنفة حسب الجودة */
 export function getAvailableVoices() {
   if (typeof window === 'undefined' || !window.speechSynthesis) return [];

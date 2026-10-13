@@ -3,7 +3,7 @@ import {
   logAIEvent, chunkForTTS, DIALECTS, VOICES, norm
 } from './aiConfig.js';
 import {
-  STUDIO_PERSONAS, STUDIO_DIALECTS, playPersonaStudio, playDialectStudio,
+  STUDIO_PERSONAS, STUDIO_DIALECTS, STUDIO_QA_ANSWERS, playPersonaStudio, playDialectStudio, playQAStudio,
   speakEasySpeech, stopAllSpeech, getStudioAudioUrl
 } from './voiceLibrary.js';
 
@@ -545,6 +545,24 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         }
       }
 
+      // 0.ج. التحقق من مطابقة النص للأسئلة الشائعة والمستودع في بنك الأصوات البشري الاستوديو
+      const matchedQAKey = Object.keys(STUDIO_QA_ANSWERS).find(k => {
+        const item = STUDIO_QA_ANSWERS[k];
+        return item.keywords.some(kw => normClean.includes(norm(kw)));
+      });
+      if (matchedQAKey) {
+        if (token !== speaker.token) return;
+        try {
+          notifyEngine('human-studio-hd');
+          await playQAStudio(matchedQAKey, { voiceId: effectiveVoiceId, rate: effectiveRate });
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
+          return;
+        } catch (err) {
+          if (token !== speaker.token) return;
+          console.warn('Studio QA playback fallback:', err);
+        }
+      }
+
       // 1. مفتاح OpenAI المخصص إن وجد في إعدادات الصوت
       if (v.openaiKey) {
         if (token !== speaker.token) return;
@@ -656,6 +674,8 @@ export function cleanTextForSpeech(text) {
   s = s.replace(/\bCSV\b/gi, 'سي إس في');
   s = s.replace(/\bAPI\b/gi, 'واجهة الربط');
   s = s.replace(/\bDep\b/gi, 'الإهلاك');
+  s = s.replace(/\bA4\b/gi, 'مقاس أربعة');
+  s = s.replace(/\bHP\b/gi, 'إتش بي');
 
   // 5. نطق العملات والنسب بدقة وسلاسة
   s = s.replace(/ر\.س|SAR/g, 'ريال سعودي');
@@ -686,6 +706,8 @@ export function cleanTextForSpeech(text) {
   s = s.replace(/[-–—]/g, '، ');
   s = s.replace(/:\s*/g, '، ');
   s = s.replace(/[()]/g, ' ');
+  s = s.replace(/[،,]\s*[،,]+/g, '، ');
+  s = s.replace(/\.{2,}/g, '. ');
   s = s.replace(/\s{2,}/g, ' ');
 
   return s.trim();
