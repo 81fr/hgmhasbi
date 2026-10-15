@@ -139,34 +139,85 @@ export function playDialectStudio(dialectId, options = {}) {
   return playStudioAudio(dialect.file, options);
 }
 
+import { norm } from './aiConfig.js';
+
 /** مكتبة الإجابات السريعة المسجلة استوديو فائق النقاء للإجابة الفورية بدون استهلاك حصص */
 export const STUDIO_QA_ANSWERS = {
   warehouse: {
+    id: 'warehouse',
+    label: 'المستودع والنواقص',
     male: 'audio/voices/answer_warehouse_male.mp3',
     female: 'audio/voices/answer_warehouse_female.mp3',
-    keywords: ['مستودع', 'المستودع', 'نواقص', 'النواقص', 'المخزون', 'أصناف', 'نقصة']
+    questions: ['المستودع والنواقص', 'وضع المستودع', 'نواقص المستودع', 'المستودع', 'نواقص المخزون', 'وش وضع المستودع'],
+    answerPhrases: ['المستودع وضعه ممتاز ومستقر', 'ورق التصوير', 'عشرون صنفا برصيد الفين وخمس مئة وحدة', 'صنف واحد فقط وصل لحد اعادة الطلب']
   },
   assets: {
+    id: 'assets',
+    label: 'قيمة الأصول الثابتة',
     male: 'audio/voices/answer_assets_male.mp3',
     female: 'audio/voices/answer_assets_female.mp3',
-    keywords: ['الأصول الثابتة', 'وقيمتها', '476', '110.19']
+    questions: ['كم الاصول الثابتة', 'الاصول الثابتة وقيمتها', 'قيمة الاصول الثابتة', 'كم عدد الاصول الثابتة', 'كم الاصول'],
+    answerPhrases: ['476 اصلا بتكلفة اجمالية 110.19 مليون', 'الاصول الثابتة عندنا 476 اصلا', '110.19 مليون']
   },
   custody: {
+    id: 'custody',
+    label: 'أكثر موظف عنده عهد',
     male: 'audio/voices/answer_custody_male.mp3',
     female: 'audio/voices/answer_custody_female.mp3',
-    keywords: ['أكثر موظف', 'عنده عهد', 'نواف عبيد', 'الحربي']
+    questions: ['اكثر موظف عنده عهد', 'مين اكثر موظف عنده عهد', 'اكثر موظف عهدة', 'من اكثر موظف عهدا', 'صاحب اكثر عهدة'],
+    answerPhrases: ['نواف عبيد ذياب الحربي ب 107 عهدة', 'اكثر موظف عنده عهدة هو نواف عبيد', '107 عهدة مسجلة وموثقة']
   },
   journals: {
+    id: 'journals',
+    label: 'توازن قيود اليومية',
     male: 'audio/voices/answer_journals_male.mp3',
     female: 'audio/voices/answer_journals_female.mp3',
-    keywords: ['القيود متوازنة', 'قيود اليومية', 'المدين يطابق الدائن']
+    questions: ['هل القيود متوازنة', 'قيود متوازنة', 'توازن قيود اليومية', 'القيود اليومية متوازنة', 'هل قيودنا متوازنة'],
+    answerPhrases: ['قيود اليومية متوازنة تماما والمدين يطابق الدائن', 'المدين يطابق الدائن بنسبة مئة في المئة']
   },
   register: {
+    id: 'register',
+    label: 'فتح سجل الأصول',
     male: 'audio/voices/answer_register_male.mp3',
     female: 'audio/voices/answer_register_female.mp3',
-    keywords: ['سجل الأصول', 'افتح لي سجل']
+    questions: ['افتح لي سجل الاصول', 'افتح سجل الاصول', 'سجل الاصول الثابتة', 'اعرض سجل الاصول'],
+    answerPhrases: ['تم فتح سجل الاصول الثابتة', 'سجل الاصول الثابتة وتقدر تطلع']
   }
 };
+
+/** دالة فحص وتحديد ما إذا كان السؤال أو الإجابة يطابق بنك أصوات الاستوديو البشري */
+export function findMatchingQA(text = '', question = '') {
+  const normQ = question ? norm(question) : '';
+  const normA = text ? norm(text) : '';
+
+  // 1. الأولوية الأولى: مطابقة السؤال الصريح إذا تم تمريره
+  if (normQ) {
+    for (const key of Object.keys(STUDIO_QA_ANSWERS)) {
+      const item = STUDIO_QA_ANSWERS[key];
+      if (item.questions.some(q => normQ.includes(norm(q)))) {
+        return key;
+      }
+    }
+  }
+
+  // 2. فحص ما إذا كان النص المنطوق نفسه يمثل السؤال
+  for (const key of Object.keys(STUDIO_QA_ANSWERS)) {
+    const item = STUDIO_QA_ANSWERS[key];
+    if (item.questions.some(q => normA.includes(norm(q)))) {
+      return key;
+    }
+  }
+
+  // 3. مطابقة العبارات المفتاحية الفريدة للإجابة المحددة حصراً (بدون كلمات عامة كالمخزون أو أصناف)
+  for (const key of Object.keys(STUDIO_QA_ANSWERS)) {
+    const item = STUDIO_QA_ANSWERS[key];
+    if (item.answerPhrases.some(phrase => normA.includes(norm(phrase)))) {
+      return key;
+    }
+  }
+
+  return null;
+}
 
 /** تشغيل إجابة استوديو سريعة بصوت بشري أصيل ومناسب للشخصية المختارة */
 export function playQAStudio(qaKey, { voiceId = 'fahad', rate = 1.0, onEnd } = {}) {
@@ -200,7 +251,7 @@ export function getAvailableVoices() {
   }
 }
 
-/** اختيار أفضل صوت عربي طبيعي في المتصفح لمطابقة الشخصية */
+/** اختيار أفضل صوت عربي طبيعي في المتصفح لمطابقة الشخصية — استبعاد الصوت الآلي الميكانيكي قطعياً */
 export function pickBestBrowserVoice(voiceId = 'fahad') {
   if (typeof window === 'undefined' || !window.speechSynthesis) return null;
   const voices = (typeof EasySpeech.voices === 'function' && EasySpeech.voices()) || window.speechSynthesis.getVoices() || [];
@@ -208,37 +259,53 @@ export function pickBestBrowserVoice(voiceId = 'fahad') {
 
   const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
 
-  // 1. الأفضل: أصوات مايكروسوفت إيدج السحابية الطبيعية
+  // البحث حصراً عن الأصوات السحابية الطبيعية (Natural / Online / Neural)
+  const naturalVoices = voices.filter(v => {
+    const name = (v.name || '').toLowerCase();
+    const lang = (v.lang || '').toLowerCase();
+    const isAr = lang.startsWith('ar') || name.includes('arabic');
+    const isNat = name.includes('natural') || name.includes('online') || name.includes('neural') || name.includes('cloud');
+    const isRobotic = name.includes('naayf') || name.includes('desktop') || name.includes('sapi');
+    return isAr && isNat && !isRobotic;
+  });
+
+  if (!naturalVoices.length) {
+    // منع إرجاع أي صوت آلي ميكانيكي (مثل Microsoft Naayf)
+    return null;
+  }
+
+  // 1. صوت نسائي طبيعي إن كانت الشخصية نسائية
   if (isFemale) {
-    const naturalFemale = voices.find(v => (v.name.includes('Zariyah') || v.name.includes('Salma') || v.name.includes('Fatima')) && v.name.includes('Natural'));
+    const naturalFemale = naturalVoices.find(v => {
+      const n = (v.name || '').toLowerCase();
+      return n.includes('zariyah') || n.includes('salma') || n.includes('fatima') || n.includes('noura');
+    });
     if (naturalFemale) return naturalFemale;
   } else {
-    const naturalMale = voices.find(v => (v.name.includes('Hamed') || v.name.includes('Shakir') || v.name.includes('Fahed')) && v.name.includes('Natural'));
+    const naturalMale = naturalVoices.find(v => {
+      const n = (v.name || '').toLowerCase();
+      return n.includes('hamed') || n.includes('shakir') || n.includes('fahed');
+    });
     if (naturalMale) return naturalMale;
   }
 
-  // 2. أي صوت طبيعي عربي
-  const anyNatural = voices.find(v => (v.lang || '').startsWith('ar') && (v.name.includes('Natural') || v.name.includes('Online')));
-  if (anyNatural) return anyNatural;
-
-  // 3. الصوت السعودي المباشر
-  const saudiVoice = voices.find(v => (v.lang || '').toLowerCase() === 'ar-sa');
-  if (saudiVoice) return saudiVoice;
-
-  // 4. أي صوت عربي
-  const anyArabic = voices.find(v => (v.lang || '').toLowerCase().startsWith('ar'));
-  return anyArabic || null;
+  return naturalVoices[0] || null;
 }
 
-/** التحدث باستخدام مكتبة EasySpeech المتقدمة */
+/** التحدث باستخدام مكتبة EasySpeech المتقدمة — مع ضمان عدم استخدام أي صوت آلي ميكانيكي */
 export async function speakEasySpeech(text, { voiceId = 'fahad', rate = 1.0, onStart, onEnd } = {}) {
   await initVoiceLibrary();
   stopAllSpeech();
 
   const clean = cleanTextForSpeech(text);
-  if (!clean) return;
+  if (!clean) return false;
 
   const targetVoice = pickBestBrowserVoice(voiceId);
+  if (!targetVoice) {
+    // لا يتوفر صوت طبيعي، نتجنب الصوت الآلي ونُرجع فشلاً للتحول للبديل البشري الاستوديو
+    throw new Error('No natural neural browser voice available');
+  }
+
   const mod = PERSONA_MODULATION[voiceId] || { pitch: 1.0, rate: 1.0 };
   const effectiveRate = Math.max(0.7, Math.min(1.4, (rate || 1.0) * mod.rate));
   const effectivePitch = Math.max(0.6, Math.min(1.6, mod.pitch));
@@ -253,6 +320,7 @@ export async function speakEasySpeech(text, { voiceId = 'fahad', rate = 1.0, onS
       volume: 1.0
     });
     if (onEnd) onEnd();
+    return true;
   } catch (err) {
     console.warn('EasySpeech synthesis error:', err);
     if (onEnd) onEnd();

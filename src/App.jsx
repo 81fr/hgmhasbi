@@ -1114,17 +1114,66 @@ const App = () => {
     });
   };
 
-  const speak = (text) => {
+  const speak = (text, opts = {}) => {
     try {
       const ai = new AIService(aiApiKey || null, aiProvider || 'groq');
-      ai.speak(text);
+      ai.speak(text, opts);
     } catch (e) {
       console.warn('AIService speak fallback:', e);
-      try {
-        speaker.speakBrowserChunks(text);
-      } catch (err) {
-        console.warn('Speaker fallback error:', err);
+    }
+  };
+
+  const handleSendChatMessage = async (textToSend) => {
+    const userInput = (textToSend != null ? textToSend : chatInput).trim();
+    if (!userInput || isTyping) return;
+
+    sfx.playClick();
+    setChatMessages(prev => [...prev, { role: 'user', text: userInput }]);
+    setChatInput('');
+    setIsTyping(true);
+
+    setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+
+    let botResponse = '';
+    try {
+      const liveData = {
+        assets,
+        employees: employeesList,
+        warehouseItems,
+        journals,
+        transfers
+      };
+      const ai = new AIService(aiApiKey || null, aiProvider || 'groq', {
+        getData: () => liveData,
+        onNavigate: (page) => {
+          setView(page);
+          showToast(`🚀 [تراؤف AI] تم الانتقال إلى صفحة: ${NAV_PAGES[page] || page}`);
+        },
+        view
+      });
+
+      const history = [
+        ...chatMessages.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text })),
+        { role: 'user', content: userInput }
+      ];
+
+      const result = await ai.chat(history, {
+        enableTools: true,
+        view,
+        extraContext: window.aiFileContext || ''
+      });
+      botResponse = result.content || "أبشر، تم تنفيذ المطلوب.";
+      setChatMessages(prev => [...prev, { role: 'bot', text: botResponse }]);
+      window.aiFileContext = "";
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { role: 'bot', text: "❌ " + (err.message || "تعذر إكمال الرد، يرجى المحاولة لاحقاً") }]);
+    } finally {
+      setIsTyping(false);
+      if (autoSpeak && botResponse) {
+        speak(botResponse, { question: userInput });
       }
+      setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }
   };
 
@@ -5834,7 +5883,7 @@ const renderDepreciation = () => {
                   {msg.role === 'bot' && (
                     <button
                       type="button"
-                      onClick={() => speak(msg.text)}
+                      onClick={() => speak(msg.text, { question: chatMessages[i - 1]?.text || '' })}
                       style={{background:'transparent', border:'none', cursor:'pointer', color:'var(--brand-teal)', display:'flex', alignItems:'center', gap:'3px', padding:'2px 4px', borderRadius:'4px'}}
                       title="استمع للصوت البشري"
                     >
@@ -5863,62 +5912,23 @@ const renderDepreciation = () => {
                {label: 'افتح لي سجل الأصول', icon: <Box size={12}/>},
                {label: 'هل القيود متوازنة؟', icon: <CheckCircle size={12}/>},
              ].map((chip, idx) => (
-               <button key={idx} onClick={() => setChatInput(chip.label)} style={{whiteSpace:'nowrap', padding:'0.4rem 0.8rem', borderRadius:'20px', border:'1px solid var(--border)', background:'var(--card-bg)', fontSize:'0.75rem', fontWeight:600, color:'var(--text-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.4rem', transition:'all 0.2s'}} onMouseEnter={e => {e.currentTarget.style.borderColor = 'var(--brand-teal)'; e.currentTarget.style.color = 'var(--brand-teal)';}} onMouseLeave={e => {e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)';}}>
+               <button
+                 key={idx}
+                 type="button"
+                 onClick={() => handleSendChatMessage(chip.label)}
+                 style={{whiteSpace:'nowrap', padding:'0.4rem 0.8rem', borderRadius:'20px', border:'1px solid var(--border)', background:'var(--card-bg)', fontSize:'0.75rem', fontWeight:600, color:'var(--text-secondary)', cursor:'pointer', display:'flex', alignItems:'center', gap:'0.4rem', transition:'all 0.2s'}}
+                 onMouseEnter={e => {e.currentTarget.style.borderColor = 'var(--brand-teal)'; e.currentTarget.style.color = 'var(--brand-teal)';}}
+                 onMouseLeave={e => {e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-secondary)';}}
+               >
                  {chip.icon} {chip.label}
                </button>
              ))}
           </div>
 
           {/* Input Area */}
-          <form style={{display:'flex', padding:'1.25rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.75rem'}} onSubmit={async (e) => {
+          <form style={{display:'flex', padding:'1.25rem', background:'var(--card-bg)', borderTop:'1px solid var(--border)', gap:'0.75rem'}} onSubmit={(e) => {
             e.preventDefault();
-            if(!chatInput.trim()) return;
-            const userInput = chatInput;
-            setChatMessages(prev => [...prev, {role: 'user', text: userInput}]);
-            setChatInput('');
-            setIsTyping(true);
-            
-            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
-
-            let botResponse = '';
-            try {
-              const liveData = {
-                assets,
-                employees: employeesList,
-                warehouseItems,
-                journals,
-                transfers
-              };
-              const ai = new AIService(aiApiKey || null, aiProvider || 'groq', {
-                getData: () => liveData,
-                onNavigate: (page) => {
-                  setView(page);
-                  showToast(`🚀 [تراؤف AI] تم الانتقال إلى صفحة: ${page}`);
-                },
-                view
-              });
-
-              const history = [
-                ...chatMessages.map(m => ({ role: m.role === 'bot' ? 'assistant' : 'user', content: m.text })),
-                { role: 'user', content: userInput }
-              ];
-
-              const result = await ai.chat(history, {
-                enableTools: true,
-                view,
-                extraContext: window.aiFileContext || ''
-              });
-              botResponse = result.content || "أبشر، تم تنفيذ المطلوب.";
-              setChatMessages(prev => [...prev, {role: 'bot', text: botResponse}]);
-              window.aiFileContext = "";
-            } catch (err) {
-              console.error(err);
-              setChatMessages(prev => [...prev, {role: 'bot', text: "❌ " + (err.message || "تعذر إكمال الرد، يرجى المحاولة لاحقاً")}]);
-            }
-            
-            setIsTyping(false);
-            if(autoSpeak) speak(botResponse);
-            setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+            handleSendChatMessage();
           }}>
             <input type="file" id="ai-file-upload" style={{display:'none'}} accept=".txt,.csv,.json,.md" onChange={(e) => {
               const file = e.target.files[0];

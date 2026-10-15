@@ -3,7 +3,7 @@ import {
   logAIEvent, chunkForTTS, DIALECTS, VOICES, norm
 } from './aiConfig.js';
 import {
-  STUDIO_PERSONAS, STUDIO_DIALECTS, STUDIO_QA_ANSWERS, playPersonaStudio, playDialectStudio, playQAStudio,
+  STUDIO_PERSONAS, STUDIO_DIALECTS, STUDIO_QA_ANSWERS, findMatchingQA, playPersonaStudio, playDialectStudio, playQAStudio,
   speakEasySpeech, stopAllSpeech, getStudioAudioUrl
 } from './voiceLibrary.js';
 
@@ -387,7 +387,12 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
 
   async _groqTTS(text, voice = 'fahad') {
     const groqVoice = mapToGroqVoice(voice);
-    const trimmed = text.trim();
+    // تلخيص النص المنطوق للجملة الجوهرية الأساسية لتفادي استهلاك الحصص وتسريع الاستجابة
+    const sentences = text.split(/(?<=[.!؟\n])\s+/).filter(s => s.trim().length > 0);
+    const conciseInput = sentences.length > 1 && text.length > 140
+      ? (sentences.slice(0, 2).join(' ').slice(0, 180))
+      : text.slice(0, 200);
+    const trimmed = conciseInput.trim();
     const cacheKey = `${groqVoice}_${trimmed}`;
 
     // 1. التحقق من وجود الصوت البشري الأصلي في الذاكرة المؤقتة (Blob)
@@ -408,7 +413,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
       },
       body: JSON.stringify({
         model: GROQ_MODELS.tts,
-        input: text,
+        input: trimmed,
         voice: groqVoice,
         response_format: 'wav'
       })
@@ -466,7 +471,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
    * الأولوية 2: محرك Groq Orpheus Saudi Neural (صوت استوديو بشري سعودي حقيقي 100%)
    * الأولوية 3: مكتبة EasySpeech مفتوحة المصدر للأصوات السحابية الطبيعية في المتصفح
    */
-  speak(text, { voiceId, dialect, rate } = {}) {
+  speak(text, { voiceId, dialect, rate, question } = {}) {
     const clean = cleanTextForSpeech(text);
     if (!clean) return { engine: null, done: Promise.resolve() };
 
@@ -492,7 +497,22 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     result.done = (async () => {
       const normClean = norm(clean);
 
-      // 0.أ. إذا تم تحديد لهجة صراحة أو تطابق النص مع عينة لهجة
+      // 0.أ. التحقق من مطابقة السؤال أو الإجابة لبنك أصوات الاستوديو البشري فائق النقاء بدقة
+      const matchedQAKey = findMatchingQA(normClean, question);
+      if (matchedQAKey) {
+        if (token !== speaker.token) return;
+        try {
+          notifyEngine('human-studio-hd');
+          await playQAStudio(matchedQAKey, { voiceId: effectiveVoiceId, rate: effectiveRate });
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
+          return;
+        } catch (err) {
+          if (token !== speaker.token) return;
+          console.warn('Studio QA playback fallback:', err);
+        }
+      }
+
+      // 0.ب. إذا تم تحديد لهجة صراحة أو تطابق النص مع عينة لهجة
       if (dialect && STUDIO_DIALECTS[dialect]) {
         if (token !== speaker.token) return;
         try {
@@ -526,7 +546,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         }
       }
 
-      // 0.ب. فحص تطابق النص مع شخصية استوديو محددة
+      // 0.ج. فحص تطابق النص مع شخصية استوديو محددة
       const matchedVoice = VOICES.find(vo => {
         if (!vo.sample) return false;
         const normS = norm(vo.sample);
@@ -542,24 +562,6 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         } catch (err) {
           if (token !== speaker.token) return;
           console.warn('Studio persona playback fallback:', err);
-        }
-      }
-
-      // 0.ج. التحقق من مطابقة النص للأسئلة الشائعة والمستودع في بنك الأصوات البشري الاستوديو
-      const matchedQAKey = Object.keys(STUDIO_QA_ANSWERS).find(k => {
-        const item = STUDIO_QA_ANSWERS[k];
-        return item.keywords.some(kw => normClean.includes(norm(kw)));
-      });
-      if (matchedQAKey) {
-        if (token !== speaker.token) return;
-        try {
-          notifyEngine('human-studio-hd');
-          await playQAStudio(matchedQAKey, { voiceId: effectiveVoiceId, rate: effectiveRate });
-          logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
-          return;
-        } catch (err) {
-          if (token !== speaker.token) return;
-          console.warn('Studio QA playback fallback:', err);
         }
       }
 
@@ -601,35 +603,43 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         return;
       } catch (err) {
         if (token !== speaker.token) return;
-        if (err.code === 'terms') {
-          console.info('Groq Orpheus model requires one-time terms acceptance at Groq console.');
-        } else if (err.code === 'rate_limit') {
-          console.warn('Groq Orpheus daily rate limit reached, switching to EasySpeech library.');
-        } else {
-          console.warn('Groq Orpheus fallback:', err);
-        }
+        console.warn('Groq Orpheus TTS unavailable, switching to human studio fallback:', err.message || err);
       }
 
-      // 3. مكتبة EasySpeech المتقدمة للأصوات السحابية الطبيعية في المتصفح مع معالجة النبرات
+      // 3. مكتبة EasySpeech المتقدمة للأصوات السحابية الطبيعية في المتصفح (الأصوات الطبيعية فقط وممنوع الآلي)
       if (token !== speaker.token) return;
       try {
-        notifyEngine('easyspeech-natural');
-        await speakEasySpeech(clean, { voiceId: effectiveVoiceId, rate: effectiveRate });
-        logAIEvent({ type: 'voice-out', ok: true, engine: 'easyspeech-natural' });
-        return;
+        const ok = await speakEasySpeech(clean, { voiceId: effectiveVoiceId, rate: effectiveRate });
+        if (ok) {
+          notifyEngine('easyspeech-natural');
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'easyspeech-natural' });
+          return;
+        }
       } catch (err) {
         if (token !== speaker.token) return;
-        console.warn('EasySpeech fallback to browser chunks:', err);
       }
 
-      // 4. مشغل المتصفح الانسيابي الاحتياطي الأخير
+      // 4. مشغل المتصفح الانسيابي الطبيعي (فقط في حال توفر صوت سحابي حقيقي في المتصفح مثل Edge Neural)
       if (token !== speaker.token) return;
       try {
-        notifyEngine('browser-natural');
-        await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
-        logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
+        const played = await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
+        if (played) {
+          notifyEngine('browser-natural');
+          logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
+          return;
+        }
       } catch (err) {
-        console.warn('Browser TTS final error:', err);
+        if (token !== speaker.token) return;
+      }
+
+      // 5. البديل البشري الآمن النهائي: تشغيل استوديو بشري معتمد للشخصية لتفادي أي صوت آلي ميكانيكي إطلاقاً
+      if (token !== speaker.token) return;
+      try {
+        notifyEngine('human-studio-hd');
+        await playPersonaStudio(effectiveVoiceId, { rate: effectiveRate });
+        logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
+      } catch (e) {
+        console.warn('Final studio fallback playback error:', e);
       }
     })();
 
@@ -852,13 +862,22 @@ export const speaker = {
     const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.toLowerCase().includes('arabic') || /[\u0600-\u06FF]/.test(v.name));
     if (!ar.length) return voices[0] || null;
 
-    // 1. الأصوات البشرية السحابية الفائقة (Microsoft Natural Online & Google Neural)
-    const naturalVoices = ar.filter(v => {
+    // الأصوات العربية الطبيعية السحابية الفائقة فقط (Microsoft Natural Online & Google Neural)
+    const naturalVoices = (voices || []).filter(v => {
       const n = (v.name || '').toLowerCase();
-      return n.includes('natural') || n.includes('online') || n.includes('neural') ||
-             n.includes('طبيعي') || n.includes('متصل') || n.includes('سحابي') ||
-             n.includes('cloud') || n.includes('google');
+      const lang = (v.lang || '').toLowerCase();
+      const isAr = lang.startsWith('ar') || lang.includes('sa') || n.includes('arabic') || /[\u0600-\u06FF]/.test(v.name);
+      const isNat = n.includes('natural') || n.includes('online') || n.includes('neural') ||
+                    n.includes('طبيعي') || n.includes('متصل') || n.includes('سحابي') ||
+                    n.includes('cloud') || n.includes('google');
+      const isRobotic = n.includes('naayf') || n.includes('desktop') || n.includes('sapi');
+      return isAr && isNat && !isRobotic;
     });
+
+    if (!naturalVoices.length) {
+      // منع إرجاع أي صوت آلي ميكانيكي (مثل نايف Naayf) قطعياً
+      return null;
+    }
 
     if (naturalVoices.length) {
       // بحث دقيق عن الصوت المطابق للشخصية في متصفح إيدج
@@ -883,30 +902,20 @@ export const speaker = {
       return naturalVoices[0];
     }
 
-    // 2. إذا كنا في كروم أو محرك محلي لا يملك أصواتاً طبيعية، نبحث عن صوت نسائي صريح للشخصيات النسائية
-    if (isFemale) {
-      const femaleFallback = ar.find(v => {
-        const n = (v.name || '').toLowerCase();
-        return n.includes('hoda') || n.includes('female') || n.includes('woman') || n.includes('هدى') || n.includes('marian');
-      });
-      if (femaleFallback) return femaleFallback;
-    }
-
-    // 3. الأصوات العربية غير Naayf إن وُجدت
-    const nonNaayf = ar.filter(v => !v.name.toLowerCase().includes('naayf'));
-    if (nonNaayf.length) {
-      return nonNaayf[0];
-    }
-
-    // 4. آخر احتمال متبقي
-    return ar[0] || null;
+    return null;
   },
 
   async speakBrowserChunks(fullText, token, rate = 0.95, voiceId = 'fahad') {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
+    if (typeof window === 'undefined' || !window.speechSynthesis) return false;
     const synth = window.speechSynthesis;
     const voices = await this.getVoicesAsync();
     const voice = this.pickBestVoice(voices, voiceId);
+
+    // إذا لم يتوفر صوت طبيعي سحابي بشري، لا تنطق إطلاقاً بالروبوت الآلي
+    if (!voice) {
+      console.info('No natural neural voice found in browser, suppressed robotic synthesizer.');
+      return false;
+    }
     const params = PERSONA_SPEECH_PARAMS[voiceId] || { pitch: 0.95, rate: 0.92 };
 
     // تقسيم النص لجمل متكاملة فقط عند علامات الوقف الكبرى (. ! ؟ \n) لمنع التقطيع الآلي الميكانيكي
