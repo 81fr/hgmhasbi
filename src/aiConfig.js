@@ -155,7 +155,7 @@ export const DEFAULT_CONFIG = {
   model: 'openai/gpt-oss-120b',
   fallbackModels: ['openai/gpt-oss-20b', 'allam-2-7b'],
   temperature: 0.35,
-  voice: { enabled: false, engine: 'auto', voiceId: 'fahad', rate: 1.0, liveModeAuto: false },
+  voice: { enabled: false, engine: 'auto', voiceId: 'salman', rate: 1.0, liveModeAuto: false },
   appearance: { accent: '#00A59B', accent2: '#10b981', icon: '🤖', position: 'left', greeting: '' },
   quickPrompts: [],
   knowledge: { docs: [], faqs: [] },

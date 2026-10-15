@@ -857,10 +857,6 @@ export const speaker = {
   pickBestVoice(voices = [], voiceId = 'fahad') {
     if (!voices.length) return null;
     const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
-    
-    // الأصوات العربية
-    const ar = voices.filter(v => /^ar/i.test(v.lang) || v.lang.includes('SA') || v.name.toLowerCase().includes('arabic') || /[\u0600-\u06FF]/.test(v.name));
-    if (!ar.length) return voices[0] || null;
 
     // الأصوات العربية الطبيعية السحابية الفائقة فقط (Microsoft Natural Online & Google Neural)
     const naturalVoices = (voices || []).filter(v => {

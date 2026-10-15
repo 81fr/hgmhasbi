@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Volume2, VolumeX, Play, Pause, Square, Sparkles, Activity, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { sfx } from './audioEffects';
-import { AIService, speaker } from './aiService';
+import { speaker } from './aiService';
 import { loadAIConfig } from './aiConfig';
+import { playStudioAudio, stopAllSpeech } from './voiceLibrary';
 
 export default function ExecutiveVoiceBriefing({
   totals,
@@ -10,96 +11,69 @@ export default function ExecutiveVoiceBriefing({
   lowStockCount,
   pendingVouchersCount,
   currencySymbol = 'ر.س',
-  activeRate = 96
+  activeRate = 100
 }) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [speechRate, setSpeechRate] = useState(1.0);
-  const [voiceSupported, setVoiceSupported] = useState(true);
   const [dialectMode, setDialectMode] = useState('saudi');
-  const synthRef = useRef(null);
-  const utteranceRef = useRef(null);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
-      synthRef.current = window.speechSynthesis;
-    } else {
-      setVoiceSupported(false);
-    }
-
     return () => {
-      if (synthRef.current) {
-        synthRef.current.cancel();
-      }
+      stopAllSpeech();
     };
   }, []);
 
-  const generateBriefingText = () => {
-    const costMillion = (totals.cost / 1_000_000).toFixed(2);
-    const nbvMillion = (totals.nbv / 1_000_000).toFixed(2);
-    const depK = Math.round(totals.dep / 1_000);
-
-    if (dialectMode === 'saudi') {
-      return `يا هلا ومسهلا والله، حياكم الله في لوحة قيادة جمعية تراؤف لإدارة الأصول والمستودعات. 
-أبشركم، هذا موجزنا المالي والتشغيلي اللحظي: 
-إجمالي أصولنا المسجلة وصل ${totals.cost > 1000000 ? `${costMillion} مليون` : `${Math.round(totals.cost).toLocaleString()}`} ${currencySymbol}، وصافي القيمة الدفترية الحين ${totals.nbv > 1000000 ? `${nbvMillion} مليون` : `${Math.round(totals.nbv).toLocaleString()}`} ${currencySymbol} بعد ما حسبنا مجمع إهلاك قدره ${depK.toLocaleString()} ألف ${currencySymbol}. 
-وجاهزية أصولنا ما شاء الله تبارك الله ممتازة بنسبة ${activeRate} بالمية موزعة على ${assetsCount} أصل ونظام تشغيلي. 
-وبالنسبة للمستودع، عندنا ${lowStockCount} أصناف وصلت الحد الأدنى وتحتاج إعادة طلب، ومعها ${pendingVouchersCount} طلبات صرف عهد بانتظار الاعتماد. 
-شغلنا كله تمام ومطابق لأعلى المعايير المحاسبية، وعسى الله يبارك بجهودكم جميعاً.`;
-    }
-
-    return `السلام عليكم ورحمة الله وبركاته. مرحباً بكم في لوحة القيادة التنفيذية لمنظومة جمعية تراؤف لرعاية الأيتام لإدارة الأصول والمستودعات. 
-يسعدنا إحاطتكم بالإيجاز المالي والتشغيلي اللحظي: 
-تبلغ القيمة الإجمالية لمحفظة الأصول المسجلة ${totals.cost > 1000000 ? `${costMillion} مليون` : `${Math.round(totals.cost).toLocaleString()}`} ${currencySymbol}، 
-بينما يبلغ صافي القيمة الدفترية الحالية ${totals.nbv > 1000000 ? `${nbvMillion} مليون` : `${Math.round(totals.nbv).toLocaleString()}`} ${currencySymbol}، بعد احتساب مجمع إهلاك تراكمي قدره ${depK.toLocaleString()} ألف ${currencySymbol}. 
-بلغت نسبة الجاهزية التشغيلية للأصول ${activeRate} بالمائة عبر ${assetsCount} أصلاً ونظاماً تشغيلياً. 
-على صعيد المستودعات وسلاسل الإمداد، تم رصد ${lowStockCount} أصناف عند حد الطلب الأدنى وتستلزم إعادة تموين عاجلة، 
-بالإضافة إلى ${pendingVouchersCount} طلبات صرف عهد بانتظار الاعتماد المالي والرقابي. 
-جميع العمليات والقيود مطابقة لمعايير المحاسبة الدولية، والنظام يعمل بكفاءة تامة. نتمنى لكم يوماً حافلاً بالنجاح.`;
-  };
-
   const handleStartBriefing = () => {
     sfx.playClick();
-
     speaker.stop();
-    const text = generateBriefingText();
+    stopAllSpeech();
+
     const cfg = loadAIConfig();
-    const ai = new AIService(null, cfg.provider || 'groq', { config: cfg });
-    const res = ai.speak(text, {
-      voiceId: cfg.voice?.voiceId || 'salman',
-      rate: speechRate || cfg.voice?.rate || 0.95
-    });
+    const voiceId = cfg.voice?.voiceId || 'salman';
+
+    // مسارات ملفات الإيجاز الصوتي البشري عالي النقاء 100% المسجلة بأصوات استوديو سعودية فخمة
+    const briefings = {
+      salman: 'audio/voices/briefing_salman.mp3',
+      fahad: 'audio/voices/briefing_fahad.mp3',
+      noura: 'audio/voices/briefing_noura.mp3',
+      sultan: 'audio/voices/briefing_sultan.mp3',
+      reem: 'audio/voices/briefing_reem.mp3'
+    };
+
+    const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
+    const audioPath = briefings[voiceId] || (isFemale ? briefings.noura : briefings.salman);
 
     setIsPlaying(true);
     setIsPaused(false);
 
-    if (res?.done) {
-      res.done.then(() => {
+    playStudioAudio(audioPath, {
+      rate: speechRate || cfg.voice?.rate || 1.0,
+      onEnd: () => {
         setIsPlaying(false);
         setIsPaused(false);
         sfx.playSuccess();
-      }).catch(() => {
-        setIsPlaying(false);
-        setIsPaused(false);
-      });
-    }
+      }
+    }).catch(err => {
+      console.warn('Executive briefing playback error:', err);
+      setIsPlaying(false);
+      setIsPaused(false);
+    });
   };
 
   const handlePause = () => {
     sfx.playClick();
-    speaker.stop();
+    stopAllSpeech();
     setIsPaused(false);
     setIsPlaying(false);
   };
 
   const handleStop = () => {
     sfx.playClick();
-    speaker.stop();
+    stopAllSpeech();
     setIsPlaying(false);
     setIsPaused(false);
   };
-
-  if (!voiceSupported) return null;
 
   return (
     <div style={{
