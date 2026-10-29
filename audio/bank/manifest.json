@@ -1,0 +1,215 @@
+{
+ "version": 1793279894040,
+ "personas": {
+  "fahad": {
+   "voice": "ar-SA-HamedNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "sultan": {
+   "voice": "ar-AE-HamdanNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "salman": {
+   "voice": "ar-OM-AbdullahNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "majed": {
+   "voice": "ar-KW-FahedNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "hamed": {
+   "voice": "ar-QA-MoazNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "noura": {
+   "voice": "ar-KW-NouraNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "sara": {
+   "voice": "ar-AE-FatimaNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "lulwa": {
+   "voice": "ar-OM-AyshaNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "aisha": {
+   "voice": "ar-SA-ZariyahNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  },
+  "reem": {
+   "voice": "ar-QA-AmalNeural",
+   "clips": [
+    "briefing",
+    "dialect_eastern",
+    "dialect_formal",
+    "dialect_gulf",
+    "dialect_hijazi",
+    "dialect_najdi",
+    "dialect_northern",
+    "dialect_southern",
+    "dialect_white",
+    "qa_assets",
+    "qa_custody",
+    "qa_journals",
+    "qa_register",
+    "qa_role",
+    "qa_warehouse",
+    "sample"
+   ]
+  }
+ }
+}
