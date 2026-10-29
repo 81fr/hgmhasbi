@@ -272,45 +272,10 @@ export function getAvailableVoices() {
   }
 }
 
-/** اختيار أفضل صوت عربي طبيعي في المتصفح لمطابقة الشخصية — استبعاد الصوت الآلي الميكانيكي قطعياً */
+/** اختيار أفضل صوت عربي طبيعي في المتصفح — تم حظره نهائياً للقضاء التام والنهائي على صوت الرجل الآلي والمحافظة على الأصوات البشرية المسجلة فقط */
 export function pickBestBrowserVoice(voiceId = 'fahad') {
-  if (typeof window === 'undefined' || !window.speechSynthesis) return null;
-  const voices = (typeof EasySpeech.voices === 'function' && EasySpeech.voices()) || window.speechSynthesis.getVoices() || [];
-  if (!voices.length) return null;
-
-  const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
-
-  // البحث حصراً عن الأصوات السحابية الطبيعية (Natural / Online / Neural)
-  const naturalVoices = voices.filter(v => {
-    const name = (v.name || '').toLowerCase();
-    const lang = (v.lang || '').toLowerCase();
-    const isAr = lang.startsWith('ar') || name.includes('arabic');
-    const isNat = name.includes('natural') || name.includes('online') || name.includes('neural') || name.includes('cloud');
-    const isRobotic = name.includes('naayf') || name.includes('desktop') || name.includes('sapi');
-    return isAr && isNat && !isRobotic;
-  });
-
-  if (!naturalVoices.length) {
-    // منع إرجاع أي صوت آلي ميكانيكي (مثل Microsoft Naayf)
-    return null;
-  }
-
-  // 1. صوت نسائي طبيعي إن كانت الشخصية نسائية
-  if (isFemale) {
-    const naturalFemale = naturalVoices.find(v => {
-      const n = (v.name || '').toLowerCase();
-      return n.includes('zariyah') || n.includes('salma') || n.includes('fatima') || n.includes('noura');
-    });
-    if (naturalFemale) return naturalFemale;
-  } else {
-    const naturalMale = naturalVoices.find(v => {
-      const n = (v.name || '').toLowerCase();
-      return n.includes('hamed') || n.includes('shakir') || n.includes('fahed');
-    });
-    if (naturalMale) return naturalMale;
-  }
-
-  return naturalVoices[0] || null;
+  // منع قاطع لأي محرك صوتي داخلي للمتصفح لتفادي أي نبرة ميكانيكية أو صوت رجل آلي
+  return null;
 }
 
 /** التحدث باستخدام مكتبة EasySpeech المتقدمة — مع ضمان عدم استخدام أي صوت آلي ميكانيكي */

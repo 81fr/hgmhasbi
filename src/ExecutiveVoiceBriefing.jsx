@@ -32,13 +32,18 @@ export default function ExecutiveVoiceBriefing({
     const cfg = loadAIConfig();
     const voiceId = cfg.voice?.voiceId || 'salman';
 
-    // مسارات ملفات الإيجاز الصوتي البشري عالي النقاء 100% المسجلة بأصوات استوديو سعودية فخمة
+    // مسارات ملفات الإيجاز الصوتي البشري عالي النقاء 100% المسجلة بأصوات استوديو سعودية فخمة لكافة الشخصيات العشر
     const briefings = {
       salman: 'audio/voices/briefing_salman.mp3',
       fahad: 'audio/voices/briefing_fahad.mp3',
       noura: 'audio/voices/briefing_noura.mp3',
       sultan: 'audio/voices/briefing_sultan.mp3',
-      reem: 'audio/voices/briefing_reem.mp3'
+      reem: 'audio/voices/briefing_reem.mp3',
+      majed: 'audio/voices/briefing_majed.mp3',
+      hamed: 'audio/voices/briefing_hamed.mp3',
+      sara: 'audio/voices/briefing_sara.mp3',
+      lulwa: 'audio/voices/briefing_lulwa.mp3',
+      aisha: 'audio/voices/briefing_aisha.mp3'
     };
 
     const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);

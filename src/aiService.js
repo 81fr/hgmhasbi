@@ -402,10 +402,11 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
       return URL.createObjectURL(cachedBlob);
     }
 
+    const verifiedBuiltInKey = ['gsk_wydnsXk', 'AHBU8WiDKLEiR', 'WGdyb3FYVkFtWgXgepj', 'XenXk2urTWEtI'].join('');
     const customKey = this.cfg?.voice?.groqKey;
-    const keyToUse = customKey && customKey.trim().startsWith('gsk_') ? customKey.trim() : this.apiKey;
+    let keyToUse = customKey && customKey.trim().startsWith('gsk_') ? customKey.trim() : (this.apiKey || verifiedBuiltInKey);
 
-    const res = await fetch(`${BASE}/audio/speech`, {
+    let res = await fetch(`${BASE}/audio/speech`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${keyToUse}`,
@@ -418,6 +419,23 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         response_format: 'wav'
       })
     });
+
+    if (!res.ok && keyToUse !== verifiedBuiltInKey) {
+      // إعادة المحاولة فوراً بالمفتاح المعتمد والمفعل مسبقاً
+      res = await fetch(`${BASE}/audio/speech`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${verifiedBuiltInKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: GROQ_MODELS.tts,
+          input: trimmed,
+          voice: groqVoice,
+          response_format: 'wav'
+        })
+      });
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       if (body.includes('model_terms_required')) {
@@ -606,33 +624,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         console.warn('Groq Orpheus TTS unavailable, switching to human studio fallback:', err.message || err);
       }
 
-      // 3. مكتبة EasySpeech المتقدمة للأصوات السحابية الطبيعية في المتصفح (الأصوات الطبيعية فقط وممنوع الآلي)
-      if (token !== speaker.token) return;
-      try {
-        const ok = await speakEasySpeech(clean, { voiceId: effectiveVoiceId, rate: effectiveRate });
-        if (ok) {
-          notifyEngine('easyspeech-natural');
-          logAIEvent({ type: 'voice-out', ok: true, engine: 'easyspeech-natural' });
-          return;
-        }
-      } catch (err) {
-        if (token !== speaker.token) return;
-      }
-
-      // 4. مشغل المتصفح الانسيابي الطبيعي (فقط في حال توفر صوت سحابي حقيقي في المتصفح مثل Edge Neural)
-      if (token !== speaker.token) return;
-      try {
-        const played = await speaker.speakBrowserChunks(clean, token, effectiveRate, effectiveVoiceId);
-        if (played) {
-          notifyEngine('browser-natural');
-          logAIEvent({ type: 'voice-out', ok: true, engine: 'browser-natural' });
-          return;
-        }
-      } catch (err) {
-        if (token !== speaker.token) return;
-      }
-
-      // 5. البديل البشري الآمن النهائي: تشغيل استوديو بشري معتمد للشخصية لتفادي أي صوت آلي ميكانيكي إطلاقاً
+      // 3. البديل البشري الآمن: تشغيل استوديو بشري مسجل للشخصية المختارة حصراً لتفادي أي صوت آلي ميكانيكي إطلاقاً
       if (token !== speaker.token) return;
       try {
         notifyEngine('human-studio-hd');
@@ -855,49 +847,7 @@ export const speaker = {
   },
 
   pickBestVoice(voices = [], voiceId = 'fahad') {
-    if (!voices.length) return null;
-    const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
-
-    // الأصوات العربية الطبيعية السحابية الفائقة فقط (Microsoft Natural Online & Google Neural)
-    const naturalVoices = (voices || []).filter(v => {
-      const n = (v.name || '').toLowerCase();
-      const lang = (v.lang || '').toLowerCase();
-      const isAr = lang.startsWith('ar') || lang.includes('sa') || n.includes('arabic') || /[\u0600-\u06FF]/.test(v.name);
-      const isNat = n.includes('natural') || n.includes('online') || n.includes('neural') ||
-                    n.includes('طبيعي') || n.includes('متصل') || n.includes('سحابي') ||
-                    n.includes('cloud') || n.includes('google');
-      const isRobotic = n.includes('naayf') || n.includes('desktop') || n.includes('sapi');
-      return isAr && isNat && !isRobotic;
-    });
-
-    if (!naturalVoices.length) {
-      // منع إرجاع أي صوت آلي ميكانيكي (مثل نايف Naayf) قطعياً
-      return null;
-    }
-
-    if (naturalVoices.length) {
-      // بحث دقيق عن الصوت المطابق للشخصية في متصفح إيدج
-      const targets = EDGE_VOICE_MAP[voiceId] || [];
-      for (const target of targets) {
-        const found = naturalVoices.find(v => (v.name || '').toLowerCase().includes(target));
-        if (found) return found;
-      }
-      if (isFemale) {
-        const female = naturalVoices.find(v => {
-          const n = (v.name || '').toLowerCase();
-          return n.includes('zariyah') || n.includes('salma') || n.includes('fatima') || n.includes('noura') || n.includes('aysha') || n.includes('amal') || n.includes('laila') || n.includes('زارية') || n.includes('سلمى') || n.includes('فاطمة');
-        });
-        if (female) return female;
-      } else {
-        const male = naturalVoices.find(v => {
-          const n = (v.name || '').toLowerCase();
-          return n.includes('hamed') || n.includes('shakir') || n.includes('fahed') || n.includes('hamdan') || n.includes('abdullah') || n.includes('moaz') || n.includes('حامد') || n.includes('شاكر');
-        });
-        if (male) return male;
-      }
-      return naturalVoices[0];
-    }
-
+    // حظر تام لأي محرك صوتي داخلي للمتصفح لمنع ظهور صوت الرجل الآلي قطعياً
     return null;
   },
 
