@@ -1,6 +1,5 @@
 import EasySpeech from 'easy-speech';
 import { cleanTextForSpeech } from './aiService.js';
-import { bankFile, resolvePersonaId, PERSONA_VOICES } from './voiceTexts.js';
 
 /* ------------------------------------------------------------------ *
  *  مكتبة الأصوات المجانية ومحركات النطق المتقدمة (Traouf Voice Library)
@@ -10,28 +9,27 @@ import { bankFile, resolvePersonaId, PERSONA_VOICES } from './voiceTexts.js';
  * ------------------------------------------------------------------ */
 
 export const STUDIO_PERSONAS = {
-  fahad: { id: 'fahad', label: 'فهد', gender: 'رجالي', tone: 'وقور ورسمي', file: bankFile('fahad', 'sample') },
-  sultan: { id: 'sultan', label: 'سلطان', gender: 'رجالي', tone: 'واثق وحيوي', file: bankFile('sultan', 'sample') },
-  salman: { id: 'salman', label: 'سلمان', gender: 'رجالي', tone: 'تنفيذي قيادي', file: bankFile('salman', 'sample') },
-  majed: { id: 'majed', label: 'ماجد', gender: 'رجالي', tone: 'ميداني ودود', file: bankFile('majed', 'sample') },
-  hamed: { id: 'hamed', label: 'حامد', gender: 'رجالي', tone: 'خبير مالي', file: bankFile('hamed', 'sample') },
-  noura: { id: 'noura', label: 'نورة', gender: 'نسائي', tone: 'دافئ وواضح', file: bankFile('noura', 'sample') },
-  sara: { id: 'sara', label: 'سارة', gender: 'نسائي', tone: 'ذكي ومتحمس', file: bankFile('sara', 'sample') },
-  lulwa: { id: 'lulwa', label: 'لولوة', gender: 'نسائي', tone: 'ناعم ودقيق', file: bankFile('lulwa', 'sample') },
-  aisha: { id: 'aisha', label: 'عائشة', gender: 'نسائي', tone: 'مهني وواثق', file: bankFile('aisha', 'sample') },
-  reem: { id: 'reem', label: 'ريم', gender: 'نسائي', tone: 'تنفيذي راقي', file: bankFile('reem', 'sample') }
+  fahad: { id: 'fahad', label: 'فهد', gender: 'رجالي', tone: 'وقور ورسمي', file: 'audio/voices/fahad.mp3' },
+  sultan: { id: 'sultan', label: 'سلطان', gender: 'رجالي', tone: 'واثق وحيوي', file: 'audio/voices/sultan.mp3' },
+  salman: { id: 'salman', label: 'سلمان', gender: 'رجالي', tone: 'تنفيذي قيادي', file: 'audio/voices/salman.mp3' },
+  majed: { id: 'majed', label: 'ماجد', gender: 'رجالي', tone: 'ميداني ودود', file: 'audio/voices/majed.mp3' },
+  hamed: { id: 'hamed', label: 'حامد', gender: 'رجالي', tone: 'خبير مالي', file: 'audio/voices/hamed.mp3' },
+  noura: { id: 'noura', label: 'نورة', gender: 'نسائي', tone: 'دافئ وواضح', file: 'audio/voices/noura.mp3' },
+  sara: { id: 'sara', label: 'سارة', gender: 'نسائي', tone: 'ذكي ومتحمس', file: 'audio/voices/sara.mp3' },
+  lulwa: { id: 'lulwa', label: 'لولوة', gender: 'نسائي', tone: 'ناعم ودقيق', file: 'audio/voices/lulwa.mp3' },
+  aisha: { id: 'aisha', label: 'عائشة', gender: 'نسائي', tone: 'مهني وواثق', file: 'audio/voices/aisha.mp3' },
+  reem: { id: 'reem', label: 'ريم', gender: 'نسائي', tone: 'تنفيذي راقي', file: 'audio/voices/reem.mp3' }
 };
 
-/** عينات اللهجات — الملف يُحدَّد بحسب الشخصية المختارة (dialect_<key>) */
 export const STUDIO_DIALECTS = {
-  white: { id: 'white', label: 'سعودي أبيض' },
-  najdi: { id: 'najdi', label: 'نجدي أصيل' },
-  hijazi: { id: 'hijazi', label: 'حجازي ودود' },
-  eastern: { id: 'eastern', label: 'شرقاوي حساوي' },
-  southern: { id: 'southern', label: 'جنوبي مرحب' },
-  northern: { id: 'northern', label: 'شمالي كرم' },
-  gulf: { id: 'gulf', label: 'خليجي تنفيذي' },
-  formal: { id: 'formal', label: 'فصحى إدارية سعودية' }
+  white: { id: 'white', label: 'سعودي أبيض', file: 'audio/voices/dialect_white.mp3' },
+  najdi: { id: 'najdi', label: 'نجدي أصيل', file: 'audio/voices/dialect_najdi.mp3' },
+  hijazi: { id: 'hijazi', label: 'حجازي ودود', file: 'audio/voices/dialect_hijazi.mp3' },
+  eastern: { id: 'eastern', label: 'شرقاوي حساوي', file: 'audio/voices/dialect_eastern.mp3' },
+  southern: { id: 'southern', label: 'جنوبي مرحب', file: 'audio/voices/dialect_southern.mp3' },
+  northern: { id: 'northern', label: 'شمالي كرم', file: 'audio/voices/dialect_northern.mp3' },
+  gulf: { id: 'gulf', label: 'خليجي تنفيذي', file: 'audio/voices/dialect_gulf.mp3' },
+  formal: { id: 'formal', label: 'فصحى إدارية سعودية', file: 'audio/voices/dialect_formal.mp3' }
 };
 
 export const PERSONA_MODULATION = {
@@ -129,20 +127,16 @@ export function playStudioAudio(filePath, { rate = 1.0, onEnd } = {}) {
   });
 }
 
-/** تشغيل عينة الشخصية المحددة بصوتها هي فقط */
+/** تشغيل استوديو لشخصية محددة */
 export function playPersonaStudio(voiceId, options = {}) {
-  return playStudioAudio(bankFile(resolvePersonaId(voiceId), 'sample'), options);
+  const persona = STUDIO_PERSONAS[voiceId] || STUDIO_PERSONAS.fahad;
+  return playStudioAudio(persona.file, options);
 }
 
-/** تشغيل عينة لهجة بصوت الشخصية المختارة (options.voiceId) */
+/** تشغيل استوديو لعينة لهجة محددة */
 export function playDialectStudio(dialectId, options = {}) {
   const dialect = STUDIO_DIALECTS[dialectId] || STUDIO_DIALECTS.white;
-  return playStudioAudio(bankFile(resolvePersonaId(options.voiceId), `dialect_${dialect.id}`), options);
-}
-
-/** تشغيل الإيجاز التنفيذي بصوت الشخصية المختارة */
-export function playBriefingStudio(voiceId, options = {}) {
-  return playStudioAudio(bankFile(resolvePersonaId(voiceId), 'briefing'), options);
+  return playStudioAudio(dialect.file, options);
 }
 
 import { norm } from './aiConfig.js';
@@ -152,38 +146,56 @@ export const STUDIO_QA_ANSWERS = {
   warehouse: {
     id: 'warehouse',
     label: 'المستودع والنواقص',
+    male: 'audio/voices/answer_warehouse_male.mp3',
+    female: 'audio/voices/answer_warehouse_female.mp3',
+    salman: 'audio/voices/answer_warehouse_salman.mp3',
     questions: ['وضع المستودع والنواقص', 'المستودع والنواقص', 'وش وضع المستودع', 'نواقص المستودع', 'نواقص المخزون', 'تقرير المستودع'],
     answerPhrases: ['المستودع وضعه ممتاز ومستقر', 'ورق التصوير', 'عشرون صنفا برصيد الفين وخمس مئة وحدة', 'صنف واحد فقط وصل لحد اعادة الطلب']
   },
   assets: {
     id: 'assets',
     label: 'قيمة الأصول الثابتة',
+    male: 'audio/voices/answer_assets_male.mp3',
+    female: 'audio/voices/answer_assets_female.mp3',
+    salman: 'audio/voices/answer_assets_salman.mp3',
     questions: ['كم الاصول الثابتة', 'الاصول الثابتة وقيمتها', 'قيمة الاصول الثابتة', 'كم عدد الاصول الثابتة', 'اجمالي الاصول'],
     answerPhrases: ['476 اصلا بتكلفة اجمالية 110.19 مليون', 'الاصول الثابتة عندنا 476 اصلا', '110.19 مليون']
   },
   custody: {
     id: 'custody',
     label: 'أكثر موظف عنده عهد',
+    male: 'audio/voices/answer_custody_male.mp3',
+    female: 'audio/voices/answer_custody_female.mp3',
+    salman: 'audio/voices/answer_custody_salman.mp3',
     questions: ['اكثر موظف عنده عهد', 'مين اكثر موظف عنده عهد', 'اكثر موظف عهدة', 'من اكثر موظف عهدا', 'صاحب اكثر عهدة'],
     answerPhrases: ['نواف عبيد ذياب الحربي ب 107 عهدة', 'اكثر موظف عنده عهدة هو نواف عبيد', '107 عهدة مسجلة وموثقة']
   },
   journals: {
     id: 'journals',
     label: 'توازن قيود اليومية',
+    male: 'audio/voices/answer_journals_male.mp3',
+    female: 'audio/voices/answer_journals_female.mp3',
+    salman: 'audio/voices/answer_journals_salman.mp3',
     questions: ['هل القيود متوازنة', 'قيود متوازنة', 'توازن قيود اليومية', 'القيود اليومية متوازنة', 'هل قيودنا متوازنة'],
     answerPhrases: ['قيود اليومية متوازنة تماما والمدين يطابق الدائن', 'المدين يطابق الدائن بنسبة مئة في المئة']
   },
   register: {
     id: 'register',
     label: 'فتح سجل الأصول',
+    male: 'audio/voices/answer_register_male.mp3',
+    female: 'audio/voices/answer_register_female.mp3',
+    salman: 'audio/voices/answer_register_salman.mp3',
     questions: ['افتح لي سجل الاصول', 'افتح سجل الاصول', 'سجل الاصول الثابتة', 'اعرض سجل الاصول'],
     answerPhrases: ['تم فتح سجل الاصول الثابتة', 'سجل الاصول الثابتة وتقدر تطلع']
   },
   role: {
     id: 'role',
-    label: 'تعريف المستشار الذكي ومهامه',
+    label: 'مهام المستشار التنفيذي',
+    male: 'audio/voices/answer_role_salman.mp3',
+    female: 'audio/voices/answer_role_salman.mp3',
+    salman: 'audio/voices/answer_role_salman.mp3',
     questions: ['ما هي مهامك', 'ماهي مهامك', 'وش مهامك', 'من انت', 'تعريف بنفسك', 'عرفنا بنفسك', 'مهامك يا سلمان'],
-    answerPhrases: ['مستشاركم الذكي في جمعية تراؤف', 'مهمتي تحليل محفظة الاصول والعهد ومراقبة توازن القيود']
+    answerPhrases: ['مرحبا بكم طال عمركم انا سلمان مستشاركم التنفيذي', 'مهمتي تحليل محفظة الاصول والعهد ومراقبة توازن القيود']
   }
 };
 
@@ -223,10 +235,18 @@ export function findMatchingQA(text = '', question = '') {
   return null;
 }
 
-/** تشغيل إجابة استوديو سريعة بصوت الشخصية المختارة فقط (لا استبدال بشخصية أخرى) */
-export function playQAStudio(qaKey, { voiceId, rate = 1.0, onEnd } = {}) {
-  if (!STUDIO_QA_ANSWERS[qaKey]) return Promise.reject(new Error('Unknown QA key'));
-  return playStudioAudio(bankFile(resolvePersonaId(voiceId), `qa_${qaKey}`), { rate, onEnd });
+/** تشغيل إجابة استوديو سريعة بصوت بشري أصيل ومناسب للشخصية المختارة */
+export function playQAStudio(qaKey, { voiceId = 'salman', rate = 1.0, onEnd } = {}) {
+  const qa = STUDIO_QA_ANSWERS[qaKey];
+  if (!qa) return Promise.reject(new Error('Unknown QA key'));
+  
+  if (voiceId === 'salman' && qa.salman) {
+    return playStudioAudio(qa.salman, { rate, onEnd });
+  }
+
+  const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
+  const file = isFemale ? qa.female : (qa[voiceId] || qa.male);
+  return playStudioAudio(file, { rate, onEnd });
 }
 
 /** جلب جميع الأصوات المجانية المتاحة للمتصفح مصنفة حسب الجودة */
@@ -258,7 +278,7 @@ export function pickBestBrowserVoice(voiceId = 'fahad') {
   const voices = (typeof EasySpeech.voices === 'function' && EasySpeech.voices()) || window.speechSynthesis.getVoices() || [];
   if (!voices.length) return null;
 
-  const isFemale = PERSONA_VOICES[voiceId]?.gender === 'female';
+  const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
 
   // البحث حصراً عن الأصوات السحابية الطبيعية (Natural / Online / Neural)
   const naturalVoices = voices.filter(v => {

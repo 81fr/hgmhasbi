@@ -3,7 +3,7 @@ import { Volume2, VolumeX, Play, Pause, Square, Sparkles, Activity, ShieldCheck,
 import { sfx } from './audioEffects';
 import { speaker } from './aiService';
 import { loadAIConfig } from './aiConfig';
-import { playStudioAudio, playBriefingStudio, stopAllSpeech } from './voiceLibrary';
+import { playStudioAudio, stopAllSpeech } from './voiceLibrary';
 
 export default function ExecutiveVoiceBriefing({
   totals,
@@ -32,10 +32,22 @@ export default function ExecutiveVoiceBriefing({
     const cfg = loadAIConfig();
     const voiceId = cfg.voice?.voiceId || 'salman';
 
+    // مسارات ملفات الإيجاز الصوتي البشري عالي النقاء 100% المسجلة بأصوات استوديو سعودية فخمة
+    const briefings = {
+      salman: 'audio/voices/briefing_salman.mp3',
+      fahad: 'audio/voices/briefing_fahad.mp3',
+      noura: 'audio/voices/briefing_noura.mp3',
+      sultan: 'audio/voices/briefing_sultan.mp3',
+      reem: 'audio/voices/briefing_reem.mp3'
+    };
+
+    const isFemale = ['noura', 'sara', 'lulwa', 'aisha', 'reem'].includes(voiceId);
+    const audioPath = briefings[voiceId] || (isFemale ? briefings.noura : briefings.salman);
+
     setIsPlaying(true);
     setIsPaused(false);
 
-    playBriefingStudio(voiceId, {
+    playStudioAudio(audioPath, {
       rate: speechRate || cfg.voice?.rate || 1.0,
       onEnd: () => {
         setIsPlaying(false);
@@ -44,19 +56,8 @@ export default function ExecutiveVoiceBriefing({
       }
     }).catch(err => {
       console.warn('Executive briefing playback error:', err);
-      // Fallback to legacy path if bank file fails
-      const legacyPath = `audio/voices/briefing_${voiceId}.mp3`;
-      playStudioAudio(legacyPath, {
-        rate: speechRate || cfg.voice?.rate || 1.0,
-        onEnd: () => {
-          setIsPlaying(false);
-          setIsPaused(false);
-          sfx.playSuccess();
-        }
-      }).catch(e => {
-        setIsPlaying(false);
-        setIsPaused(false);
-      });
+      setIsPlaying(false);
+      setIsPaused(false);
     });
   };
 

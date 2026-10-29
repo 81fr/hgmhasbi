@@ -6,7 +6,6 @@ import {
   STUDIO_PERSONAS, STUDIO_DIALECTS, STUDIO_QA_ANSWERS, findMatchingQA, playPersonaStudio, playDialectStudio, playQAStudio,
   speakEasySpeech, stopAllSpeech, getStudioAudioUrl
 } from './voiceLibrary.js';
-import { PERSONA_VOICES, resolvePersonaId } from './voiceTexts.js';
 
 /* ------------------------------------------------------------------ *
  *  خدمة الذكاء الاصطناعي — تراؤف AI
@@ -479,8 +478,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
     const cfg = this.cfg;
     const v = cfg.voice || {};
     const effectiveRate = rate || v.rate || 0.95;
-    // مصدر الحقيقة الوحيد للشخصية: الإعداد المنشور دائماً (لا نسخة مسودة قديمة)
-    const effectiveVoiceId = resolvePersonaId(voiceId || (loadAIConfig().voice || {}).voiceId || v.voiceId);
+    const effectiveVoiceId = voiceId || v.voiceId || 'fahad';
 
     speaker.stop();
     stopAllSpeech();
@@ -519,7 +517,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         if (token !== speaker.token) return;
         try {
           notifyEngine('human-studio-hd');
-          await playDialectStudio(dialect, { rate: effectiveRate, voiceId: effectiveVoiceId });
+          await playDialectStudio(dialect, { rate: effectiveRate });
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
@@ -539,7 +537,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         if (token !== speaker.token) return;
         try {
           notifyEngine('human-studio-hd');
-          await playDialectStudio(matchedDialectKey, { rate: effectiveRate, voiceId: effectiveVoiceId });
+          await playDialectStudio(matchedDialectKey, { rate: effectiveRate });
           logAIEvent({ type: 'voice-out', ok: true, engine: 'human-studio-hd' });
           return;
         } catch (err) {
@@ -554,7 +552,7 @@ ${enabled.map(t => `- ${t.name} ${t.params}: ${t.desc}`).join('\n')}${nav}`;
         const normS = norm(vo.sample);
         return normClean.includes(normS.slice(0, 12)) || normS.includes(normClean.slice(0, 12));
       });
-      if (matchedVoice && matchedVoice.id === effectiveVoiceId && STUDIO_PERSONAS[effectiveVoiceId]) {
+      if (matchedVoice && STUDIO_PERSONAS[effectiveVoiceId]) {
         if (token !== speaker.token) return;
         try {
           notifyEngine('human-studio-hd');
